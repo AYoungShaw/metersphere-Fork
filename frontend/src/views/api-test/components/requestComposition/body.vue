@@ -4,6 +4,7 @@
       v-model:model-value="innerParams.bodyType"
       type="button"
       size="small"
+      :disabled="props.disabledBodyType"
       @change="(val) => changeBodyFormat(val as RequestBodyFormat)"
     >
       <a-radio v-for="item of RequestBodyFormat" :key="item" :value="item">
@@ -84,8 +85,55 @@
       </a-tooltip>
     </div> -->
   </div>
-  <div v-else class="h-[calc(100%-34px)]">
+  <a-spin v-else :loading="bodyLoading" class="block h-[calc(100%-34px)]">
+    <div class="mb-[8px] flex items-center justify-between">
+      <div class="flex items-center gap-[8px]">
+        <MsButton
+          type="text"
+          class="!mr-0"
+          :class="
+            innerParams.jsonBody.enableJsonSchema
+              ? 'font-medium !text-[rgb(var(--primary-5))]'
+              : '!text-[var(--color-text-4)]'
+          "
+          @click="innerParams.jsonBody.enableJsonSchema = true"
+          >Schema</MsButton
+        >
+        <a-divider :margin="0" direction="vertical"></a-divider>
+        <MsButton
+          type="text"
+          class="!mr-0"
+          :class="
+            !innerParams.jsonBody.enableJsonSchema
+              ? 'font-medium !text-[rgb(var(--primary-5))]'
+              : '!text-[var(--color-text-4)]'
+          "
+          @click="innerParams.jsonBody.enableJsonSchema = false"
+          >Json</MsButton
+        >
+      </div>
+      <a-button
+        v-show="innerParams.jsonBody.enableJsonSchema"
+        type="outline"
+        class="arco-btn-outline--secondary px-[8px]"
+        size="small"
+        @click="previewJsonSchema"
+      >
+        <div class="flex items-center gap-[8px]">
+          <icon-eye />
+          {{ t('common.preview') }}
+        </div>
+      </a-button>
+    </div>
+    <MsJsonSchema
+      v-if="innerParams.jsonBody.enableJsonSchema"
+      ref="jsonSchemaRef"
+      v-model:data="innerParams.jsonBody.jsonSchemaTableData"
+      v-model:selectedKeys="innerParams.jsonBody.jsonSchemaTableSelectedRowKeys"
+      :disabled="props.disabledExceptParam"
+    />
     <MsCodeEditor
+      v-else
       v-model:model-value="currentBodyCode"
       :read-only="props.disabledExceptParam"
       theme="vs"
@@ -96,29 +144,44 @@
       :language="currentCodeLanguage"
       is-adaptive
     >
+      <template #rightTitle>
+        <a-button
+          type="outline"
+          class="arco-btn-outline--secondary p-[0_8px]"
+          size="mini"
+          :disabled="props.disabledParamValue"
+          @click="autoMakeJson"
+        >
+          <div class="text-[var(--color-text-1)]">{{ t('apiTestManagement.autoMake') }}</div>
+        </a-button>
+      </template>
     </MsCodeEditor>
-  </div>
+  </a-spin>
   <batchAddKeyVal
     v-if="showParamTable"
     v-model:visible="batchAddKeyValVisible"
     :disabled="props.disabledExceptParam"
     :params="currentTableParams"
     :default-param-item="defaultBodyParamsItem"
+    has-standard
     @apply="handleBatchParamApply"
   />
 </template>
 
 <script setup lang="ts">
-  import { useVModel } from '@vueuse/core';
-  import { TableColumnData } from '@arco-design/web-vue';
+  import { Message, TableColumnData } from '@arco-design/web-vue';
 
+  import MsButton from '@/components/pure/ms-button/index.vue';
   import MsCodeEditor from '@/components/pure/ms-code-editor/index.vue';
   import { LanguageEnum } from '@/components/pure/ms-code-editor/types';
+  import MsJsonSchema from '@/components/pure/ms-json-schema/index.vue';
+  import { parseSchemaToJsonSchemaTableData, parseTableDataToJsonSchema } from '@/components/pure/ms-json-schema/utils';
   import { MsFileItem } from '@/components/pure/ms-upload/types';
   import MsAddAttachment from '@/components/business/ms-add-attachment/index.vue';
   import batchAddKeyVal from '@/views/api-test/components/batchAddKeyVal.vue';
   import paramTable, { type ParamTableColumn } from '@/views/api-test/components/paramTable.vue';
 
+  import { convertJsonSchemaToJson } from '@/api/modules/api-test/management';
   import { requestBodyTypeMap } from '@/config/apiTest';
   import { useI18n } from '@/hooks/useI18n';
   import useAppStore from '@/store/modules/app';
@@ -132,7 +195,7 @@
   import { defaultBodyParamsItem } from '@/views/api-test/components/config';
 
   const props = defineProps<{
-    params: ExecuteBody;
+    disabledBodyType?: boolean; // 禁用body类型切换
     disabledParamValue?: boolean; // 参数值禁用
     disabledExceptParam?: boolean; // 除了可以修改参数值其他都禁用
     uploadTempFileApi?: (file: File) => Promise<any>; // 上传临时文件接口
@@ -148,13 +211,38 @@
   const appStore = useAppStore();
   const { t } = useI18n();
 
-  const innerParams = useVModel(props, 'params', emit);
+  const innerParams = defineModel<ExecuteBody>('params', {
+    required: true,
+  });
+  const bodyLoading = ref(false);
+
   const batchAddKeyValVisible = ref(false);
   const fileList = ref<MsFileItem[]>([]);
 
-  onBeforeMount(() => {
-    if (innerParams.value.binaryBody && innerParams.value.binaryBody.file) {
-      fileList.value = [innerParams.value.binaryBody.file as unknown as MsFileItem];
+  watch(
+    () => innerParams.value.binaryBody?.file,
+    () => {
+      if (innerParams.value.binaryBody?.file) {
+        fileList.value = [innerParams.value.binaryBody.file as unknown as MsFileItem];
+      }
+    },
+    {
+      immediate: true,
+      deep: true,
+    }
+  );
+
+  watchEffect(() => {
+    if (innerParams.value.jsonBody.jsonSchema) {
+      const { result, ids } = parseSchemaToJsonSchemaTableData(innerParams.value.jsonBody.jsonSchema);
+      innerParams.value.jsonBody.jsonSchemaTableData = result;
+      innerParams.value.jsonBody.jsonSchemaTableSelectedRowKeys = ids;
+    } else if (
+      !innerParams.value.jsonBody.jsonSchemaTableData ||
+      innerParams.value.jsonBody.jsonSchemaTableData.length === 0
+    ) {
+      innerParams.value.jsonBody.jsonSchemaTableData = [];
+      innerParams.value.jsonBody.jsonSchemaTableSelectedRowKeys = [];
     }
   });
 
@@ -192,7 +280,7 @@
     }
   }
 
-  const typeOptions = computed(() => {
+  const options = computed(() => {
     const fullOptions = Object.values(RequestParamsType).map((val) => ({
       label: val,
       value: val,
@@ -216,7 +304,7 @@
         dataIndex: 'paramType',
         slotName: 'paramType',
         hasRequired: true,
-        typeOptions: typeOptions.value,
+        options: options.value,
         width: 130,
       },
       {
@@ -275,6 +363,43 @@
       }
     },
   });
+
+  const jsonSchemaRef = ref<InstanceType<typeof MsJsonSchema>>();
+
+  function previewJsonSchema() {
+    if (innerParams.value.jsonBody.enableJsonSchema) {
+      jsonSchemaRef.value?.previewSchema();
+    }
+  }
+
+  /**
+   * 自动转换json schema为json
+   */
+  async function autoMakeJson() {
+    if (!innerParams.value.jsonBody.enableJsonSchema) {
+      try {
+        bodyLoading.value = true;
+        let schema = innerParams.value.jsonBody.jsonSchema;
+        if (!schema && innerParams.value.jsonBody.jsonSchemaTableData) {
+          // 若jsonSchema不存在，先将表格数据转换为 json schema格式
+          schema = parseTableDataToJsonSchema(innerParams.value.jsonBody.jsonSchemaTableData[0]);
+        }
+        if (schema) {
+          // 再将 json schema 转换为 json 格式
+          const res = await convertJsonSchemaToJson(schema);
+          innerParams.value.jsonBody.jsonValue = res;
+        } else {
+          Message.warning(t('apiTestManagement.pleaseInputJsonSchema'));
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.log(error);
+      } finally {
+        bodyLoading.value = false;
+      }
+    }
+  }
+
   // 当前显示的代码
   const currentBodyCode = computed({
     get() {

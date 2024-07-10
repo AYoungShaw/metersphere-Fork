@@ -38,6 +38,7 @@
     delProps,
     editMenuProps,
     floatMenuProps,
+    headerProps,
     insertProps,
     mainEditorProps,
     MinderEvent,
@@ -48,6 +49,7 @@
     tagProps,
     viewMenuProps,
   } from './props';
+  import { isNodeInMinderView } from './script/tool/utils';
 
   const emit = defineEmits<{
     (e: 'moldChange', data: number): void;
@@ -62,6 +64,7 @@
   }>();
 
   const props = defineProps({
+    ...headerProps,
     ...floatMenuProps,
     ...insertProps,
     ...editMenuProps,
@@ -97,9 +100,13 @@
     (val) => {
       const node: MinderJsonNode = window.minder.getSelectedNode();
       if (val && node) {
-        setTimeout(() => {
-          window.minder.execCommand('camera', node, 100);
-        }, 100);
+        const nodePosition = node?.getRenderBox();
+        // 如果节点不在视图中，将节点移动到视图中
+        if (nodePosition && !isNodeInMinderView(undefined, nodePosition, nodePosition.width / 2)) {
+          setTimeout(() => {
+            window.minder.execCommand('camera', node, 100);
+          }, 300); // 抽屉动画 300ms
+        }
       }
     }
   );
@@ -156,6 +163,10 @@
 
       width: 0;
       transition: all 300ms ease-in-out;
+      :deep(.ms-tab--button-item) {
+        flex: 1;
+        text-align: center;
+      }
       .ms-minder-editor-extra-content {
         @apply relative  flex-1 overflow-y-auto;
         .ms-scroll-bar();

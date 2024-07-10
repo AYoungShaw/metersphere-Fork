@@ -346,7 +346,7 @@ public class ApiTestCaseControllerTests extends BaseTest {
         request.setPriority("P0");
         request.setStatus(ApiDefinitionStatus.PROCESSING.name());
         request.setTags(new LinkedHashSet<>(List.of("tag1", "tag2")));
-        request.setEnvironmentId(environments.get(0).getId());
+        request.setEnvironmentId(environments.getFirst().getId());
         MsHTTPElement msHttpElement = MsHTTPElementTest.getMsHttpElement();
         msHttpElement.setBody(ApiDebugControllerTests.addBodyLinkFile(msHttpElement.getBody(), fileMetadataId));
         request.setRequest(getMsElementParam(msHttpElement));
@@ -750,7 +750,7 @@ public class ApiTestCaseControllerTests extends BaseTest {
         apiFileResourceExample.createCriteria().andResourceIdEqualTo(apiTestCase.getId());
         List<ApiFileResource> apiFileResources = apiFileResourceMapper.selectByExample(apiFileResourceExample);
         Assertions.assertFalse(apiFileResources.isEmpty());
-        apiTransferRequest.setFileId(apiFileResources.get(0).getFileId());
+        apiTransferRequest.setFileId(apiFileResources.getFirst().getFileId());
         apiTransferRequest.setFileName("test-api-test-case-1");
         apiTransferRequest.setOriginalName("test-api-test-case-1.txt");
         this.requestPost("transfer", apiTransferRequest).andExpect(status().isOk());
@@ -788,7 +788,7 @@ public class ApiTestCaseControllerTests extends BaseTest {
         testPlanApiCase.setCreateTime(System.currentTimeMillis());
         testPlanApiCase.setLastExecTime(System.currentTimeMillis());
         testPlanApiCase.setLastExecReportId(IDGenerator.nextStr());
-        testPlanApiCase.setLastExecResult(ExecStatus.SUCCESS.name());
+        testPlanApiCase.setLastExecResult(ResultStatus.SUCCESS.name());
         testPlanApiCase.setPos(1024l);
         testPlanApiCase.setTestPlanCollectionId(planId);
         testPlanApiCaseMapper.insert(testPlanApiCase);
@@ -806,10 +806,10 @@ public class ApiTestCaseControllerTests extends BaseTest {
             apiReport.setEnvironmentId("api-environment-id" + i);
             apiReport.setRunMode("api-run-mode" + i);
             if (i % 2 == 0) {
-                apiReport.setStatus(ExecStatus.SUCCESS.name());
+                apiReport.setStatus(ResultStatus.SUCCESS.name());
             } else {
                 apiReport.setTestPlanCaseId(testPlanApiCase.getId());
-                apiReport.setStatus(ExecStatus.ERROR.name());
+                apiReport.setStatus(ResultStatus.ERROR.name());
             }
             apiReport.setTriggerMode("api-trigger-mode" + i);
             reports.add(apiReport);
@@ -828,7 +828,7 @@ public class ApiTestCaseControllerTests extends BaseTest {
         //返回值不为空
         Assertions.assertNotNull(returnPager);
         request.setFilter(new HashMap<>() {{
-            put("status", List.of(ReportStatus.SUCCESS.name()));
+            put("status", List.of(ResultStatus.SUCCESS.name()));
         }});
         mvcResult = requestPostWithOkAndReturn(EXECUTE, request);
         returnPager = parseObjectFromMvcResult(mvcResult, Pager.class);
@@ -837,7 +837,7 @@ public class ApiTestCaseControllerTests extends BaseTest {
         Assertions.assertTrue(((List<ApiReport>) returnPager.getList()).size() <= request.getPageSize());
         List<ExecuteReportDTO> reportDTOS = JSON.parseArray(JSON.toJSONString(returnPager.getList()), ExecuteReportDTO.class);
         reportDTOS.forEach(apiReport -> {
-            Assertions.assertEquals(apiReport.getStatus(), ReportStatus.SUCCESS.name());
+            Assertions.assertEquals(apiReport.getStatus(), ResultStatus.SUCCESS.name());
         });
     }
 
@@ -1018,11 +1018,11 @@ public class ApiTestCaseControllerTests extends BaseTest {
         EnvironmentExample environmentExample = new EnvironmentExample();
         environmentExample.createCriteria().andProjectIdEqualTo(DEFAULT_PROJECT_ID).andMockEqualTo(true);
         List<Environment> environments = environmentMapper.selectByExample(environmentExample);
-        request.setEnvironmentId(environments.get(0).getId());
+        request.setEnvironmentId(environments.getFirst().getId());
         requestPostWithOkAndReturn(BATCH_EDIT, request);
-        //判断数据的环境是不是environments.get(0).getId()
+        //判断数据的环境是不是environments.getFirst().getId()
         caseList = apiTestCaseMapper.selectByExample(example);
-        caseList.forEach(apiTestCase -> Assertions.assertEquals(apiTestCase.getEnvironmentId(), environments.get(0).getId()));
+        caseList.forEach(apiTestCase -> Assertions.assertEquals(apiTestCase.getEnvironmentId(), environments.getFirst().getId()));
         //环境数据为空
         request.setEnvironmentId(null);
         this.requestPost(BATCH_EDIT, request, ERROR_REQUEST_MATCHER);

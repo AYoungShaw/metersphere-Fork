@@ -1,19 +1,21 @@
 <p align="center"><a href="https://metersphere.io"><img src="https://metersphere.oss-cn-hangzhou.aliyuncs.com/img/MeterSphere-%E7%B4%AB%E8%89%B2.png" alt="MeterSphere" width="300" /></a></p>
 <h3 align="center">现代化、开源的测试管理和接口测试工具</h3>
 <p align="center">
-  <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img src="https://shields.io/github/license/metersphere/metersphere" alt="License: GPL v3"></a>
+  <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img src="https://shields.io/github/license/metersphere/metersphere?color=%231890FF" alt="License: GPL v3"></a>
   <a href="https://www.codacy.com/gh/metersphere/metersphere/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=metersphere/metersphere&amp;utm_campaign=Badge_Grade"><img src="https://app.codacy.com/project/badge/Grade/da67574fd82b473992781d1386b937ef" alt="Codacy"></a>
   <a href="https://github.com/metersphere/metersphere/releases"><img src="https://img.shields.io/github/v/release/metersphere/metersphere" alt="GitHub release"></a>
   <a href="https://github.com/metersphere/metersphere"><img src="https://img.shields.io/github/stars/metersphere/metersphere?color=%231890FF&style=flat-square" alt="Stars"></a>
-  <a href="https://hub.docker.com/r/metersphere/metersphere-ce-allinone"><img src="https://img.shields.io/docker/pulls/metersphere/metersphere-ce-allinone?label=downloads" alt="Download"></a>  
+  <a href="https://hub.docker.com/r/metersphere/metersphere-ce-allinone"><img src="https://img.shields.io/docker/pulls/metersphere/metersphere-ce-allinone?label=downloads" alt="Download"></a>
+  <a href="https://gitee.com/fit2cloud-feizhiyun/MeterSphere"><img src="https://gitee.com/fit2cloud-feizhiyun/MeterSphere/badge/star.svg?theme=gvp" alt="Gitee Stars"></a><br>
 </p>
 <hr />
 
-MeterSphere 是新一代的测试管理和接口测试工具，让测试工作更简单、更高效，不再成为持续交付的瓶颈。
+MeterSphere 是新一代的测试管理和接口测试工具，让软件测试工作更简单、更高效，不再成为持续交付的瓶颈。
 
--   **测试管理**: 从测试用例管理，到测试计划执行、缺陷管理、测试报告生成，具有远超禅道和 TestLink 的使用体验；
--   **接口测试**: 集 Postman 的易用与 JMeter 的灵活于一体，接口定义、接口调试、接口 Mock、场景自动化、接口报告，你想要的都有；
--   **团队协作**: 摆脱单机测试工具的束缚，支持团队协作并对接 DevOps 工具链，将测试融入持续交付体系。
+-   **测试管理**：从测试用例管理，到测试计划执行、缺陷管理、测试报告生成，具有远超 TestLink 等传统测试管理工具的使用体验；
+-   **接口测试**：集 Postman 的易用与 JMeter 的灵活于一体，接口调试、接口定义、接口 Mock、场景自动化、接口报告，你想要的都有；
+-   **团队协作**：采用“系统-组织-项目”分层设计理念，帮助用户摆脱单机测试工具的束缚，方便快捷地开展团队协作；
+-   **插件体系**：提供各种类别的插件，用户可以按需取用，快速实现 MeterSphere 测试能力的扩展以及与 DevOps 流水线的集成。
 
 ## 快速开始
 
@@ -24,34 +26,36 @@ docker run -d -p 8081:8081 --name=metersphere -v ~/.metersphere/data:/opt/meters
 # 密码: metersphere
 ```
 
-你也可以通过 [1Panel 应用商店](https://1panel.cn/) 快速部署 MeterSphere。如果是内网环境，推荐使用 [离线安装包方式](https://community.fit2cloud.com/#/products/metersphere/downloads) 进行安装部署。
+你也可以通过 [1Panel 应用商店](https://1panel.cn/) 快速部署 MeterSphere。
+
+如果是内网环境，推荐使用 [离线安装包方式](https://community.fit2cloud.com/#/products/metersphere/downloads) 进行安装部署。
 
 如你有更多问题，可以通过论坛和技术交流群与我们交流。
 
 -   [论坛求助](https://bbs.fit2cloud.com/c/ms/8)
--   技术交流群     
-    <image height="150px" width="150px" src="https://github.com/metersphere/metersphere/assets/23045261/57314d2c-ea97-4a7d-b20c-0eb577c0ebbf"/>    
+-   技术交流群
+     
+<image height="150px" width="150px" src="https://github.com/metersphere/metersphere/assets/23045261/57314d2c-ea97-4a7d-b20c-0eb577c0ebbf"/>
 
-    
 
 ## UI 展示
 
 <table style="border-collapse: collapse; border: 1px solid black;">
   <tr>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/decee1a8-65d3-41ae-bab4-fdd8364c54ce" alt="MeterSphere Demo1" /></td>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/5121e81b-65e3-4ab6-b2be-47c501064195" alt="MeterSphere Demo2" /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/e330db63-ea48-43b5-9645-b143c3326632" alt="MeterSphere Demo1" /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/315a13f6-6565-498d-ab62-6d5b46d49591" alt="MeterSphere Demo2" /></td>
   </tr>
   <tr>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/34df2cfc-0698-4ab2-b7e0-5022dc5b1eaa" alt="MeterSphere Demo3" /></td>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/5c5781aa-ad1b-42e0-b32a-1e08d591d092" alt="MeterSphere Demo4" /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/785f7c05-430c-4eab-a0c5-0661bc177df0" alt="MeterSphere Demo3" /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/a53dd241-0140-43e4-83ba-95f0f0aeccc5" alt="MeterSphere Demo4" /></td>
   </tr>
   <tr>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/c6308825-9484-4f84-a725-b88a26cbf35c" alt="MeterSphere Demo5" /></td>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/d05f9bb7-f814-4f42-889e-e5709d8b7390" alt="MeterSphere Demo6" /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/fc09f2bc-a822-4c8c-ba58-c8e55f362fa3" alt="MeterSphere Demo5" /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/ed689d96-78fc-4e21-a29b-49054291dc59" alt="MeterSphere Demo6" /></td>
   </tr>
   <tr>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/d02de0a6-fb30-4169-8aaf-815bcf379214" alt="MeterSphere Demo7" /></td>
-    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/3753ff34-4783-498d-a0a0-e2605b219d39" alt="MeterSphere Demo8" /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/8b468704-3741-4f73-a86c-f224f15aeba2" alt="MeterSphere Demo7" /></td>
+    <td style="padding: 5px;background-color:#fff;"><img src= "https://github.com/metersphere/metersphere/assets/23045261/023dad1b-37c6-480c-a32e-4c71dd1010d2" alt="MeterSphere Demo8" /></td>
   </tr>
 </table>
 
@@ -79,12 +83,21 @@ MeterSphere v3.x 的版本发布计划：
 -   基础设施: [Docker](https://www.docker.com/)
 -   测试引擎: [JMeter](https://jmeter.apache.org/)
 
-## 我们的其他明星开源项目
+## 插件
+
+- [TAPD](https://www.tapd.cn/) 需求和缺陷同步插件：通过调用 TAPD 企业版本提供的 API 接口（[TAPD 企业版（API）申请](https://jsj.top/f/Lpk1sh)），将 MeterSphere 的测试用例和 TAPD 需求项进行关联，以及将 MeterSphere 和 TAPD 两个应用的缺陷进行双向同步。
+- 禅道需求和缺陷同步插件：将 MeterSphere 的测试用例和禅道需求项进行关联，以及将 MeterSphere 和禅道两个应用的缺陷进行双向同步。
+- JIRA 需求和缺陷同步插件：将 MeterSphere 的测试用例和 JIRA 需求项进行关联，以及将 MeterSphere 和 JIRA 两个应用的缺陷进行双向同步。
+- [Jenkins](https://www.jenkins.io/) 持续集成插件：实现在 Jenkins 流水线中触发并自动执行 MeteSphere 测试计划。
+- 自定义数据库驱动：支持对 达梦、Oracle、SQLite、Microsoft SQL Server 等数据库的连接和数据访问。
+- 接口协议插件：实现接口测试中对 TCP、Dubbo、MQTT 等协议的支持。
+
+## 飞致云的其他明星项目
 
 - [1Panel](https://github.com/1panel-dev/1panel/) - 现代化、开源的 Linux 服务器运维管理面板
+- [MaxKB](https://github.com/1panel-dev/maxkb) - 基于 LLM 大语言模型的知识库问答系统
 - [JumpServer](https://github.com/jumpserver/jumpserver/) - 广受欢迎的开源堡垒机
 - [DataEase](https://github.com/dataease/dataease/) - 人人可用的开源数据可视化分析工具
-- [MaxKB](https://github.com/1panel-dev/maxkb) - 基于 LLM 大语言模型的知识库问答系统
 - [Halo](https://github.com/halo-dev/halo/) - 强大易用的开源建站工具
 
 ## License & Copyright

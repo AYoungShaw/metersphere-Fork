@@ -1,5 +1,8 @@
 package io.metersphere.functional.mapper;
 
+import io.metersphere.api.domain.ApiScenario;
+import io.metersphere.api.domain.ApiTestCase;
+import io.metersphere.functional.domain.FunctionalCaseTest;
 import io.metersphere.functional.dto.FunctionalCaseTestDTO;
 import io.metersphere.functional.dto.FunctionalCaseTestPlanDTO;
 import io.metersphere.functional.dto.TestPlanCaseExecuteHistoryDTO;
@@ -20,6 +23,11 @@ public interface ExtFunctionalCaseTestMapper {
 
     List<FunctionalCaseTestPlanDTO> getPlanList(@Param("request") AssociatePlanPageRequest request);
 
-    List<TestPlanCaseExecuteHistoryDTO>getPlanExecuteHistoryList(@Param("caseId") String caseId, @Param("planId") String planId);
+    List<TestPlanCaseExecuteHistoryDTO> getPlanExecuteHistoryList(@Param("caseId") String caseId, @Param("planId") String planId);
 
+    List<ApiTestCase> selectApiCaseByCaseIds(@Param("caseIds") List<String> caseIds);
+
+    List<ApiScenario> selectApiScenarioByCaseIds(@Param("caseIds") List<String> caseIds);
+
+    List<FunctionalCaseTest> selectApiAndScenarioIdsFromCaseIds(@Param("caseIds") List<String> functionalCaseIds);
 }

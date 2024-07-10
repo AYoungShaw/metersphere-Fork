@@ -13,7 +13,6 @@ import io.metersphere.api.dto.request.http.QueryParam;
 import io.metersphere.api.dto.request.http.RestParam;
 import io.metersphere.api.dto.request.http.body.*;
 import io.metersphere.api.dto.schema.JsonSchemaItem;
-import io.metersphere.api.utils.ApiDataUtils;
 import io.metersphere.api.utils.JsonSchemaBuilder;
 import io.metersphere.plugin.api.spi.AbstractMsTestElement;
 import io.metersphere.project.constants.PropertyConstant;
@@ -41,7 +40,7 @@ import java.io.InputStream;
 import java.util.*;
 
 
-public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImport> {
+public class Swagger3Parser extends ApiImportAbstractParser<ApiDefinitionImport> {
 
     protected String projectId;
     private Components components;
@@ -62,7 +61,7 @@ public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImpo
             }
         } else {
             String apiTestStr = getApiTestStr(source);
-            Map<String, Object> o = ApiDataUtils.parseObject(apiTestStr, Map.class);
+            Map<String, Object> o = JSON.parseMap(apiTestStr);
             // 判断属性 swagger的值是不是3.0开头
             if (o instanceof Map map) {
                 if (map.containsKey("swagger") && !map.get("swagger").toString().startsWith("3.0")) {
@@ -152,16 +151,19 @@ public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImpo
             Content content = requestBody.getContent();
             if (content != null) {
                 List<MsHeader> headers = request.getHeaders();
-                content.forEach((key, value) -> {
-                    setRequestBodyData(key, value, request.getBody());
+                Iterator<Map.Entry<String, io.swagger.v3.oas.models.media.MediaType>> iterator = content.entrySet().iterator();
+                if (iterator.hasNext()) {
+                    // 优先获取第一个
+                    Map.Entry<String, io.swagger.v3.oas.models.media.MediaType> mediaType = iterator.next();
+                    setRequestBodyData(mediaType.getKey(), mediaType.getValue(), request.getBody());
                     // 如果key不包含Content-Type  则默认添加Content-Type
                     if (headers.stream().noneMatch(header -> StringUtils.equals(header.getKey(), ApiConstants.CONTENT_TYPE))) {
                         MsHeader header = new MsHeader();
                         header.setKey(ApiConstants.CONTENT_TYPE);
-                        header.setValue(key);
+                        header.setValue(mediaType.getKey());
                         headers.add(header);
                     }
-                });
+                }
             } else {
                 request.getBody().setBodyType(Body.BodyType.NONE.name());
                 request.getBody().setNoneBody(new NoneBody());
@@ -184,7 +186,7 @@ public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImpo
             if (value != null && !StringUtils.equals(PropertyConstant.OBJECT, value.getType())) {
                 FormDataKV formDataKV = new FormDataKV();
                 formDataKV.setKey(key);
-                formDataKV.setValue(String.valueOf(value.getExample()));
+                formDataKV.setValue(value.getExample());
                 formDataKV.setRequired(CollectionUtils.isNotEmpty(required) && required.contains(key));
                 formDataKV.setDescription(value.getDescription());
                 formDataKV.setParamType(value.getType());
@@ -209,7 +211,7 @@ public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImpo
             if (value != null && !StringUtils.equals(PropertyConstant.OBJECT, value.getType())) {
                 FormDataKV formDataKV = new FormDataKV();
                 formDataKV.setKey(key);
-                formDataKV.setValue(String.valueOf(value.getExample()));
+                formDataKV.setValue(value.getExample());
                 formDataKV.setRequired(CollectionUtils.isNotEmpty(required) && required.contains(key));
                 formDataKV.setDescription(value.getDescription());
                 formDataKV.setParamType(value.getType());
@@ -273,45 +275,26 @@ public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImpo
     }
 
     private void setResponseBodyData(String k, io.swagger.v3.oas.models.media.MediaType value, ResponseBody body) {
-        //TODO body  默认如果json格式
         JsonSchemaItem jsonSchemaItem = parseSchema(value.getSchema());
         switch (k) {
             case MediaType.APPLICATION_JSON_VALUE, MediaType.ALL_VALUE -> {
                 body.setBodyType(Body.BodyType.JSON.name());
-                JsonBody jsonBody = new JsonBody();
-                jsonBody.setJsonSchema(jsonSchemaItem);
-                jsonBody.setEnableJsonSchema(false);
-                if (ObjectUtils.isNotEmpty(value.getExample())) {
-                    jsonBody.setJsonValue(ApiDataUtils.toJSONString(value.getExample()));
-                }
-                String jsonString = JSON.toJSONString(jsonSchemaItem);
-                if (StringUtils.isNotBlank(jsonString)) {
-                    jsonBody.setJsonValue(JsonSchemaBuilder.jsonSchemaToJson(jsonString));
-                }
-                body.setJsonBody(jsonBody);
+                body.setJsonBody(getJsonBody(value, jsonSchemaItem));
             }
             case MediaType.APPLICATION_XML_VALUE -> {
-                if (StringUtils.isBlank(body.getBodyType())) {
-                    body.setBodyType(Body.BodyType.XML.name());
-                }
+                body.setBodyType(Body.BodyType.XML.name());
                 XmlBody xml = new XmlBody();
                 //xml.setValue(XMLUtils.jsonToXmlStr(jsonValue));
                 body.setXmlBody(xml);
             }
             case MediaType.MULTIPART_FORM_DATA_VALUE -> {
-                if (StringUtils.isBlank(body.getBodyType())) {
-                    body.setBodyType(Body.BodyType.FORM_DATA.name());
-                }
+                body.setBodyType(Body.BodyType.FORM_DATA.name());
             }
             case MediaType.APPLICATION_OCTET_STREAM_VALUE -> {
-                if (StringUtils.isBlank(body.getBodyType())) {
-                    body.setBodyType(Body.BodyType.BINARY.name());
-                }
+                body.setBodyType(Body.BodyType.BINARY.name());
             }
             case MediaType.TEXT_PLAIN_VALUE -> {
-                if (StringUtils.isBlank(body.getBodyType())) {
-                    body.setBodyType(Body.BodyType.RAW.name());
-                }
+                body.setBodyType(Body.BodyType.RAW.name());
                 RawBody rawBody = new RawBody();
                 body.setRawBody(rawBody);
             }
@@ -319,53 +302,46 @@ public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImpo
         }
     }
 
+    private JsonBody getJsonBody(io.swagger.v3.oas.models.media.MediaType value, JsonSchemaItem jsonSchemaItem) {
+        JsonBody jsonBody = new JsonBody();
+        jsonBody.setJsonSchema(jsonSchemaItem);
+        if (ObjectUtils.isNotEmpty(value.getExample())) {
+            jsonBody.setJsonValue(JSON.toJSONString(value.getExample()));
+        } else {
+            String jsonString = JSON.toJSONString(jsonSchemaItem);
+            if (StringUtils.isNotBlank(jsonString)) {
+                jsonBody.setJsonValue(JsonSchemaBuilder.jsonSchemaToJson(jsonString));
+            }
+        }
+        return jsonBody;
+    }
+
     private void setRequestBodyData(String k, io.swagger.v3.oas.models.media.MediaType value, Body body) {
-        //TODO body  默认如果json格式
         JsonSchemaItem jsonSchemaItem = parseSchema(value.getSchema());
         switch (k) {
             case MediaType.APPLICATION_JSON_VALUE, MediaType.ALL_VALUE -> {
                 body.setBodyType(Body.BodyType.JSON.name());
-                JsonBody jsonBody = new JsonBody();
-                jsonBody.setJsonSchema(jsonSchemaItem);
-                jsonBody.setEnableJsonSchema(false);
-                if (ObjectUtils.isNotEmpty(value.getExample())) {
-                    jsonBody.setJsonValue(ApiDataUtils.toJSONString(value.getExample()));
-                }
-                String jsonString = JSON.toJSONString(jsonSchemaItem);
-                if (StringUtils.isNotBlank(jsonString)) {
-                    jsonBody.setJsonValue(JsonSchemaBuilder.jsonSchemaToJson(jsonString));
-                }
-                body.setJsonBody(jsonBody);
+                body.setJsonBody(getJsonBody(value, jsonSchemaItem));
             }
             case MediaType.APPLICATION_XML_VALUE -> {
-                if (StringUtils.isBlank(body.getBodyType())) {
-                    body.setBodyType(Body.BodyType.XML.name());
-                }
+                body.setBodyType(Body.BodyType.XML.name());
                 XmlBody xml = new XmlBody();
                 //xml.setValue(XMLUtils.jsonToXmlStr(jsonValue));
                 body.setXmlBody(xml);
             }
             case MediaType.APPLICATION_FORM_URLENCODED_VALUE -> {
-                if (StringUtils.isBlank(body.getBodyType())) {
-                    body.setBodyType(Body.BodyType.WWW_FORM.name());
-                }
+                body.setBodyType(Body.BodyType.WWW_FORM.name());
                 parseWWWFormBody(jsonSchemaItem, body);
             }
             case MediaType.MULTIPART_FORM_DATA_VALUE -> {
-                if (StringUtils.isBlank(body.getBodyType())) {
-                    body.setBodyType(Body.BodyType.FORM_DATA.name());
-                }
+                body.setBodyType(Body.BodyType.FORM_DATA.name());
                 parseFormBody(jsonSchemaItem, body);
             }
             case MediaType.APPLICATION_OCTET_STREAM_VALUE -> {
-                if (StringUtils.isBlank(body.getBodyType())) {
-                    body.setBodyType(Body.BodyType.BINARY.name());
-                }
+                body.setBodyType(Body.BodyType.BINARY.name());
             }
             case MediaType.TEXT_PLAIN_VALUE -> {
-                if (StringUtils.isBlank(body.getBodyType())) {
-                    body.setBodyType(Body.BodyType.RAW.name());
-                }
+                body.setBodyType(Body.BodyType.RAW.name());
                 RawBody rawBody = new RawBody();
                 body.setRawBody(rawBody);
             }
@@ -523,7 +499,7 @@ public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImpo
 
             if (modelByRef != null) {
                 return switch (modelByRef) {
-                    case ArraySchema arraySchema -> parseArraySchema(arraySchema.getItems(), false);
+                    case ArraySchema arraySchema -> parseArraySchema(arraySchema, false);
                     case ObjectSchema objectSchema -> parseObject(objectSchema, false);
                     default -> {
                         JsonSchemaItem jsonSchemaItem = new JsonSchemaItem();
@@ -559,7 +535,7 @@ public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImpo
             case StringSchema stringSchema -> item = parseString(stringSchema);
             case NumberSchema numberSchema -> item = parseNumber(numberSchema);
             case BooleanSchema booleanSchema -> item = parseBoolean(booleanSchema);
-            case ArraySchema arraySchema -> item = parseArraySchema(arraySchema.getItems(), false);
+            case ArraySchema arraySchema -> item = parseArraySchema(arraySchema, false);
             case ObjectSchema objectSchemaItem -> item = parseObject(objectSchemaItem, false);
             default -> {
             }
@@ -601,11 +577,11 @@ public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImpo
                     JsonSchemaItem arrayItem = new JsonSchemaItem();
                     arrayItem.setId(IDGenerator.nextStr());
                     arrayItem.setType(PropertyConstant.ARRAY);
-                    arrayItem.setItems(new JsonSchemaItem());
+                    arrayItem.setItems(List.of());
                     yield arrayItem;
                 }
-                yield isRef(arraySchema.getItems(), 0) ? parseArraySchema(arraySchema.getItems(), true) :
-                        parseArraySchema(arraySchema.getItems(), false);
+                yield isRef(arraySchema.getItems(), 0) ? parseArraySchema(arraySchema, true) :
+                        parseArraySchema(arraySchema, false);
             }
             case ObjectSchema objectSchema -> {
                 if (onlyOnce) {
@@ -670,56 +646,47 @@ public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImpo
 
 
     private JsonSchemaItem parseString(StringSchema stringSchema) {
-        JsonSchemaItem jsonSchemaString = new JsonSchemaItem();
-        jsonSchemaString.setType(PropertyConstant.STRING);
-        jsonSchemaString.setId(IDGenerator.nextStr());
-        jsonSchemaString.setFormat(StringUtils.isNotBlank(stringSchema.getFormat()) ? stringSchema.getFormat() : StringUtils.EMPTY);
-        jsonSchemaString.setDescription(getDefaultStringValue(stringSchema.getDescription()));
-        jsonSchemaString.setExample(stringSchema.getExample());
-        if (stringSchema.getMaxLength() != null) {
-            jsonSchemaString.setMaxLength(stringSchema.getMaxLength());
-        }
-        if (stringSchema.getMinLength() != null) {
-            jsonSchemaString.setMinLength(stringSchema.getMinLength());
-        }
-        jsonSchemaString.setPattern(stringSchema.getPattern());
-        jsonSchemaString.setEnumString(stringSchema.getEnum());
-        if (stringSchema.getExample() == null && CollectionUtils.isNotEmpty(stringSchema.getEnum())) {
-            jsonSchemaString.setExample(stringSchema.getEnum().getFirst());
-        }
-        return jsonSchemaString;
+        JsonSchemaItem jsonSchemaItem = parseSchemaItem(stringSchema);
+        jsonSchemaItem.setType(PropertyConstant.STRING);
+        jsonSchemaItem.setFormat(getDefaultStringValue(stringSchema.getFormat()));
+        jsonSchemaItem.setDescription(getDefaultStringValue(stringSchema.getDescription()));
+        jsonSchemaItem.setMaxLength(stringSchema.getMaxLength());
+        jsonSchemaItem.setMinLength(stringSchema.getMinLength());
+        jsonSchemaItem.setPattern(stringSchema.getPattern());
+        jsonSchemaItem.setEnumValues(stringSchema.getEnum());
+        return jsonSchemaItem;
     }
 
     private JsonSchemaItem parseInteger(IntegerSchema integerSchema) {
-        JsonSchemaItem jsonSchemaInteger = new JsonSchemaItem();
-        jsonSchemaInteger.setType(PropertyConstant.INTEGER);
-        jsonSchemaInteger.setId(IDGenerator.nextStr());
-        jsonSchemaInteger.setFormat(StringUtils.isNotBlank(integerSchema.getFormat()) ? integerSchema.getFormat() : StringUtils.EMPTY);
-        jsonSchemaInteger.setDescription(StringUtils.isNotBlank(integerSchema.getDescription()) ? integerSchema.getDescription() : StringUtils.EMPTY);
-        jsonSchemaInteger.setExample(integerSchema.getExample());
-        jsonSchemaInteger.setMaximum(integerSchema.getMaximum());
-        jsonSchemaInteger.setMinimum(integerSchema.getMinimum());
-        jsonSchemaInteger.setEnumInteger(integerSchema.getEnum());
-        return jsonSchemaInteger;
+        JsonSchemaItem jsonSchemaItem = parseSchemaItem(integerSchema);
+        jsonSchemaItem.setType(PropertyConstant.INTEGER);
+        jsonSchemaItem.setFormat(StringUtils.isNotBlank(integerSchema.getFormat()) ? integerSchema.getFormat() : StringUtils.EMPTY);
+        jsonSchemaItem.setMaximum(integerSchema.getMaximum());
+        jsonSchemaItem.setMinimum(integerSchema.getMinimum());
+        jsonSchemaItem.setEnumValues(integerSchema.getEnum());
+        return jsonSchemaItem;
     }
 
     private JsonSchemaItem parseNumber(NumberSchema numberSchema) {
-        JsonSchemaItem jsonSchemaNumber = new JsonSchemaItem();
-        jsonSchemaNumber.setType(PropertyConstant.NUMBER);
-        jsonSchemaNumber.setId(IDGenerator.nextStr());
-        jsonSchemaNumber.setDescription(StringUtils.isNotBlank(numberSchema.getDescription()) ? numberSchema.getDescription() : StringUtils.EMPTY);
-        jsonSchemaNumber.setExample(numberSchema.getExample());
-        jsonSchemaNumber.setEnumNumber(numberSchema.getEnum());
-        return jsonSchemaNumber;
+        JsonSchemaItem jsonSchemaItem = parseSchemaItem(numberSchema);
+        jsonSchemaItem.setType(PropertyConstant.NUMBER);
+        return jsonSchemaItem;
     }
 
     private JsonSchemaItem parseBoolean(BooleanSchema booleanSchema) {
-        JsonSchemaItem jsonSchemaBoolean = new JsonSchemaItem();
-        jsonSchemaBoolean.setType(PropertyConstant.BOOLEAN);
-        jsonSchemaBoolean.setId(IDGenerator.nextStr());
-        jsonSchemaBoolean.setDescription(getDefaultStringValue(booleanSchema.getDescription()));
-        jsonSchemaBoolean.setExample(booleanSchema.getExample());
-        return jsonSchemaBoolean;
+        JsonSchemaItem jsonSchemaItem = parseSchemaItem(booleanSchema);
+        jsonSchemaItem.setType(PropertyConstant.NUMBER);
+        return jsonSchemaItem;
+    }
+
+    private JsonSchemaItem parseSchemaItem(Schema schema) {
+        JsonSchemaItem jsonSchemaItem = new JsonSchemaItem();
+        jsonSchemaItem.setId(IDGenerator.nextStr());
+        jsonSchemaItem.setDescription(getDefaultStringValue(schema.getDescription()));
+        Optional.ofNullable(schema.getExample()).ifPresent(example -> jsonSchemaItem.setExample(example.toString()));
+        jsonSchemaItem.setEnumValues(schema.getEnum());
+        jsonSchemaItem.setDefaultValue(schema.getDefault());
+        return jsonSchemaItem;
     }
 
     private JsonSchemaItem parseNull() {
@@ -729,7 +696,8 @@ public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImpo
         return jsonSchemaNull;
     }
 
-    private JsonSchemaItem parseArraySchema(Schema<?> items, boolean onlyOnce) {
+    private JsonSchemaItem parseArraySchema(ArraySchema arraySchema, boolean onlyOnce) {
+        Schema<?> items = arraySchema.getItems();
         JsonSchemaItem jsonSchemaArray = new JsonSchemaItem();
         jsonSchemaArray.setType(PropertyConstant.ARRAY);
         jsonSchemaArray.setId(IDGenerator.nextStr());
@@ -744,8 +712,9 @@ public class Swagger3Parser<T> extends ApiImportAbstractParser<ApiDefinitionImpo
         }
 
         JsonSchemaItem itemsJsonSchema = parseProperty(itemsSchema, onlyOnce);
-        jsonSchemaArray.setItems(itemsJsonSchema);
-
+        jsonSchemaArray.setItems(List.of(itemsJsonSchema));
+        jsonSchemaArray.setMaxItems(arraySchema.getMaxItems());
+        jsonSchemaArray.setMinItems(arraySchema.getMinItems());
         return jsonSchemaArray;
     }
 

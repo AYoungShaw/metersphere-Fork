@@ -77,7 +77,7 @@
 
       <div
         v-if="!condition.enableCommonScript"
-        class="relative flex-1 rounded-[var(--border-radius-small)] bg-[var(--color-text-n9)]"
+        class="relative min-w-[500px] flex-1 rounded-[var(--border-radius-small)] bg-[var(--color-text-n9)]"
       >
         <div v-if="isShowEditScriptNameInput" class="absolute left-[12px] top-[12px] z-10 w-[calc(100%-24px)]">
           <a-input
@@ -388,10 +388,10 @@
             class="ms-params-input-popover"
           >
             <template #content>
-              <div class="param-popover-title">
+              <div class="ms-params-popover-title">
                 {{ t('apiTestDebug.expression') }}
               </div>
-              <div class="param-popover-value">
+              <div class="ms-params-popover-value">
                 {{ record.expression }}
               </div>
             </template>
@@ -416,7 +416,7 @@
                     type="icon-icon_flashlamp"
                     :size="15"
                     :class="!props.response ? 'ms-params-input-suffix-icon--disabled' : 'ms-params-input-suffix-icon'"
-                    @click.stop="() => showFastExtraction(record)"
+                    @click.stop="() => showFastExtraction(record as ExpressionConfig)"
                   />
                 </a-tooltip>
               </template>
@@ -437,7 +437,7 @@
                 <a-button type="secondary" size="mini" @click="record.moreSettingPopoverVisible = false">
                   {{ t('common.cancel') }}
                 </a-button>
-                <a-button type="primary" size="mini" @click="() => applyMoreSetting(record)">
+                <a-button type="primary" size="mini" @click="() => applyMoreSetting(record as ExpressionConfig)">
                   {{ t('common.confirm') }}
                 </a-button>
               </div>
@@ -835,7 +835,7 @@ if (!result){
       title: 'apiTestDebug.paramType',
       dataIndex: 'variableType',
       slotName: 'variableType',
-      typeOptions: extractTypeOptions.map((item) => {
+      options: extractTypeOptions.map((item) => {
         return {
           label: t(item.label),
           value: item.value,
@@ -847,7 +847,7 @@ if (!result){
       title: 'apiTestDebug.mode',
       dataIndex: 'extractType',
       slotName: 'extractType',
-      typeOptions: [
+      options: [
         {
           label: 'JSONPath',
           value: RequestExtractExpressionEnum.JSON_PATH,
@@ -867,7 +867,7 @@ if (!result){
       title: 'apiTestDebug.range',
       dataIndex: 'extractScope',
       slotName: 'extractScope',
-      typeOptions: [
+      options: [
         {
           label: 'Body',
           value: RequestExtractScope.BODY,
@@ -1117,21 +1117,5 @@ if (!result){
         color: rgb(var(--primary-5));
       }
     }
-  }
-  .param-popover-title {
-    @apply font-medium;
-
-    margin-bottom: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 16px;
-    color: var(--color-text-1);
-  }
-  .param-popover-value {
-    min-width: 100px;
-    max-width: 280px;
-    font-size: 12px;
-    line-height: 16px;
-    color: var(--color-text-1);
   }
 </style>

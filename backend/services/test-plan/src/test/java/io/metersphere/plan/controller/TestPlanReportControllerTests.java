@@ -45,17 +45,21 @@ public class TestPlanReportControllerTests extends BaseTest {
     private static final String RENAME_PLAN_REPORT = "/test-plan/report/rename";
     private static final String DELETE_PLAN_REPORT = "/test-plan/report/delete";
     private static final String BATCH_DELETE_PLAN_REPORT = "/test-plan/report/batch-delete";
-    private static final String GEN_PLAN_REPORT = "/test-plan/report/gen";
+    private static final String MANUAL_GEN_PLAN_REPORT = "/test-plan/report/manual-gen";
+    private static final String GET_MANUAL_PLAN_REPORT_LAYOUT = "/test-plan/report/get-layout";
+    private static final String AUTO_GEN_PLAN_REPORT = "/test-plan/report/auto-gen";
     private static final String GET_PLAN_REPORT = "/test-plan/report/get";
     private static final String EDIT_PLAN_REPORT_AND_UPLOAD_PIC = "/test-plan/report/upload/md/file";
     private static final String EDIT_PLAN_REPORT = "/test-plan/report/detail/edit";
     private static final String GET_PLAN_REPORT_DETAIL_BUG_PAGE = "/test-plan/report/detail/bug/page";
     private static final String GET_PLAN_REPORT_DETAIL_FUNCTIONAL_PAGE = "/test-plan/report/detail/functional/case/page";
+    private static final String GET_PLAN_REPORT_DETAIL_FUNCTIONAL_RESULT = "/test-plan/report/detail/functional/case/step";
     private static final String GET_PLAN_REPORT_DETAIL_API_PAGE = "/test-plan/report/detail/api/case/page";
     private static final String GET_PLAN_REPORT_DETAIL_SCENARIO_PAGE = "/test-plan/report/detail/scenario/case/page";
     private static final String GET_PLAN_REPORT_DETAIL_PLAN_PAGE = "/test-plan/report/detail/plan/report/page";
     private static final String GEN_AND_SHARE = "/test-plan/report/share/gen";
     private static final String GET_SHARE_INFO = "/test-plan/report/share/get";
+    private static final String GET_SHARE_REPORT_LAYOUT = "/test-plan/report/share/get-layout";
     private static final String GET_SHARE_TIME = "/test-plan/report/share/get-share-time";
     private static final String GET_SHARE_REPORT = "/test-plan/report/share/get/detail";
     private static final String GET_SHARE_REPORT_BUG_LIST = "/test-plan/report/share/detail/bug/page";
@@ -65,6 +69,7 @@ public class TestPlanReportControllerTests extends BaseTest {
     private static final String GET_SHARE_REPORT_PLAN_LIST = "/test-plan/report/share/detail/plan/report/page";
     private static final String GET_SHARE_REPORT_API_REPORT_LIST = "/test-plan/report/share/detail/api-report";
     private static final String GET_SHARE_REPORT_SCENARIO_REPORT_LIST = "/test-plan/report/share/detail/scenario-report";
+    private static final String GET_SHARE_REPORT_DETAIL_FUNCTIONAL_RESULT = "/test-plan/report/share/detail/functional/case/step";
 
     @Autowired
     private TestPlanReportMapper testPlanReportMapper;
@@ -101,7 +106,7 @@ public class TestPlanReportControllerTests extends BaseTest {
         // 返回的数据量不超过规定要返回的数据量相同
         Assertions.assertTrue(JSON.parseArray(JSON.toJSONString(pageData.getList())).size() <= request.getPageSize());
         // 返回值中取出第一条数据, 并判断是否包含关键字default
-        TestPlanReportPageResponse report = JSON.parseArray(JSON.toJSONString(pageData.getList()), TestPlanReportPageResponse.class).get(0);
+        TestPlanReportPageResponse report = JSON.parseArray(JSON.toJSONString(pageData.getList()), TestPlanReportPageResponse.class).getFirst();
         Assertions.assertTrue(StringUtils.contains(report.getName(), request.getKeyword()));
         // 覆盖排序, 及数据为空
         request.setSort(Map.of("tpr.create_time", "asc"));
@@ -213,6 +218,8 @@ public class TestPlanReportControllerTests extends BaseTest {
         mockMvc.perform(getRequestBuilder(GET_SHARE_REPORT_SCENARIO_REPORT_LIST + "/get/" + GEN_SHARE_ID + "/" + "test" + "/111"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
+
+        this.requestGetWithOk(GET_SHARE_REPORT_DETAIL_FUNCTIONAL_RESULT + "/" + GEN_SHARE_ID + "/execute-his-1");
     }
 
     @Test
@@ -265,7 +272,7 @@ public class TestPlanReportControllerTests extends BaseTest {
         TestPlanReportGenRequest genRequest = new TestPlanReportGenRequest();
         genRequest.setProjectId("100001100001");
         genRequest.setTestPlanId("plan_id_for_gen_report-x");
-        this.requestPost(GEN_PLAN_REPORT, genRequest, status().is5xxServerError());
+        this.requestPost(AUTO_GEN_PLAN_REPORT, genRequest, status().is5xxServerError());
     }
 
     @Test
@@ -275,9 +282,9 @@ public class TestPlanReportControllerTests extends BaseTest {
         genRequest.setProjectId("100001100001");
         genRequest.setTestPlanId("plan_id_for_gen_report_1");
         genRequest.setTriggerMode(TaskTriggerMode.MANUAL.name());
-        this.requestPost(GEN_PLAN_REPORT, genRequest);
+        this.requestPost(AUTO_GEN_PLAN_REPORT, genRequest);
         genRequest.setTestPlanId("plan_id_for_gen_report");
-        this.requestPost(GEN_PLAN_REPORT, genRequest);
+        this.requestPost(AUTO_GEN_PLAN_REPORT, genRequest);
         GEN_REPORT_ID = getGenReportId();
     }
 
@@ -321,7 +328,7 @@ public class TestPlanReportControllerTests extends BaseTest {
     void testEditReportDetail() throws Exception {
         TestPlanReportDetailEditRequest request = new TestPlanReportDetailEditRequest();
         request.setId(GEN_REPORT_ID);
-        request.setSummary("This is a summary for report detail");
+        request.setComponentValue("This is a summary for report detail");
         this.requestPostWithOk(EDIT_PLAN_REPORT, request);
         request.setRichTextTmpFileIds(List.of("rich-text-file-id-for-report"));
         this.requestPost(EDIT_PLAN_REPORT, request, status().is5xxServerError());
@@ -342,6 +349,58 @@ public class TestPlanReportControllerTests extends BaseTest {
         testPlanReportService.summaryGroupReport("test-plan-report-id-5");
         testPlanReportService.summaryGroupReport("test-plan-report-id-7");
         testPlanReportService.summaryGroupReport("test-plan-report-id-9");
+    }
+
+    @Test
+    @Order(19)
+    void testGetReportFunctionalExecResult() throws Exception {
+        this.requestGet(GET_PLAN_REPORT_DETAIL_FUNCTIONAL_RESULT + "/execute-his-1");
+        this.requestGet(GET_PLAN_REPORT_DETAIL_FUNCTIONAL_RESULT + "/execute-his-2");
+    }
+
+    @Test
+    @Order(20)
+    void testGenReportByManual() throws Exception {
+        TestPlanReportComponentSaveRequest component = new TestPlanReportComponentSaveRequest();
+        component.setName("component-for-test");
+        component.setType("RICH_TEXT");
+        component.setLabel("component-for-test");
+        component.setValue("Val for test!");
+        component.setPos(1L);
+        TestPlanReportManualRequest genRequest = new TestPlanReportManualRequest();
+        genRequest.setProjectId("100001100001");
+        genRequest.setTestPlanId("plan_id_for_gen_report");
+        genRequest.setTriggerMode(TaskTriggerMode.MANUAL.name());
+        genRequest.setReportName("oasis");
+        genRequest.setComponents(List.of(component));
+        this.requestPost(MANUAL_GEN_PLAN_REPORT, genRequest);
+        genRequest.setComponents(null);
+        this.requestPost(MANUAL_GEN_PLAN_REPORT, genRequest);
+    }
+
+    @Test
+    @Order(21)
+    void testShareOrEditReportByManual() throws Exception {
+        TestPlanReportShareRequest shareRequest = new TestPlanReportShareRequest();
+        shareRequest.setReportId(getManualGenPlanReportId());
+        shareRequest.setProjectId("100001100001");
+        shareRequest.setShareType(ShareInfoType.TEST_PLAN_SHARE_REPORT.name());
+        shareRequest.setLang(Locale.SIMPLIFIED_CHINESE.getLanguage());
+        MvcResult mvcResult = this.requestPost(GEN_AND_SHARE, shareRequest).andReturn();
+        String sortData = mvcResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        ResultHolder sortHolder = JSON.parseObject(sortData, ResultHolder.class);
+        TestPlanShareInfo shareInfo = JSON.parseObject(JSON.toJSONString(sortHolder.getData()), TestPlanShareInfo.class);
+        Assertions.assertNotNull(shareInfo);
+        this.requestGet(GET_SHARE_INFO + "/" + shareInfo.getId());
+        this.requestGet(GET_SHARE_REPORT_LAYOUT + "/" + shareInfo.getId() + "/" + getManualGenPlanReportId());
+
+        this.requestGet(GET_MANUAL_PLAN_REPORT_LAYOUT + "/" + getManualGenPlanReportId());
+        // 编辑手动生成的报告
+        TestPlanReportDetailEditRequest request = new TestPlanReportDetailEditRequest();
+        request.setId(getManualGenPlanReportId());
+        request.setComponentId("component-for-test");
+        request.setComponentValue("This is a summary for report detail");
+        this.requestPostWithOk(EDIT_PLAN_REPORT, request);
     }
 
     @Resource
@@ -405,6 +464,12 @@ public class TestPlanReportControllerTests extends BaseTest {
     private String getGenReportId() {
         TestPlanReportExample example = new TestPlanReportExample();
         example.createCriteria().andTestPlanIdEqualTo("plan_id_for_gen_report");
+        return testPlanReportMapper.selectByExample(example).getFirst().getId();
+    }
+
+    private String getManualGenPlanReportId() {
+        TestPlanReportExample example = new TestPlanReportExample();
+        example.createCriteria().andTestPlanIdEqualTo("plan_id_for_gen_report").andDefaultLayoutEqualTo(false);
         return testPlanReportMapper.selectByExample(example).get(0).getId();
     }
 }

@@ -15,11 +15,21 @@
           <a-select
             v-if="requestVModel.isNew"
             v-model:model-value="requestVModel.protocol"
-            :options="protocolOptions"
             :loading="protocolLoading"
             class="w-[90px]"
             @change="(val) => handleActiveDebugProtocolChange(val as string)"
-          />
+          >
+            <a-tooltip
+              v-for="item of protocolOptions"
+              :key="item.value as string"
+              :content="item.label"
+              :mouse-enter-delay="300"
+            >
+              <a-option :value="item.value">
+                {{ item.label }}
+              </a-option>
+            </a-tooltip>
+          </a-select>
           <div v-else class="flex items-center gap-[4px]">
             <apiMethodName
               :method="(requestVModel.protocol as RequestMethods)"
@@ -354,11 +364,12 @@
               threshold: 200,
             },
           }"
+          :filter-tree-node="filterTreeNode"
           allow-search
         >
           <template #tree-slot-title="node">
             <a-tooltip :content="`${node.name}`" position="tl">
-              <div class="one-line-text w-[300px] text-[var(--color-text-1)]">{{ node.name }}</div>
+              <div class="one-line-text w-[300px]">{{ node.name }}</div>
             </a-tooltip>
           </template>
         </a-tree-select>
@@ -431,6 +442,7 @@
   import { TabItem } from '@/components/pure/ms-editable-tab/types';
   import MsFormCreate from '@/components/pure/ms-form-create/formCreate.vue';
   import MsIcon from '@/components/pure/ms-icon-font/index.vue';
+  import { parseTableDataToJsonSchema } from '@/components/pure/ms-json-schema/utils';
   import MsTab from '@/components/pure/ms-tab/index.vue';
   import MsTagsInput from '@/components/pure/ms-tags-input/index.vue';
   import assertion from '@/components/business/ms-assertion/index.vue';
@@ -449,9 +461,10 @@
   import { getSocket } from '@/api/modules/project-management/commonScript';
   import { getProjectOptions } from '@/api/modules/project-management/projectMember';
   import { useI18n } from '@/hooks/useI18n';
+  import useRequestCompositionStore from '@/store/modules/api/requestComposition';
   import useAppStore from '@/store/modules/app';
   import useUserStore from '@/store/modules/user';
-  import { filterTree, getGenerateId, parseQueryParams } from '@/utils';
+  import { filterTree, filterTreeNode, getGenerateId, parseQueryParams } from '@/utils';
   import { scrollIntoView } from '@/utils/dom';
   import { registerCatchSaveShortcut, removeCatchSaveShortcut } from '@/utils/event';
   import { hasAllPermission, hasAnyPermission } from '@/utils/permission';
@@ -554,6 +567,7 @@
   const appStore = useAppStore();
   const userStore = useUserStore();
   const { t } = useI18n();
+  const requestCompositionStore = useRequestCompositionStore();
 
   const loading = defineModel<boolean>('detailLoading', { default: false });
   const requestVModel = defineModel<RequestParam>('request', { required: true });
@@ -736,7 +750,6 @@
   const localExecuteUrl = computed(() => userStore.localExecuteUrl); // 本地执行地址
 
   const pluginScriptMap = ref<Record<string, PluginConfig>>({}); // 存储初始化过后的插件配置
-  const temporaryPluginFormMap: Record<string, any> = {}; // 缓存插件表单，避免切换tab导致动态表单数据丢失
   const pluginLoading = ref(false);
   const fApi = ref<Api>();
   const currentPluginOptions = computed<Record<string, any>>(
@@ -748,7 +761,7 @@
 
   // 处理插件表单输入框变化
   const handlePluginFormChange = debounce(() => {
-    temporaryPluginFormMap[requestVModel.value.id] = fApi.value?.formData();
+    requestCompositionStore.setPluginFormMap(requestVModel.value.id, fApi.value?.formData());
     handleActiveDebugChange();
   }, 300);
 
@@ -780,8 +793,8 @@
   /**
    * 设置插件表单数据
    */
-  function setPluginFormData() {
-    const tempForm = temporaryPluginFormMap[requestVModel.value.id];
+  async function setPluginFormData() {
+    const tempForm = requestCompositionStore.pluginFormMap[requestVModel.value.id];
     if (tempForm || !requestVModel.value.isNew || requestVModel.value.isCopy) {
       // 如果缓存的表单数据存在或者是编辑状态，则需要将之前的输入数据填充
       const formData = tempForm || requestVModel.value;
@@ -809,6 +822,7 @@
         isInitPluginForm.value = true;
       });
     }
+    await nextTick();
   }
 
   const pluginError = ref(false);
@@ -823,7 +837,7 @@
     pluginError.value = false;
     isInitPluginForm.value = false;
     if (pluginScriptMap.value[requestVModel.value.protocol] !== undefined) {
-      setPluginFormData();
+      await setPluginFormData();
       // 已经初始化过
       return;
     }
@@ -831,7 +845,7 @@
       pluginLoading.value = true;
       const res = await getPluginScript(pluginId);
       pluginScriptMap.value[requestVModel.value.protocol] = res;
-      setPluginFormData();
+      await setPluginFormData();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
@@ -988,7 +1002,7 @@
    */
   function makeRequestParams(executeType?: 'localExec' | 'serverExec') {
     const isExecute = executeType === 'localExec' || executeType === 'serverExec';
-    const { formDataBody, wwwFormBody } = requestVModel.value.body;
+    const { formDataBody, wwwFormBody, jsonBody } = requestVModel.value.body;
     const polymorphicName = protocolOptions.value.find(
       (e) => e.value === requestVModel.value.protocol
     )?.polymorphicName; // 协议多态名称
@@ -1020,6 +1034,13 @@
           },
           wwwFormBody: {
             formValues: realWwwFormBodyValues,
+          },
+          jsonBody: {
+            jsonValue: jsonBody.jsonValue,
+            enableJsonSchema: jsonBody.enableJsonSchema,
+            jsonSchema: jsonBody.jsonSchemaTableData
+              ? parseTableDataToJsonSchema(jsonBody.jsonSchemaTableData[0])
+              : undefined,
           },
         },
         headers: filterKeyValParams(requestVModel.value.headers, defaultHeaderParamsItem, isExecute).validParams,
@@ -1056,6 +1077,16 @@
         response: requestVModel.value.responseDefinition?.map((e) => ({
           ...e,
           headers: filterKeyValParams(e.headers, defaultKeyValueParamItem, isExecute).validParams,
+          body: {
+            ...e.body,
+            jsonBody: {
+              jsonValue: e.body.jsonBody.jsonValue,
+              enableJsonSchema: jsonBody.enableJsonSchema,
+              jsonSchema: e.body.jsonBody.jsonSchemaTableData
+                ? parseTableDataToJsonSchema(e.body.jsonBody.jsonSchemaTableData[0])
+                : undefined,
+            },
+          },
         })),
       };
     } else {
@@ -1170,9 +1201,6 @@
     () => requestVModel.value.id,
     async () => {
       isSwitchingContent.value = true; // 正在切换内容
-      nextTick(() => {
-        isSwitchingContent.value = false; // 切换内容结束
-      });
       if (requestVModel.value.protocol !== 'HTTP') {
         requestVModel.value.activeTab = RequestComposition.PLUGIN;
         if (protocolOptions.value.length === 0) {
@@ -1191,13 +1219,22 @@
       }
       if (props.request.isExecute && !requestVModel.value.executeLoading) {
         // 如果是执行操作打开接口详情，且该接口不在执行状态中，则立即执行
-        execute(isPriorityLocalExec.value ? 'localExec' : 'serverExec');
+        if (requestVModel.value.protocol !== 'HTTP') {
+          setTimeout(() => {
+            execute(isPriorityLocalExec.value ? 'localExec' : 'serverExec');
+          }, 100);
+        } else {
+          execute(isPriorityLocalExec.value ? 'localExec' : 'serverExec');
+        }
       } else if (temporaryResponseMap[props.request.reportId]) {
         // 如果有缓存的报告未读取，则直接赋值
         requestVModel.value.response = temporaryResponseMap[props.request.reportId];
         requestVModel.value.executeLoading = false;
         delete temporaryResponseMap[props.request.reportId];
       }
+      nextTick(() => {
+        isSwitchingContent.value = false; // 切换内容结束
+      });
     },
     {
       immediate: true,
@@ -1476,6 +1513,7 @@
             Message.success(t('common.saveSuccess'));
             handleSaveCaseCancel();
             saveCaseLoading.value = false;
+            done(true);
           }
         } catch (error) {
           // eslint-disable-next-line no-console

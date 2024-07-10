@@ -191,6 +191,7 @@ public class ApiScenarioRunService {
         taskInfo.setSaveResult(true);
         taskInfo.getRunModeConfig().setEnvironmentId(parseParam.getEnvironmentId());
         taskRequest.getTaskItem().setRequestCount(tmpParam.getRequestCount().get());
+        taskInfo.setUserId(userId);
 
         if (StringUtils.isEmpty(taskItem.getReportId())) {
             taskInfo.setRealTime(false);
@@ -309,6 +310,8 @@ public class ApiScenarioRunService {
 
         ApiScenarioParamConfig parseConfig = getApiScenarioParamConfig(apiScenarioDetail.getProjectId(), parseParam, tmpParam.getScenarioParseEnvInfo());
         parseConfig.setReportId(reportId);
+        parseConfig.setRetryOnFail(request.getRunModeConfig().getRetryOnFail());
+        parseConfig.setRetryConfig(request.getRunModeConfig().getRetryConfig());
 
         String script = apiExecuteService.parseExecuteScript(runRequest.getTestElement(), parseConfig);
 

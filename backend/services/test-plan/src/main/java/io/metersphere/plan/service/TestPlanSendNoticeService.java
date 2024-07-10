@@ -9,7 +9,8 @@ import io.metersphere.plan.dto.request.TestPlanUpdateRequest;
 import io.metersphere.plan.mapper.TestPlanConfigMapper;
 import io.metersphere.plan.mapper.TestPlanFollowerMapper;
 import io.metersphere.plan.mapper.TestPlanMapper;
-import io.metersphere.sdk.constants.ReportStatus;
+import io.metersphere.sdk.constants.ResultStatus;
+import io.metersphere.sdk.constants.TaskTriggerMode;
 import io.metersphere.sdk.constants.TestPlanConstants;
 import io.metersphere.sdk.util.BeanUtils;
 import io.metersphere.sdk.util.JSON;
@@ -133,7 +134,7 @@ public class TestPlanSendNoticeService {
     public TestPlanDTO sendAddNotice(TestPlanCreateRequest request) {
         TestPlanDTO dto = new TestPlanDTO();
         BeanUtils.copyBean(dto, request);
-        dto.setStatus(TestPlanConstants.TEST_PLAN_STATUS_PREPARED);
+        dto.setStatus(TestPlanConstants.TEST_PLAN_SHOW_STATUS_PREPARED);
         return dto;
     }
 
@@ -178,26 +179,28 @@ public class TestPlanSendNoticeService {
      * @param executeResult 执行结果
      */
     @Async
-    public void sendExecuteNotice(String currentUser, String planId, String projectId, String executeResult) {
+    public void sendExecuteNotice(String currentUser, String planId, String projectId, String executeResult, String triggerMode) {
         TestPlan testPlan = testPlanMapper.selectByPrimaryKey(planId);
         if (testPlan != null) {
             User user = userMapper.selectByPrimaryKey(currentUser);
             setLanguage(user.getLanguage());
             Map<String, String> defaultTemplateMap = MessageTemplateUtils.getDefaultTemplateMap();
-            String template = defaultTemplateMap.get(StringUtils.equals(executeResult, ReportStatus.SUCCESS.name()) ?
+            String template = defaultTemplateMap.get(StringUtils.equals(executeResult, ResultStatus.SUCCESS.name()) ?
                     NoticeConstants.TemplateText.TEST_PLAN_TASK_EXECUTE_SUCCESSFUL : NoticeConstants.TemplateText.TEST_PLAN_TASK_EXECUTE_FAILED);
             Map<String, String> defaultSubjectMap = MessageTemplateUtils.getDefaultTemplateSubjectMap();
-            String subject = defaultSubjectMap.get(StringUtils.equals(executeResult, ReportStatus.SUCCESS.name()) ?
+            String subject = defaultSubjectMap.get(StringUtils.equals(executeResult, ResultStatus.SUCCESS.name()) ?
                     NoticeConstants.TemplateText.TEST_PLAN_TASK_EXECUTE_SUCCESSFUL : NoticeConstants.TemplateText.TEST_PLAN_TASK_EXECUTE_FAILED);
             Map<String, Object> paramMap = new HashMap<>(4);
             paramMap.put(NoticeConstants.RelatedUser.OPERATOR, user.getName());
             paramMap.put("name", testPlan.getName());
             paramMap.put("projectId", projectId);
+            paramMap.put("id", planId);
             paramMap.put("Language", user.getLanguage());
             NoticeModel noticeModel = NoticeModel.builder().operator(currentUser).excludeSelf(false)
-                    .context(template).subject(subject).paramMap(paramMap).event(StringUtils.equals(executeResult, ReportStatus.SUCCESS.name()) ?
-                            NoticeConstants.TemplateText.TEST_PLAN_TASK_EXECUTE_SUCCESSFUL : NoticeConstants.TemplateText.TEST_PLAN_TASK_EXECUTE_FAILED).build();
-            noticeSendService.send(NoticeConstants.TaskType.TEST_PLAN_TASK, noticeModel);
+                    .context(template).subject(subject).paramMap(paramMap).event(StringUtils.equals(executeResult, ResultStatus.SUCCESS.name()) ?
+                            NoticeConstants.Event.EXECUTE_SUCCESSFUL : NoticeConstants.Event.EXECUTE_FAILED).build();
+            noticeSendService.send(StringUtils.equals(TaskTriggerMode.API.name(), triggerMode) ?
+                    NoticeConstants.TaskType.JENKINS_TASK : NoticeConstants.TaskType.TEST_PLAN_TASK, noticeModel);
         }
     }
 }

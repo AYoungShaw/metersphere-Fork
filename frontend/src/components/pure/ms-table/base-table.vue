@@ -3,15 +3,17 @@
     <div v-if="$slots.quickCreate" class="ms-base-table-quickCreate">
       <slot name="quickCreate"></slot>
     </div>
-    <!-- 表只做自适应不做可拖拽列 -->
     <a-table
       v-bind="{ ...$attrs, ...scrollObj }"
+      v-model:selected-keys="originalSelectedKeys"
+      v-model:expanded-keys="expandedKeys"
       :row-class="getRowClass"
       :column-resizable="true"
       :span-method="spanMethod"
       :columns="currentColumns"
-      :expanded-keys="props.expandedKeys"
       :span-all="props.spanAll"
+      @select="originalRowSelectChange"
+      @select-all="originalSelectAll"
       @expand="(rowKey, record) => emit('expand', record)"
       @change="(data: TableData[], extra: TableChangeExtra, currentData: TableData[]) => handleDragChange(data, extra, currentData)"
       @sorter-change="(dataIndex: string,direction: string) => handleSortChange(dataIndex, direction)"
@@ -38,24 +40,26 @@
               :show-select-all="!!attrs.showPagination && props.showSelectorAll"
               :disabled="(attrs.data as []).length === 0"
               :row-key="rowKey"
+              :row-selection-disabled-config="attrs.rowSelectionDisabledConfig as MsTableRowSelectionDisabledConfig"
               @change="handleSelectAllChange"
             />
           </template>
           <template #cell="{ record }">
-            <MsCheckbox
-              v-if="attrs.selectorType === 'checkbox'"
-              :value="getChecked(record)"
-              :indeterminate="getIndeterminate(record)"
-              :disabled="isDisabledChildren(record)"
-              @click.stop
-              @change="rowSelectChange(record)"
-            />
-            <a-radio
-              v-else-if="attrs.selectorType === 'radio'"
-              v-model:model-value="record.tableChecked"
-              @click.stop
-              @change="(val) => handleRadioChange(val as boolean, record)"
-            />
+            <template v-if="!isDisabledChildren(record)">
+              <MsCheckbox
+                v-if="attrs.selectorType === 'checkbox'"
+                :value="getChecked(record)"
+                :indeterminate="getIndeterminate(record)"
+                @click.stop
+                @change="rowSelectChange(record)"
+              />
+              <a-radio
+                v-else-if="attrs.selectorType === 'radio'"
+                v-model:model-value="record.tableChecked"
+                @click.stop
+                @change="(val) => handleRadioChange(val as boolean, record)"
+              />
+            </template>
             <div v-if="attrs.showPagination && props.showSelectorAll" class="w-[16px]"></div>
           </template>
         </a-table-column>
@@ -99,8 +103,11 @@
                 "
                 :table-key="(attrs.tableKey as TableKeyEnum)"
                 :is-simple="(attrs.isSimpleSetting as boolean)"
+                :only-page-size="!!attrs.onlyPageSize"
+                :show-pagination="!!attrs.showPagination"
                 @show-setting="handleShowSetting"
                 @init-data="handleInitColumn"
+                @page-size-change="pageSizeChange"
               />
               <DefaultFilter
                 v-else-if="(item.filterConfig && item.filterConfig.options?.length) || item?.filterConfig?.remoteMethod"
@@ -176,7 +183,7 @@
                   :content="String(record[item.dataIndex as string])"
                   :disabled="record[item.dataIndex as string] === '' || record[item.dataIndex as string] === undefined || record[item.dataIndex as string] === null"
                 >
-                  <div class="one-line-text">
+                  <div class="one-line-text w-full">
                     <slot :name="item.slotName" v-bind="{ record, rowIndex, column, columnConfig: item }">
                       {{ record[item.dataIndex as string] || (attrs.emptyDataShowLine ? '-' : '') }}
                     </slot>
@@ -224,7 +231,7 @@
       </template>
       <template #expand-icon="{ expanded, record }">
         <!-- @desc: 这里为了树级别展开折叠如果子级别children不存在不展示展开折叠，所以原本组件的隐藏掉，改成自定义便于控制展示隐藏 -->
-        <slot v-if="record.children && record.children.length" name="expand-icon" v-bind="{ expanded, record }">
+        <slot v-if="record.children" name="expand-icon" v-bind="{ expanded, record }">
           <div
             :class="`${
               expanded ? 'bg-[rgb(var(--primary-1))]' : 'bg-[var(--color-text-n8)]'
@@ -234,11 +241,6 @@
             <MsIcon v-else :size="8" class="text-[rgb(var(--primary-6))]" type="icon-icon_down_outlined" />
           </div>
         </slot>
-      </template>
-
-      <!-- 控制拖拽类 -->
-      <template #tr="{ record }">
-        <tr :class="!record.parent ? 'parent-tr' : 'children-tr'" />
       </template>
     </a-table>
     <div
@@ -290,7 +292,6 @@
 </template>
 
 <script lang="ts" setup>
-  import { computed, defineModel, nextTick, onMounted, ref, useAttrs, watch } from 'vue';
   import { Message } from '@arco-design/web-vue';
 
   import MsIcon from '@/components/pure/ms-icon-font/index.vue';
@@ -318,6 +319,7 @@
     MsTableColumnData,
     MsTableDataItem,
     MsTableProps,
+    MsTableRowSelectionDisabledConfig,
   } from './type';
   import { getCurrentRecordChildrenIds } from './utils';
   import type { TableChangeExtra, TableColumnData, TableData } from '@arco-design/web-vue';
@@ -335,10 +337,6 @@
     excludeKeys: Set<string>;
     selectorStatus: SelectAllEnum;
     actionConfig?: BatchActionConfig;
-    disabledConfig?: {
-      disabledChildren?: boolean;
-      parentKey?: string;
-    };
     noDisable?: boolean;
     showSetting?: boolean;
     columns: MsTableColumn;
@@ -351,7 +349,6 @@
       rowspan?: number | undefined;
       colspan?: number | undefined;
     };
-    expandedKeys?: string[];
     rowClass?: string | any[] | Record<string, any> | ((record: TableData, rowIndex: number) => any);
     spanAll?: boolean;
     showSelectorAll?: boolean;
@@ -380,8 +377,13 @@
     (e: 'moduleChange'): void;
     (e: 'initEnd'): void;
     (e: 'reset'): void;
+    (e: 'select', rowKeys: (string | number)[], _rowKey: string | number, record: TableData): void;
+    (e: 'selectAll', checked: boolean): void;
   }>();
   const attrs = useAttrs();
+
+  const expandedKeys = defineModel<string[]>('expandedKeys', { default: [] });
+  const originalSelectedKeys = defineModel<(string | number)[]>('originalSelectedKeys', { default: [] });
 
   // 编辑按钮的Active状态
   const editActiveKey = ref<string>('');
@@ -519,6 +521,15 @@
   const rowSelectChange = (record: TableData) => {
     emit('rowSelectChange', record);
   };
+  // 表格原生行选择器change事件
+  function originalRowSelectChange(rowKeys: (string | number)[], _rowKey: string | number, record: TableData) {
+    emit('select', rowKeys, _rowKey, record);
+  }
+
+  // 表格原生选择全部事件
+  function originalSelectAll(checked: boolean) {
+    emit('selectAll', checked);
+  }
 
   // 分页change事件
   const pageChange = (v: number) => {
@@ -619,12 +630,12 @@
       return;
     }
 
-    if (extra && extra.dragTarget?.id) {
+    if (extra && extra.dragTarget?.[rowKey || 'id']) {
       let newDragData: TableData[] = data;
-      let oldDragData: TableData[] = currentData;
+      let oldDragData: TableData[] = attrs.data as TableData[]; // attrs.data 在这仍保留了原本数据顺序
 
-      const newDragItem = getCurrentList(data, 'id', extra.dragTarget.id);
-      const oldDragItem = getCurrentList(currentData, 'key', extra.dragTarget.id);
+      const newDragItem = getCurrentList(data, rowKey || 'id', extra.dragTarget[rowKey || 'id']);
+      const oldDragItem = getCurrentList(oldDragData, rowKey || 'id', extra.dragTarget[rowKey || 'id']);
 
       if (newDragItem && newDragItem.children && oldDragItem && oldDragItem.children) {
         newDragData = newDragItem.children;
@@ -634,8 +645,8 @@
       let oldIndex = 0;
       let newIndex = 0;
 
-      newIndex = newDragData.findIndex((item: any) => item.id === extra.dragTarget?.id);
-      oldIndex = oldDragData.findIndex((item: any) => item.key === extra.dragTarget?.id);
+      newIndex = newDragData.findIndex((item: any) => item[rowKey || 'id'] === extra.dragTarget?.[rowKey || 'id']);
+      oldIndex = oldDragData.findIndex((item: any) => item[rowKey || 'id'] === extra.dragTarget?.[rowKey || 'id']);
       let position: 'AFTER' | 'BEFORE' = 'BEFORE';
 
       position = newIndex > oldIndex ? 'AFTER' : 'BEFORE';
@@ -643,7 +654,7 @@
         projectId: appStore.currentProjectId,
         targetId: '', // 放置目标id
         moveMode: position,
-        moveId: extra.dragTarget.id as string, // 拖拽id
+        moveId: extra.dragTarget[rowKey || 'id'] as string, // 拖拽id
       };
 
       let targetIndex;
@@ -658,9 +669,12 @@
         params.moveMode = 'AFTER';
         targetIndex = newIndex - 1;
       }
-      params.targetId = newDragData[targetIndex]?.id ?? newDragData[newIndex]?.id;
+      params.targetId = newDragData[targetIndex]?.[rowKey || 'id'] ?? newDragData[newIndex]?.[rowKey || 'id'];
 
-      emit('dragChange', params);
+      if (oldIndex !== newIndex) {
+        // 原地移动不触发
+        emit('dragChange', params);
+      }
     }
   };
 
@@ -722,8 +736,16 @@
     emit('filterChange', dataIndex, value, isCustomParam);
   };
 
+  function isDisabledChildren(record: TableData) {
+    if (!(attrs.rowSelectionDisabledConfig as MsTableRowSelectionDisabledConfig)?.disabledChildren) {
+      return false;
+    }
+    // 子级禁用
+    return !!record[(attrs.rowSelectionDisabledConfig as MsTableRowSelectionDisabledConfig).parentKey || 'parent'];
+  }
+
   function getChecked(record: TableData) {
-    if (!record.children) {
+    if (!record.children || (attrs.rowSelectionDisabledConfig as MsTableRowSelectionDisabledConfig)?.disabledChildren) {
       return props.selectedKeys.has(record[rowKey || 'id']);
     }
 
@@ -732,7 +754,7 @@
   }
 
   function getIndeterminate(record: TableData) {
-    if (!record.children) {
+    if (!record.children || (attrs.rowSelectionDisabledConfig as MsTableRowSelectionDisabledConfig)?.disabledChildren) {
       return false;
     }
     const childKeyIds = getCurrentRecordChildrenIds(record.children, rowKey || 'id');
@@ -745,14 +767,6 @@
       return true;
     }
     return false;
-  }
-
-  function isDisabledChildren(record: TableData) {
-    if (!props.disabledConfig?.disabledChildren) {
-      return false;
-    }
-    // 子级禁用
-    return !!record[props.disabledConfig.parentKey || 'parent'];
   }
 
   onMounted(async () => {

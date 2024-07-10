@@ -122,10 +122,20 @@
         <if test="request.scenarioId != null and request.scenarioId != ''">
             and api_scenario.id = #{request.scenarioId}
         </if>
+        <if test="request.projectId != null and request.projectId != ''">
+            and api_scenario.project_id = #{request.projectId}
+        </if>
         <if test="request.moduleIds != null and request.moduleIds.size() > 0">
             and api_scenario.module_id in
             <foreach collection="request.moduleIds" item="nodeId" separator="," open="(" close=")">
-                #{nodeId}
+                <choose>
+                    <when test="nodeId.contains('_root')">
+                        'root'
+                    </when>
+                    <otherwise>
+                        #{nodeId}
+                    </otherwise>
+                </choose>
             </foreach>
         </if>
         <if test="request.collectionId != null and request.collectionId != ''">
@@ -323,14 +333,15 @@
 
 
     <select id="countModuleIdByRequest"  resultType="io.metersphere.functional.dto.FunctionalCaseModuleCountDTO">
-        SELECT api_scenario.module_id AS moduleId, count(api_scenario.id) AS dataCount, api_scenario.project_id AS projectId, project.name AS projectName
+        SELECT CASE WHEN api_scenario.module_id = 'root' THEN CONCAT(api_scenario.project_id, '_', api_scenario.module_id) ELSE api_scenario.module_id END AS moduleId,
+               count(api_scenario.id) AS dataCount, api_scenario.project_id AS projectId, project.name AS projectName
         FROM test_plan_api_scenario
         INNER JOIN api_scenario on api_scenario.id = test_plan_api_scenario.api_scenario_id
         INNER JOIN project ON api_scenario.project_id = project.id
         WHERE test_plan_api_scenario.test_plan_id = #{request.testPlanId}
         AND api_scenario.deleted = #{deleted}
         <include refid="queryApiScenarioWhereCondition"/>
-        GROUP BY module_id
+        GROUP BY moduleId
     </select>
 
     <select id="caseCount"
@@ -372,7 +383,7 @@
                  INNER JOIN api_scenario on api_scenario.id = test_plan_api_scenario.api_scenario_id
                  LEFT JOIN project p ON api_scenario.project_id = p.id
         WHERE test_plan_api_scenario.test_plan_id = #{testPlanId}
-          AND api_scenario.deleted = false AND api_scenario.module_id = 'root'
+          AND api_scenario.deleted = false
         ORDER BY api_scenario.pos
     </select>
 
@@ -389,8 +400,9 @@
         select tpas.test_plan_id testPlanId, tpas.api_scenario_id apiScenarioId, tpas.last_exec_result lastExecResult
         from test_plan_api_scenario tpas join api_scenario asce on asce.id = tpas.api_scenario_id
         <where>
+            asce.deleted = false
             <if test="planIds != null and planIds.size() > 0">
-                tpas.test_plan_id in
+                and tpas.test_plan_id in
                 <foreach collection="planIds" item="id" separator="," open="(" close=")">
                     #{id}
                 </foreach>
@@ -432,7 +444,7 @@
     <select id="getIdsByReportIdAndCollectionId" resultType="java.lang.String">
         select id from test_plan_report_api_scenario
         where test_plan_report_id = #{testPlanReportId} and test_plan_collection_id = #{collectionId}
-        order by pos
+        order by pos desc
     </select>
     <sql id="queryWhereConditionByBatchQueryRequest">
         <if test="request.condition.keyword != null and request.condition.keyword != ''">
@@ -462,6 +474,36 @@
             </include>
         </if>
     </sql>
+
+    <select id="getPlanScenarioCaseNotDeletedByCollectionIds" resultType="io.metersphere.plan.domain.TestPlanApiScenario">
+        SELECT t.*
+        FROM test_plan_api_scenario t
+                 INNER JOIN api_scenario a ON t.api_scenario_id = a.id
+        WHERE t.test_plan_collection_id IN
+        <foreach collection="collectionIds" item="collectionId" separator="," open="(" close=")">
+            #{collectionId}
+        </foreach>
+          AND a.deleted = false
+    </select>
+    <select id="selectDistinctExecResult" resultType="io.metersphere.plan.dto.TestPlanResourceExecResultDTO">
+        select distinct resource.test_plan_id AS testPlanId,
+                        CASE
+                            WHEN resource.last_exec_result = 'BLOCKED'
+                                THEN 'COMPLETED'
+                            WHEN resource.last_exec_result = 'FAKE_ERROR'
+                                THEN 'COMPLETED'
+                            WHEN resource.last_exec_result = 'ERROR'
+                                THEN 'COMPLETED'
+                            WHEN resource.last_exec_result = 'SUCCESS'
+                                THEN 'COMPLETED'
+                            ELSE 'PENDING'
+                            END               AS execResult,
+                        test_plan.group_id    AS testPlanGroupId
+        from test_plan_api_scenario resource
+                 INNER JOIN test_plan ON test_plan.id = resource.test_plan_id
+        where test_plan.project_id = #{projectId}
+          AND test_plan.status != 'ARCHIVED'
+    </select>
 
 
     <update id="batchUpdateExecutor">

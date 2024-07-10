@@ -107,7 +107,7 @@
                   {{ dayjs(item.createTime).format('YYYY-MM-DD HH:mm:ss') }}
                 </div>
               </div>
-              <div v-else class="ms-message-item">
+              <div v-else class="ms-message-item" @click.stop="setReadMessage(item)">
                 <MSAvatar v-if="item.avatar" :avatar="item.avatar" :word="item.userName" />
                 <div class="ml-[8px] flex flex-col">
                   <div class="flex items-center">
@@ -183,6 +183,7 @@
   import MsList from '@/components/pure/ms-list/index.vue';
 
   import {
+    getMessageRead,
     getMessageReadAll,
     MessageHistoryItem,
     OptionItem,
@@ -268,7 +269,7 @@
       current: pageNation.value.current || 1,
       pageSize: pageNation.value.pageSize,
     });
-    res.list.forEach((item) => messageHistoryList.value.push(item));
+    messageHistoryList.value = res.list || [];
     pageNation.value.total = res.total;
   }
 
@@ -306,6 +307,8 @@
       key = 'SCHEDULE';
     } else if (key === 'TEST_PLAN_MANAGEMENT') {
       key = 'TEST_PLAN';
+    } else if (key === 'JENKINS_TASK_MANAGEMENT') {
+      key = 'JENKINS';
     } else {
       key = '';
     }
@@ -376,6 +379,12 @@
         count = module.name;
       }
     }
+    if (type === 'JENKINS_TASK_MANAGEMENT') {
+      const module = options.value.find((item) => item.id === 'JENKINS');
+      if (module) {
+        count = module.name;
+      }
+    }
     const number = parseInt(count, 10);
     if (number > 99) {
       return '+99';
@@ -392,6 +401,7 @@
     [MessageResourceType.API_DEFINITION_TASK]: ApiTestRouteEnum.API_TEST_MANAGEMENT,
     [MessageResourceType.API_SCENARIO_TASK]: ApiTestRouteEnum.API_TEST_SCENARIO,
     [MessageResourceType.TEST_PLAN_TASK]: TestPlanRouteEnum.TEST_PLAN_INDEX_DETAIL,
+    [MessageResourceType.JENKINS_TASK]: TestPlanRouteEnum.TEST_PLAN_INDEX_DETAIL,
   };
 
   // 点击名称跳转
@@ -424,6 +434,18 @@
     // 左侧消息总数
     await loadTotalCount('');
     await loadMessageHistoryList(position.value, currentResourceType.value);
+  }
+
+  async function setReadMessage(item: MessageHistoryItem) {
+    if (item.status === 'READ') {
+      return;
+    }
+    try {
+      await getMessageRead(item.id);
+      loadMessageHistoryList(position.value, currentResourceType.value);
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   watch(

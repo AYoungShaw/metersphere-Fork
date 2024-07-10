@@ -27,7 +27,7 @@ VALUES
 INSERT INTO functional_case(id, num, module_id, project_id, template_id, name, review_status, tags, case_edit_type, pos, version_id, ref_id, last_execute_result, deleted, public_case, latest, create_user, update_user, delete_user, create_time, update_time, delete_time)
 VALUES
        ('fc_1', 1, 't_1', '123', '100001', '111', 'UN_REVIEWED', NULL, 'TEXT', 55000, 'v3.0.0', 'TEST_FUNCTIONAL_MINDER_CASE_ID_7', 'UN_EXECUTED', b'0', b'0', b'1', 'admin', 'admin', '', 1698058347559, 1698058347559, NULL),
-       ('fc_2', 2, 't_1', '123', '100001', '222', 'UN_REVIEWED', NULL, 'TEXT', 55000, 'v3.0.0', 'TEST_FUNCTIONAL_MINDER_CASE_ID_7', 'UN_EXECUTED', b'0', b'0', b'1', 'admin', 'admin', '', 1698058347559, 1698058347559, NULL),
+       ('fc_2', 2, 'root', '123', '100001', '222', 'UN_REVIEWED', NULL, 'TEXT', 55000, 'v3.0.0', 'TEST_FUNCTIONAL_MINDER_CASE_ID_7', 'UN_EXECUTED', b'0', b'0', b'1', 'admin', 'admin', '', 1698058347559, 1698058347559, NULL),
        ('fc_3', 3, 'root', '123', '100001', '333', 'UN_REVIEWED', NULL, 'TEXT', 55000, 'v3.0.0', 'TEST_FUNCTIONAL_MINDER_CASE_ID_7', 'UN_EXECUTED', b'0', b'0', b'1', 'admin', 'admin', '', 1698058347559, 1698058347559, NULL),
        ('gyq_disassociate_fc_1', 4, 'root', 'gyq_disassociate', '100001', 'disassociate1', 'UN_REVIEWED', NULL, 'TEXT', 55000, 'v3.0.0', 'gyq_disassociate_fc_1', 'UN_EXECUTED', b'0', b'0', b'1', 'admin', 'admin', '', 1698058347559, 1698058347559, NULL),
        ('gyq_disassociate_fc_2', 5, 'root', 'gyq_disassociate', '100001', 'disassociate2', 'UN_REVIEWED', NULL, 'TEXT', 55000, 'v3.0.0', 'gyq_disassociate_fc_2', 'UN_EXECUTED', b'0', b'0', b'1', 'admin', 'admin', '', 1698058347559, 1698058347559, NULL),
@@ -59,7 +59,9 @@ INSERT INTO template (id,name,remark,internal,update_time,create_time,create_use
 
 INSERT INTO `test_plan_collection`(`id`, `test_plan_id`, `name`, `type`, `environment_id`, `test_resource_pool_id`, `pos`, `create_user`, `create_time`, `parent_id`)
 VALUES
-    ('123', 'plan_1', 'coll_1', 'FUNCTIONAL', 'NONE', 'NONE', 1, 'admin', 1716370415311, '123456');
+    ('123', 'plan_1', 'coll_1', 'FUNCTIONAL', 'NONE', 'NONE', 1, 'admin', 1716370415311, '123456'),
+    ('223', 'plan_1', 'api_coll_1', 'API', 'NONE', 'NONE', 2, 'admin', 1716370415311, '123456'),
+    ('323', 'plan_1', 'scenario_coll_1', 'SCENARIO', 'NONE', 'NONE', 3, 'admin', 1716370415311, '123456');
 
 INSERT INTO `test_plan_case_execute_history`(`id`, `test_plan_case_id`, `test_plan_id`, `case_id`, `status`, `content`, `steps`, `deleted`, `notifier`, `create_user`, `create_time`)
 VALUES
@@ -69,3 +71,6 @@ INSERT INTO functional_case_blob(id, steps, text_description, expected_result, p
 INSERT INTO project (id, num, organization_id, name, description, create_user, update_user, create_time, update_time, module_setting)
 VALUES
     ('123', 2, 1, 'wx', 'wx', 'admin', 'admin', unix_timestamp() * 1000, unix_timestamp() * 1000,'["bugManagement","caseManagement","apiTest","testPlan"]');
+
+INSERT INTO `test_plan_config`(`test_plan_id`, `automatic_status_update`, `repeat_case`, `pass_threshold`, `case_run_mode`)
+VALUES ('plan_1', b'0', b'0', 100.00, 'PARALLEL');

@@ -280,7 +280,7 @@ public class ApiTestCaseBatchRunService {
             reportId = IDGenerator.nextStr();
         } else {
             // 独立报告，执行到当前任务时初始化报告
-            reportId = initApiReport(runModeConfig, List.of(apiTestCase), queue.getUserId()).get(0).getApiReportId();
+            reportId = initApiReport(runModeConfig, List.of(apiTestCase), queue.getUserId()).getFirst().getApiReportId();
         }
 
         if (apiTestCase == null) {
@@ -290,6 +290,7 @@ public class ApiTestCaseBatchRunService {
 
         TaskRequestDTO taskRequest = getTaskRequestDTO(reportId, apiTestCase, runModeConfig);
         taskRequest.getTaskInfo().setQueueId(queue.getQueueId());
+        taskRequest.getTaskInfo().setUserId(queue.getUserId());
         taskRequest.getTaskItem().setRequestCount(1L);
 
         apiExecuteService.execute(taskRequest);
@@ -377,7 +378,7 @@ public class ApiTestCaseBatchRunService {
             BeanUtils.copyBean(apiScenarioReport, report);
             apiScenarioReport = apiBatchRunBaseService.computeRequestRate(apiScenarioReport, total);
             BeanUtils.copyBean(report, apiScenarioReport);
-            report.setStatus(ReportStatus.ERROR.name());
+            report.setStatus(ResultStatus.ERROR.name());
             report.setExecStatus(ExecStatus.COMPLETED.name());
             apiReportMapper.updateByPrimaryKeySelective(report);
         }

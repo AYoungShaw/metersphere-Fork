@@ -1,6 +1,7 @@
 <template>
   <a-spin :loading="attachmentLoading" class="block h-full pl-[16px]">
     <MsAddAttachment
+      v-if="!props.notShowAddButton"
       v-model:file-list="fileList"
       :disabled="!hasEditPermission"
       multiple
@@ -37,23 +38,19 @@
           >
             {{ t('ms.upload.preview') }}
           </MsButton>
+          <MsButton type="button" status="primary" class="!mr-[4px]" @click="transferFile(item)">
+            {{ t('caseManagement.featureCase.storage') }}
+          </MsButton>
           <SaveAsFilePopover
-            v-model:visible="transferVisible"
+            v-if="item.status !== 'init'"
             :saving-file="activeTransferFileParams"
             :file-save-as-source-id="activeCase.id || ''"
             :file-save-as-api="transferFileRequest"
             :file-module-options-api="getTransferFileTree"
             source-id-key="caseId"
-          />
-          <MsButton
-            v-if="item.status !== 'init'"
-            type="button"
-            status="primary"
-            class="!mr-[4px]"
-            @click="transferFile(item)"
           >
-            {{ t('caseManagement.featureCase.storage') }}
-          </MsButton>
+            <span :id="item.uid"></span>
+          </SaveAsFilePopover>
           <MsButton
             v-if="item.status !== 'init'"
             type="button"
@@ -90,6 +87,7 @@
         </div>
       </template>
     </MsFileList>
+    <MsEmpty v-if="!fileList.length" />
   </a-spin>
   <LinkFileDrawer
     v-model:visible="showLinkFileDrawer"
@@ -106,6 +104,7 @@
   import { Message } from '@arco-design/web-vue';
 
   import MsButton from '@/components/pure/ms-button/index.vue';
+  import MsEmpty from '@/components/pure/ms-empty/index.vue';
   import MsFileList from '@/components/pure/ms-upload/fileList.vue';
   import { MsFileItem } from '@/components/pure/ms-upload/types';
   import MsAddAttachment from '@/components/business/ms-add-attachment/index.vue';
@@ -136,6 +135,7 @@
 
   const props = defineProps<{
     activeCase: Record<string, any>;
+    notShowAddButton?: boolean;
   }>();
   const emit = defineEmits<{
     (e: 'uploadSuccess'): void;
@@ -198,7 +198,7 @@
           return item;
         });
       }
-      Message.success(t('ms.upload.uploadSuccess'));
+      Message.success(t('common.linkSuccess'));
       emit('uploadSuccess');
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -244,14 +244,12 @@
     }
   }
 
-  const transferVisible = ref<boolean>(false);
-
   const activeTransferFileParams = ref<MsFileItem>();
 
   // 转存
   function transferFile(item: MsFileItem) {
     activeTransferFileParams.value = { ...item };
-    transferVisible.value = true;
+    document.getElementById(item.uid)?.click();
   }
 
   // 删除本地文件
@@ -329,6 +327,7 @@
     try {
       await updateFile(appStore.currentProjectId, item.associationId);
       Message.success(t('common.updateSuccess'));
+      emit('uploadSuccess');
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);

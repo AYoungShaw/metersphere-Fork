@@ -18,7 +18,10 @@
       </div>
       <template #content>
         <a-doption :value="SelectAllEnum.CURRENT">{{ t('msTable.current') }}</a-doption>
-        <a-doption :value="SelectAllEnum.ALL">{{ t('msTable.all') }}</a-doption>
+        <a-doption v-if="selectAllStatus === SelectAllEnum.ALL" :value="SelectAllEnum.CANCEL_ALL">
+          {{ t('msTable.cancelAll') }}
+        </a-doption>
+        <a-doption v-else :value="SelectAllEnum.ALL">{{ t('msTable.all') }}</a-doption>
       </template>
     </a-dropdown>
   </div>
@@ -31,7 +34,7 @@
 
   import { SelectAllEnum } from '@/enums/tableEnum';
 
-  import { MsTableDataItem } from './type';
+  import { MsTableDataItem, MsTableRowSelectionDisabledConfig } from './type';
 
   const { t } = useI18n();
 
@@ -48,6 +51,7 @@
       disabled: boolean;
       excludeKeys: string[];
       rowKey?: string;
+      rowSelectionDisabledConfig?: MsTableRowSelectionDisabledConfig;
     }>(),
     {
       current: 0,
@@ -77,7 +81,11 @@
       if (!isHasChildren.value) {
         return (
           (props.selectedKeys.size > 0 && selectAllStatus.value === SelectAllEnum.ALL) ||
-          (props.selectedKeys.size > 0 && props.selectedKeys.size === props.total)
+          (props.selectedKeys.size > 0 && props.selectedKeys.size === props.total) ||
+          (props.selectedKeys.size > 0 &&
+            props.selectedKeys.size > props.total &&
+            props.currentData.length === props.total &&
+            props.currentData.every((e) => props.selectedKeys.has(e[props.rowKey])))
         );
       }
       // 含有子级 children全选条件
@@ -130,7 +138,7 @@
     rowKey: string
   ): boolean {
     return data.some((item: any) => {
-      if (item.children && item.children.length > 0) {
+      if (item.children && item.children.length > 0 && !props.rowSelectionDisabledConfig?.disabledChildren) {
         return hasUnselectedChildren(item.children, selectedKeys, rowKey);
       }
       return !selectedKeys.has(item[rowKey]);

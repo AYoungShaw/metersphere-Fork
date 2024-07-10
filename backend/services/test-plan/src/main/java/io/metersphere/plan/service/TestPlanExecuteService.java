@@ -21,7 +21,6 @@ import io.metersphere.system.uid.IDGenerator;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,9 +51,6 @@ public class TestPlanExecuteService {
     private PlanRunTestPlanApiScenarioService planRunTestPlanApiScenarioService;
     @Resource
     private TestPlanApiBatchRunBaseService testPlanApiBatchRunBaseService;
-
-    @Resource
-    private RedisTemplate<String, String> redisTemplate;
 
     @Resource
     private TestPlanReportMapper testPlanReportMapper;
@@ -119,16 +115,9 @@ public class TestPlanExecuteService {
     }
 
     private void deepDeleteTestPlanCaseType(TestPlanReport report) {
-        testPlanExecuteSupportService.deleteRedisKey(
-                testPlanExecuteSupportService.genQueueKey(report.getId(), QUEUE_PREFIX_TEST_PLAN_CASE_TYPE));
-        TestPlanCollectionExample collectionExample = new TestPlanCollectionExample();
-        collectionExample.createCriteria().andTestPlanIdEqualTo(report.getTestPlanId()).andParentIdEqualTo(TestPlanConstants.DEFAULT_PARENT_ID);
-        List<TestPlanCollection> parentTestPlanCollectionList = testPlanCollectionMapper.selectByExample(collectionExample);
-        parentTestPlanCollectionList.forEach(parentCollection -> {
-            testPlanExecuteSupportService.deleteRedisKey(
-                    testPlanExecuteSupportService.genQueueKey(report.getId() + "_" + parentCollection.getId(), QUEUE_PREFIX_TEST_PLAN_COLLECTION));
-            //todo @Chen-Jianxing 这里要同步清理用例/场景的执行队列
-        });
+        // 删除该任务相关的队列
+        testPlanExecuteSupportService.keys("*" + report.getId() + "*")
+                .forEach(key -> testPlanExecuteSupportService.deleteQueue(key));
     }
 
     /**
@@ -136,28 +125,28 @@ public class TestPlanExecuteService {
      * 这里涉及到嵌套查询，不使用事务。中间涉及到的报告生成、测试计划字段更改、测试报告汇总等操作会开启子事务处理。
      */
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.NOT_SUPPORTED)
-    public String singleExecuteTestPlan(TestPlanExecuteRequest request, String userId) {
+    public String singleExecuteTestPlan(TestPlanExecuteRequest request, String reportId, String userId) {
+            String queueId = IDGenerator.nextStr();
+            TestPlanExecutionQueue singleExecuteRootQueue = new TestPlanExecutionQueue(
+                    0,
+                    userId,
+                    System.currentTimeMillis(),
+                    queueId,
+                    QUEUE_PREFIX_TEST_PLAN_BATCH_EXECUTE,
+                    null,
+                    null,
+                    request.getExecuteId(),
+                    request.getRunMode(),
+                    request.getExecutionSource(),
+                    reportId
+            );
 
-        String queueId = IDGenerator.nextStr();
-        TestPlanExecutionQueue singleExecuteRootQueue = new TestPlanExecutionQueue(
-                0,
-                userId,
-                System.currentTimeMillis(),
-                queueId,
-                QUEUE_PREFIX_TEST_PLAN_BATCH_EXECUTE,
-                null,
-                null,
-                request.getExecuteId(),
-                request.getRunMode(),
-                request.getExecutionSource(),
-                IDGenerator.nextStr()
-        );
-
-        testPlanExecuteSupportService.setRedisForList(
-                testPlanExecuteSupportService.genQueueKey(queueId, QUEUE_PREFIX_TEST_PLAN_BATCH_EXECUTE), List.of(JSON.toJSONString(singleExecuteRootQueue)));
-        TestPlanExecutionQueue nextQueue = testPlanExecuteSupportService.getNextQueue(queueId, QUEUE_PREFIX_TEST_PLAN_BATCH_EXECUTE);
-        LogUtils.info("测试计划（组）的单独执行start！计划报告[{}] , 资源ID[{}]", singleExecuteRootQueue.getPrepareReportId(), singleExecuteRootQueue.getSourceID());
-        return executeTestPlanOrGroup(nextQueue);
+            testPlanExecuteSupportService.setRedisForList(
+                    testPlanExecuteSupportService.genQueueKey(queueId, QUEUE_PREFIX_TEST_PLAN_BATCH_EXECUTE), List.of(JSON.toJSONString(singleExecuteRootQueue)));
+            TestPlanExecutionQueue nextQueue = testPlanExecuteSupportService.getNextQueue(queueId, QUEUE_PREFIX_TEST_PLAN_BATCH_EXECUTE);
+            LogUtils.info("测试计划（组）的单独执行start！计划报告[{}] , 资源ID[{}]", singleExecuteRootQueue.getPrepareReportId(), singleExecuteRootQueue.getSourceID());
+            executeTestPlanOrGroup(nextQueue);
+        return reportId;
     }
 
     /**
@@ -223,7 +212,7 @@ public class TestPlanExecuteService {
         genReportRequest.setTestPlanId(executionQueue.getSourceID());
         genReportRequest.setProjectId(testPlan.getProjectId());
         if (StringUtils.equalsIgnoreCase(testPlan.getType(), TestPlanConstants.TEST_PLAN_TYPE_GROUP)) {
-            //更改测试计划组的状态
+
             List<TestPlan> children = testPlanService.selectNotArchivedChildren(testPlan.getId());
             // 预生成计划组报告
             Map<String, String> reportMap = testPlanReportService.genReportByExecution(executionQueue.getPrepareReportId(), genReportRequest, executionQueue.getCreateUser());
@@ -251,12 +240,12 @@ public class TestPlanExecuteService {
             }
 
             LogUtils.info("计划组的执行节点 --- 队列ID[{}],队列类型[{}],父队列ID[{}],父队列类型[{}]", queueId, queueType, executionQueue.getParentQueueId(), executionQueue.getParentQueueType());
-
-            testPlanService.setExecuteConfig(executionQueue.getSourceID(), executionQueue.getPrepareReportId());
             if (CollectionUtils.isEmpty(childrenQueue)) {
                 //本次的测试计划组执行完成
                 this.testPlanGroupQueueFinish(executionQueue.getQueueId(), executionQueue.getQueueType());
             } else {
+                //更改测试计划组的状态
+                testPlanService.setExecuteConfig(executionQueue.getSourceID(), executionQueue.getPrepareReportId());
                 testPlanExecuteSupportService.setRedisForList(testPlanExecuteSupportService.genQueueKey(queueId, queueType), childrenQueue.stream().map(JSON::toJSONString).toList());
 
                 if (StringUtils.equalsIgnoreCase(executionQueue.getRunMode(), ApiBatchRunMode.SERIAL.name())) {
@@ -376,7 +365,7 @@ public class TestPlanExecuteService {
                     }}
             );
         }
-        LogUtils.info("测试计划不同用例类型的执行节点 --- 队列ID[{}],队列类型[{}],父队列ID[{}],父队列类型[{}],执行模式[{}]", queueId, queueType, executionQueue.getParentQueueId(), executionQueue.getParentQueueType(), executionQueue.getRunMode());
+        LogUtils.info("测试计划不同用例类型的执行节点 --- 队列ID[{}],队列类型[{}],父队列ID[{}],父队列类型[{}],执行模式[{}]", executionQueue.getQueueId(), executionQueue.getQueueType(), executionQueue.getParentQueueId(), executionQueue.getParentQueueType(), executionQueue.getRunMode());
         if (CollectionUtils.isEmpty(childrenQueue)) {
             //本次的测试集执行完成
             this.caseTypeExecuteQueueFinish(executionQueue.getQueueId(), executionQueue.getQueueType());
@@ -404,20 +393,22 @@ public class TestPlanExecuteService {
      */
     private void executeCase(TestPlanExecutionQueue testPlanExecutionQueue) {
         String queueId = testPlanExecutionQueue.getQueueId();
-        LogUtils.info("测试集执行节点 --- 队列ID[{}],队列类型[{}],父队列ID[{}],父队列类型[{}],执行模式[{}]", queueId, testPlanExecutionQueue.getQueueType(), testPlanExecutionQueue.getParentQueueId(), testPlanExecutionQueue.getParentQueueType(), testPlanExecutionQueue.getRunMode());
+        LogUtils.info("测试集执行节点 --- 队列ID[{}],队列类型[{}],父队列ID[{}],父队列类型[{}],执行模式[{},资源ID[{}]",
+                queueId, testPlanExecutionQueue.getQueueType(), testPlanExecutionQueue.getParentQueueId(), testPlanExecutionQueue.getParentQueueType(),
+                testPlanExecutionQueue.getRunMode(), testPlanExecutionQueue.getSourceID());
         boolean execOver = false;
         try {
             TestPlanCollection collection = JSON.parseObject(testPlanExecutionQueue.getTestPlanCollectionJson(), TestPlanCollection.class);
             TestPlanCollection extendedRootCollection = testPlanApiBatchRunBaseService.getExtendedRootCollection(collection);
             String executeMethod = extendedRootCollection == null ? collection.getExecuteMethod() : extendedRootCollection.getExecuteMethod();
             if (StringUtils.equalsIgnoreCase(collection.getType(), CaseType.API_CASE.getKey())) {
-                if (StringUtils.equals(executeMethod, ApiBatchRunMode.PARALLEL.name())) {
+                if (isParallel(executeMethod)) {
                     execOver = planRunTestPlanApiCaseService.parallelExecute(testPlanExecutionQueue);
                 } else {
                     execOver = planRunTestPlanApiCaseService.serialExecute(testPlanExecutionQueue);
                 }
             } else if (StringUtils.equalsIgnoreCase(collection.getType(), CaseType.SCENARIO_CASE.getKey())) {
-                if (StringUtils.equals(executeMethod, ApiBatchRunMode.PARALLEL.name())) {
+                if (isParallel(executeMethod)) {
                     execOver = planRunTestPlanApiScenarioService.parallelExecute(testPlanExecutionQueue);
                 } else {
                     execOver = planRunTestPlanApiScenarioService.serialExecute(testPlanExecutionQueue);
@@ -434,11 +425,26 @@ public class TestPlanExecuteService {
         }
     }
 
+    private boolean isParallel(String executeMethod) {
+        return StringUtils.equals(executeMethod, ApiBatchRunMode.PARALLEL.name());
+    }
+
     //测试集执行完成
-    public void collectionExecuteQueueFinish(String queueID) {
+    public void collectionExecuteQueueFinish(String paramQueueId) {
+        LogUtils.info("收到测试集执行完成的信息： [{}]", paramQueueId);
+        String queueID = paramQueueId;
+        String[] queueIdArr = queueID.split("_");
+        if (queueIdArr.length > 2) {
+            queueID = queueIdArr[0] + "_" + queueIdArr[1];
+        }
         String queueType = QUEUE_PREFIX_TEST_PLAN_COLLECTION;
-        LogUtils.info("收到测试集执行完成的信息： 队列ID[{}],队列类型[{}]，下一个节点的执行工作准备中...", queueID, queueType);
         TestPlanExecutionQueue nextQueue = testPlanExecuteSupportService.getNextQueue(queueID, queueType);
+        if (nextQueue == null) {
+            LogUtils.info("没有获取到下一个执行节点！ 原始ID[{}]，队列ID[{}]", paramQueueId, queueID);
+            return;
+        }
+        LogUtils.info("获取执行节点完成： 队列ID[{}],队列类型[{},串并行:[{}]执行是否结束[{}],是否是最后一个[{}],当前查出节点的资源ID[{}]]，下一个节点的执行工作准备中...",
+                queueID, queueType, nextQueue.getRunMode(), nextQueue.isExecuteFinish(), nextQueue.isLastOne(), nextQueue.getSourceID());
         if (StringUtils.equalsIgnoreCase(nextQueue.getRunMode(), ApiBatchRunMode.SERIAL.name())) {
             //串行时，由于是先拿出节点再判断执行，所以要判断节点的isExecuteFinish
             if (!nextQueue.isExecuteFinish()) {

@@ -108,9 +108,7 @@ public class ApiTestCaseService extends MoveNodeService {
     @Resource
     private FunctionalCaseTestMapper functionalCaseTestMapper;
 
-
     private static final String CASE_TABLE = "api_test_case";
-    private static final int MAX_TAG_SIZE = 10;
 
     private void checkProjectExist(String projectId) {
         Project project = projectMapper.selectByPrimaryKey(projectId);
@@ -179,8 +177,7 @@ public class ApiTestCaseService extends MoveNodeService {
         testCase.setCreateTime(System.currentTimeMillis());
         testCase.setUpdateTime(System.currentTimeMillis());
         if (CollectionUtils.isNotEmpty(request.getTags())) {
-            checkTagLength(request.getTags());
-            testCase.setTags(request.getTags());
+            testCase.setTags(ServiceUtils.parseTags(request.getTags()));
         }
         apiTestCaseMapper.insertSelective(testCase);
 
@@ -286,8 +283,7 @@ public class ApiTestCaseService extends MoveNodeService {
         testCase.setUpdateUser(userId);
         testCase.setUpdateTime(System.currentTimeMillis());
         if (CollectionUtils.isNotEmpty(request.getTags())) {
-            checkTagLength(request.getTags());
-            testCase.setTags(request.getTags());
+            testCase.setTags(ServiceUtils.parseTags(request.getTags()));
         } else {
             testCase.setTags(null);
         }
@@ -506,7 +502,6 @@ public class ApiTestCaseService extends MoveNodeService {
         if (CollectionUtils.isEmpty(request.getTags())) {
             throw new MSException(Translator.get("tags_is_null"));
         }
-        checkTagLength(request.getTags());
         if (request.isAppend()) {
             Map<String, ApiTestCase> caseMap = extApiTestCaseMapper.getTagsByIds(ids, false)
                     .stream()
@@ -516,8 +511,7 @@ public class ApiTestCaseService extends MoveNodeService {
                     if (CollectionUtils.isNotEmpty(v.getTags())) {
                         List<String> orgTags = v.getTags();
                         orgTags.addAll(request.getTags());
-                        checkTagLength(orgTags.stream().distinct().toList());
-                        v.setTags(orgTags.stream().distinct().toList());
+                        v.setTags(ServiceUtils.parseTags(orgTags.stream().distinct().toList()));
                     } else {
                         v.setTags(request.getTags());
                     }
@@ -527,7 +521,7 @@ public class ApiTestCaseService extends MoveNodeService {
                 });
             }
         } else {
-            updateCase.setTags(request.getTags());
+            updateCase.setTags(ServiceUtils.parseTags(request.getTags()));
             mapper.updateByExampleSelective(updateCase, example);
         }
     }
@@ -717,6 +711,7 @@ public class ApiTestCaseService extends MoveNodeService {
         TaskInfo taskInfo = taskRequest.getTaskInfo();
         taskInfo.getRunModeConfig().setPoolId(poolId);
         taskInfo.setSaveResult(true);
+        taskInfo.setUserId(userId);
 
         if (StringUtils.isEmpty(taskItem.getReportId())) {
             taskInfo.setRealTime(false);
@@ -740,11 +735,12 @@ public class ApiTestCaseService extends MoveNodeService {
      * @param request
      * @return
      */
-    public TaskRequestDTO debug(ApiCaseRunRequest request) {
+    public TaskRequestDTO debug(ApiCaseRunRequest request, String userId) {
         TaskRequestDTO taskRequest = getTaskRequest(request.getReportId(), request.getId(),
                 request.getProjectId(), apiExecuteService.getDebugRunModule(request.getFrontendDebug()));
         taskRequest.getTaskInfo().setSaveResult(false);
         taskRequest.getTaskInfo().setRealTime(true);
+        taskRequest.getTaskInfo().setUserId(userId);
 
         ApiResourceRunRequest runRequest = apiExecuteService.getApiResourceRunRequest(request);
 
@@ -778,6 +774,8 @@ public class ApiTestCaseService extends MoveNodeService {
         ApiDefinition apiDefinition = apiDefinitionMapper.selectByPrimaryKey(apiTestCase.getApiDefinitionId());
         ApiTestCaseBlob apiTestCaseBlob = apiTestCaseBlobMapper.selectByPrimaryKey(apiTestCase.getId());
         ApiParamConfig apiParamConfig = apiExecuteService.getApiParamConfig(taskItem.getReportId(), apiTestCase.getProjectId());
+        apiParamConfig.setRetryOnFail(request.getRunModeConfig().getRetryOnFail());
+        apiParamConfig.setRetryConfig(request.getRunModeConfig().getRetryConfig());
 
         AbstractMsTestElement msTestElement = ApiDataUtils.parseObject(new String(apiTestCaseBlob.getRequest()), AbstractMsTestElement.class);
         // 设置 method 等信息
@@ -923,16 +921,5 @@ public class ApiTestCaseService extends MoveNodeService {
 
     public List<ReferenceDTO> getReference(ReferenceRequest request) {
         return extApiDefinitionMapper.getReference(request);
-    }
-
-    /**
-     * 校验TAG长度
-     *
-     * @param tags 标签集合
-     */
-    public void checkTagLength(List<String> tags) {
-        if (CollectionUtils.isNotEmpty(tags) && tags.size() > MAX_TAG_SIZE) {
-            throw new MSException(Translator.getWithArgs("tags_size_large_than", String.valueOf(MAX_TAG_SIZE)));
-        }
     }
 }

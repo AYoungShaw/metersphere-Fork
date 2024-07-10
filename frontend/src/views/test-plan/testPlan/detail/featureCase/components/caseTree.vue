@@ -61,6 +61,7 @@
   import { getFeatureCaseModule } from '@/api/modules/test-plan/testPlan';
   import { useI18n } from '@/hooks/useI18n';
   import { mapTree } from '@/utils';
+  import { getNodeParentId } from '@/utils/tree';
 
   import { ModuleTreeNode } from '@/models/common';
 
@@ -70,7 +71,7 @@
     treeType: 'MODULE' | 'COLLECTION';
   }>();
   const emit = defineEmits<{
-    (e: 'folderNodeSelect', ids: string[], _offspringIds: string[], nodeName?: string): void;
+    (e: 'folderNodeSelect', ids: string[], _offspringIds: string[], nodeName?: string, parentId?: string): void;
     (e: 'init', params: ModuleTreeNode[]): void;
   }>();
 
@@ -88,16 +89,18 @@
 
   const activeFolder = ref<string>('all');
   const allCount = ref(0);
-  const isExpandAll = ref<boolean | undefined>(false);
-
+  const isExpandAll = ref<boolean | undefined>(undefined);
+  function setIsExpandAll() {
+    if (props.treeType === 'COLLECTION') {
+      isExpandAll.value = undefined;
+    } else {
+      isExpandAll.value = false;
+    }
+  }
   watch(
     () => props.treeType,
-    (val) => {
-      if (val === 'COLLECTION') {
-        isExpandAll.value = undefined;
-      } else {
-        isExpandAll.value = false;
-      }
+    () => {
+      setIsExpandAll();
     }
   );
 
@@ -144,10 +147,11 @@
       return e;
     });
     activeFolder.value = node.id;
-    emit('folderNodeSelect', _selectedKeys as string[], offspringIds, node.name);
+    emit('folderNodeSelect', _selectedKeys as string[], offspringIds, node.name, getNodeParentId(node));
   }
 
   onBeforeMount(() => {
+    setIsExpandAll();
     initModules();
   });
 

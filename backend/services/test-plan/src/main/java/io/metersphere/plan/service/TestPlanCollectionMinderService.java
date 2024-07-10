@@ -38,13 +38,13 @@ public class TestPlanCollectionMinderService {
     private ExtTestPlanCollectionMapper extTestPlanCollectionMapper;
 
     @Resource
-    private TestPlanFunctionalCaseMapper testPlanFunctionalCaseMapper;
+    private ExtTestPlanFunctionalCaseMapper extTestPlanFunctionalCaseMapper;
 
     @Resource
-    private TestPlanApiCaseMapper testPlanApiCaseMapper;
+    private ExtTestPlanApiCaseMapper extTestPlanApiCaseMapper;
 
     @Resource
-    private TestPlanApiScenarioMapper testPlanApiScenarioMapper;
+    private ExtTestPlanApiScenarioMapper exttestPlanApiScenarioMapper;
 
     @Resource
     private TestPlanService testPlanService;
@@ -119,9 +119,7 @@ public class TestPlanCollectionMinderService {
             return new HashMap<>();
         }
         List<String> scenarioCollectIds = testPlanCollectionConfigDTOS.stream().map(TestPlanCollectionConfigDTO::getId).toList();
-        TestPlanApiScenarioExample testPlanApiScenarioExample = new TestPlanApiScenarioExample();
-        testPlanApiScenarioExample.createCriteria().andTestPlanCollectionIdIn(scenarioCollectIds);
-        List<TestPlanApiScenario> testPlanApiScenarios = testPlanApiScenarioMapper.selectByExample(testPlanApiScenarioExample);
+        List<TestPlanApiScenario> testPlanApiScenarios = exttestPlanApiScenarioMapper.getPlanScenarioCaseNotDeletedByCollectionIds(scenarioCollectIds);
         return testPlanApiScenarios.stream().collect(Collectors.groupingBy(TestPlanApiScenario::getTestPlanCollectionId));
     }
 
@@ -131,9 +129,7 @@ public class TestPlanCollectionMinderService {
             return new HashMap<>();
         }
         List<String> apiCollectIds = testPlanCollectionConfigDTOS.stream().map(TestPlanCollectionConfigDTO::getId).toList();
-        TestPlanApiCaseExample testPlanApiCaseExample = new TestPlanApiCaseExample();
-        testPlanApiCaseExample.createCriteria().andTestPlanCollectionIdIn(apiCollectIds);
-        List<TestPlanApiCase> testPlanApiCases = testPlanApiCaseMapper.selectByExample(testPlanApiCaseExample);
+        List<TestPlanApiCase> testPlanApiCases = extTestPlanApiCaseMapper.getPlanApiCaseNotDeletedByCollectionIds(apiCollectIds);
         return testPlanApiCases.stream().collect(Collectors.groupingBy(TestPlanApiCase::getTestPlanCollectionId));
 
     }
@@ -144,9 +140,7 @@ public class TestPlanCollectionMinderService {
             return new HashMap<>();
         }
         List<String> functionalCollectIds = testPlanCollectionConfigDTOS.stream().map(TestPlanCollectionConfigDTO::getId).toList();
-        TestPlanFunctionalCaseExample testPlanFunctionalCaseExample = new TestPlanFunctionalCaseExample();
-        testPlanFunctionalCaseExample.createCriteria().andTestPlanCollectionIdIn(functionalCollectIds);
-        List<TestPlanFunctionalCase> testPlanFunctionalCases = testPlanFunctionalCaseMapper.selectByExample(testPlanFunctionalCaseExample);
+        List<TestPlanFunctionalCase> testPlanFunctionalCases = extTestPlanFunctionalCaseMapper.getPlanCaseNotDeletedByCollectionIds(functionalCollectIds);
         return testPlanFunctionalCases.stream().collect(Collectors.groupingBy(TestPlanFunctionalCase::getTestPlanCollectionId));
 
     }
@@ -251,9 +245,6 @@ public class TestPlanCollectionMinderService {
         beansOfType.forEach((k, v) -> {
             v.associateCollection(request.getPlanId(), associateMap, user);
         });
-        List<TestPlanCollection> testPlanCollections = testPlanCollectionMapper.selectByExample(new TestPlanCollectionExample());
-        //更新测试计划
-        testPlanService.refreshTestPlanStatus(request.getPlanId());
     }
 
     private void dealEditList(TestPlanCollectionMinderEditRequest request, String userId, Map<String, List<BaseCollectionAssociateRequest>> associateMap) {
@@ -346,7 +337,7 @@ public class TestPlanCollectionMinderService {
     @NotNull
     private Map<String, List<TestPlanCollection>> getParentMap(TestPlanCollectionMinderEditRequest request) {
         List<TestPlanCollectionMinderEditDTO> list = request.getEditList().stream().filter(t -> StringUtils.isNotBlank(t.getId()) && t.getLevel() == 1).toList();
-        List<TestPlanCollection>parentList = new ArrayList<>();
+        List<TestPlanCollection> parentList = new ArrayList<>();
         for (TestPlanCollectionMinderEditDTO testPlanCollectionMinderEditDTO : list) {
             TestPlanCollection testPlanCollection = new TestPlanCollection();
             BeanUtils.copyBean(testPlanCollection, testPlanCollectionMinderEditDTO);
@@ -360,7 +351,7 @@ public class TestPlanCollectionMinderService {
     @NotNull
     private static TestPlanCollection updateCollection(TestPlanCollectionMinderEditRequest request, String userId, TestPlanCollectionMinderEditDTO testPlanCollectionMinderEditDTO, Map<String, List<TestPlanCollection>> parentMap, TestPlanCollectionMapper collectionMapper) {
         TestPlanCollection testPlanCollection = new TestPlanCollection();
-        TestPlanCollection parent = parentMap.get(testPlanCollectionMinderEditDTO.getType()).get(0);
+        TestPlanCollection parent = parentMap.get(testPlanCollectionMinderEditDTO.getType()).getFirst();
         if (testPlanCollectionMinderEditDTO.getExtended()) {
             BeanUtils.copyBean(testPlanCollection, parent);
         } else {
@@ -371,13 +362,16 @@ public class TestPlanCollectionMinderService {
         } else {
             testPlanCollection.setParentId(parent.getId());
         }
+        if (testPlanCollectionMinderEditDTO.getText().length() > 255) {
+            testPlanCollectionMinderEditDTO.setText(testPlanCollectionMinderEditDTO.getText().substring(0, 249));
+        }
         testPlanCollection.setName(testPlanCollectionMinderEditDTO.getText());
         testPlanCollection.setTestPlanId(request.getPlanId());
         testPlanCollection.setType(testPlanCollectionMinderEditDTO.getType());
         testPlanCollection.setId(testPlanCollectionMinderEditDTO.getId());
         testPlanCollection.setCreateUser(userId);
         testPlanCollection.setCreateTime(null);
-        testPlanCollection.setPos(testPlanCollectionMinderEditDTO.getNum());
+        testPlanCollection.setPos((testPlanCollectionMinderEditDTO.getNum() + 1) * 4096);
         collectionMapper.updateByPrimaryKeySelective(testPlanCollection);
         return testPlanCollection;
     }
@@ -385,7 +379,7 @@ public class TestPlanCollectionMinderService {
     @NotNull
     private static TestPlanCollection addCollection(TestPlanCollectionMinderEditRequest request, String userId, TestPlanCollectionMinderEditDTO testPlanCollectionMinderEditDTO, Map<String, List<TestPlanCollection>> parentMap, TestPlanCollectionMapper collectionMapper) {
         List<TestPlanCollection> testPlanCollections = parentMap.get(testPlanCollectionMinderEditDTO.getType());
-        TestPlanCollection parent = testPlanCollections.get(0);
+        TestPlanCollection parent = testPlanCollections.getFirst();
         TestPlanCollection testPlanCollection = new TestPlanCollection();
         if (testPlanCollectionMinderEditDTO.getExtended()) {
             BeanUtils.copyBean(testPlanCollection, parent);
@@ -393,12 +387,15 @@ public class TestPlanCollectionMinderService {
             BeanUtils.copyBean(testPlanCollection, testPlanCollectionMinderEditDTO);
         }
         testPlanCollection.setParentId(parent.getId());
+        if (testPlanCollectionMinderEditDTO.getText().length() > 255) {
+            testPlanCollectionMinderEditDTO.setText(testPlanCollectionMinderEditDTO.getText().substring(0, 249));
+        }
         testPlanCollection.setName(testPlanCollectionMinderEditDTO.getText());
         testPlanCollection.setId(IDGenerator.nextStr());
         testPlanCollection.setTestPlanId(request.getPlanId());
         testPlanCollection.setCreateUser(userId);
         testPlanCollection.setCreateTime(System.currentTimeMillis());
-        testPlanCollection.setPos(testPlanCollectionMinderEditDTO.getNum());
+        testPlanCollection.setPos((testPlanCollectionMinderEditDTO.getNum() + 1) * 4096);
         collectionMapper.insert(testPlanCollection);
         return testPlanCollection;
     }
@@ -423,7 +420,7 @@ public class TestPlanCollectionMinderService {
     private static void addAssociate(TestPlanCollectionAssociateDTO associateDTO, TestPlanCollection testPlanCollection, List<BaseCollectionAssociateRequest> baseCollectionAssociateRequests, Map<String, List<BaseCollectionAssociateRequest>> associateMap, String associateType) {
         BaseCollectionAssociateRequest baseCollectionAssociateRequest = new BaseCollectionAssociateRequest();
         baseCollectionAssociateRequest.setCollectionId(testPlanCollection.getId());
-        baseCollectionAssociateRequest.setIds(associateDTO.getIds());
+        baseCollectionAssociateRequest.setModules(associateDTO);
         baseCollectionAssociateRequests.add(baseCollectionAssociateRequest);
         associateMap.put(associateType, baseCollectionAssociateRequests);
     }

@@ -116,7 +116,7 @@ export interface ReviewListQueryParams extends TableQueryParams {
 export interface ReviewDetailCaseListQueryParams extends TableQueryParams {
   viewFlag: boolean; // 是否只看我的
   reviewId: string;
-  viewStatusFlag: boolean; // 我的评审状态
+  viewStatusFlag?: boolean; // 我的评审状态
 }
 // 评审详情-用例拖拽排序入参
 export interface SortReviewCaseParams {
@@ -218,15 +218,18 @@ export interface ReviewCaseItem {
   moduleName: string;
 }
 // 评审详情-提交评审入参
-export interface CommitReviewResultParams {
+export interface ReviewFormParams {
+  status: ReviewResult;
+  content: string;
+  notifiers?: string[];
+  reviewCommentFileIds?: string[];
+}
+export interface CommitReviewResultParams extends ReviewFormParams {
   projectId: string;
   reviewId: string;
   caseId: string;
   reviewPassRule: ReviewPassRule;
-  status: ReviewResult;
-  content: string;
   notifier: string;
-  reviewCommentFileIds?: string[];
 }
 // 评审详情-获取用例评审历史
 export interface ReviewHistoryItem {
@@ -249,4 +252,14 @@ export interface CaseReviewFunctionalCaseUserItem {
   caseId: string;
   reviewId: string;
   userId: string;
+}
+
+// 获取脑图请求参数
+export interface CaseReviewMinderParams {
+  projectId: string;
+  moduleId: string;
+  current?: number;
+  reviewId: string;
+  viewFlag: boolean; // 是否只看我的
+  viewStatusFlag: boolean; // 我的评审结果
 }

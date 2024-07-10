@@ -4,7 +4,7 @@
       {{ t('common.edit') }}
       <div class="text-[var(--color-text-4)]">
         {{
-          t('case.batchModalSubTitle', {
+          t('common.selectedCount', {
             count: props.batchParams.currentSelectCount,
           })
         }}
@@ -165,6 +165,7 @@
             },
             ...form.value,
             type: props.showType,
+            editColumn: 'TAGS',
           };
           await batchEditTestPlan(params);
           Message.success(t('caseManagement.featureCase.editSuccess'));

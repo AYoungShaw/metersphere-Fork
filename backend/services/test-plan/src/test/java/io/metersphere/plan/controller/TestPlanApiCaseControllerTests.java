@@ -21,6 +21,8 @@ import io.metersphere.api.utils.ApiDataUtils;
 import io.metersphere.plan.constants.AssociateCaseType;
 import io.metersphere.plan.domain.TestPlanApiCase;
 import io.metersphere.plan.domain.TestPlanApiCaseExample;
+import io.metersphere.plan.dto.ModuleSelectDTO;
+import io.metersphere.plan.dto.TestPlanCollectionAssociateDTO;
 import io.metersphere.plan.dto.request.*;
 import io.metersphere.plan.dto.response.TestPlanOperationResponse;
 import io.metersphere.plan.mapper.TestPlanApiCaseMapper;
@@ -29,7 +31,7 @@ import io.metersphere.project.mapper.ExtBaseProjectVersionMapper;
 import io.metersphere.sdk.constants.ApiBatchRunMode;
 import io.metersphere.sdk.constants.ApiExecuteResourceType;
 import io.metersphere.sdk.constants.PermissionConstants;
-import io.metersphere.sdk.constants.ReportStatus;
+import io.metersphere.sdk.constants.ResultStatus;
 import io.metersphere.sdk.dto.api.task.GetRunScriptRequest;
 import io.metersphere.sdk.dto.api.task.TaskItem;
 import io.metersphere.sdk.util.CommonBeanFactory;
@@ -161,7 +163,7 @@ public class TestPlanApiCaseControllerTests extends BaseTest {
         TestPlanOperationResponse response = JSON.parseObject(JSON.toJSONString(resultHolder.getData()), TestPlanOperationResponse.class);
         Assertions.assertEquals(response.getOperationCount(), 1);
         apiList = testPlanApiCaseMapper.selectByExample(testPlanApiCaseExample);
-        Assertions.assertEquals(apiList.get(0).getId(), request.getMoveId());
+        Assertions.assertEquals(apiList.getFirst().getId(), request.getMoveId());
         Assertions.assertEquals(apiList.get(1).getId(), request.getTargetId());
 
         //将这时的第30个放到第一位之后
@@ -173,7 +175,7 @@ public class TestPlanApiCaseControllerTests extends BaseTest {
         response = JSON.parseObject(JSON.toJSONString(resultHolder.getData()), TestPlanOperationResponse.class);
         Assertions.assertEquals(response.getOperationCount(), 1);
         apiList = testPlanApiCaseMapper.selectByExample(testPlanApiCaseExample);
-        Assertions.assertEquals(apiList.get(0).getId(), request.getTargetId());
+        Assertions.assertEquals(apiList.getFirst().getId(), request.getTargetId());
         Assertions.assertEquals(apiList.get(1).getId(), request.getMoveId());
 
     }
@@ -254,7 +256,7 @@ public class TestPlanApiCaseControllerTests extends BaseTest {
         List<BaseCollectionAssociateRequest> baseCollectionAssociateRequests = new ArrayList<>();
         BaseCollectionAssociateRequest baseCollectionAssociateRequest = new BaseCollectionAssociateRequest();
         baseCollectionAssociateRequest.setCollectionId("wxxx_2");
-        baseCollectionAssociateRequest.setIds(List.of("wxxx_api_1"));
+        baseCollectionAssociateRequest.setModules(buildModulesAll(AssociateCaseType.API));
         baseCollectionAssociateRequests.add(baseCollectionAssociateRequest);
         collectionAssociates.put(AssociateCaseType.API, baseCollectionAssociateRequests);
 
@@ -265,14 +267,20 @@ public class TestPlanApiCaseControllerTests extends BaseTest {
         SessionUser user = SessionUser.fromUser(userDTO, sessionId);
         testPlanApiCaseService.associateCollection("wxxx_1", collectionAssociates, user);
 
+        baseCollectionAssociateRequest.setModules(buildModules(AssociateCaseType.API));
+        testPlanApiCaseService.associateCollection("wxxx_1", collectionAssociates, user);
+
         //api case
         Map<String, List<BaseCollectionAssociateRequest>> collectionAssociates1 = new HashMap<>();
         List<BaseCollectionAssociateRequest> baseCollectionAssociateRequests1 = new ArrayList<>();
         BaseCollectionAssociateRequest baseCollectionAssociateRequest1 = new BaseCollectionAssociateRequest();
         baseCollectionAssociateRequest1.setCollectionId("wxxx_2");
-        baseCollectionAssociateRequest1.setIds(List.of("wxxx_api_case_1"));
+        baseCollectionAssociateRequest1.setModules(buildModulesAll(AssociateCaseType.API_CASE));
         baseCollectionAssociateRequests1.add(baseCollectionAssociateRequest1);
         collectionAssociates1.put(AssociateCaseType.API_CASE, baseCollectionAssociateRequests1);
+        testPlanApiCaseService.associateCollection("wxxx_1", collectionAssociates1, user);
+
+        baseCollectionAssociateRequest1.setModules(buildModules(AssociateCaseType.API));
         testPlanApiCaseService.associateCollection("wxxx_1", collectionAssociates1, user);
 
         apiTestCase = initApiData();
@@ -287,6 +295,34 @@ public class TestPlanApiCaseControllerTests extends BaseTest {
         testPlanApiCaseMapper.insert(testPlanApiCase);
         this.testPlanApiCase = testPlanApiCase;
         // todo 关联的接口测试
+    }
+
+    private TestPlanCollectionAssociateDTO buildModules(String type) {
+        TestPlanCollectionAssociateDTO associateDTO = new TestPlanCollectionAssociateDTO();
+        associateDTO.setSelectAllModule(false);
+        associateDTO.setAssociateType(type);
+        associateDTO.setProjectId("wxx_1234");
+        associateDTO.setModuleMaps(buildModuleMap());
+        return associateDTO;
+    }
+
+    private List<Map<String, ModuleSelectDTO>> buildModuleMap() {
+        List<Map<String, ModuleSelectDTO>> moduleMaps = new ArrayList<>();
+        Map<String, ModuleSelectDTO> moduleMap = new HashMap<>();
+        ModuleSelectDTO moduleSelectDTO = new ModuleSelectDTO();
+        moduleSelectDTO.setSelectAll(false);
+        moduleSelectDTO.setSelectIds(List.of("wxxx_api_1"));
+        moduleMap.put("123", moduleSelectDTO);
+        moduleMaps.add(moduleMap);
+        return moduleMaps;
+    }
+
+    private TestPlanCollectionAssociateDTO buildModulesAll(String type) {
+        TestPlanCollectionAssociateDTO associateDTO = new TestPlanCollectionAssociateDTO();
+        associateDTO.setSelectAllModule(true);
+        associateDTO.setAssociateType(type);
+        associateDTO.setProjectId("wxx_1234");
+        return associateDTO;
     }
 
     @Test
@@ -409,7 +445,7 @@ public class TestPlanApiCaseControllerTests extends BaseTest {
         apiReport.setEnvironmentId("test-env");
         apiReport.setRunMode("api-run-mode");
         apiReport.setTestPlanCaseId("test-plan-case-id");
-        apiReport.setStatus(ReportStatus.SUCCESS.name());
+        apiReport.setStatus(ResultStatus.SUCCESS.name());
         apiReport.setTriggerMode("api-trigger-mode");
         apiReport.setIntegrated(true);
         reports.add(apiReport);

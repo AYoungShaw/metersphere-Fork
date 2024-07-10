@@ -20,6 +20,7 @@
         v-if="activeComment === 'reviewComment' || activeComment === 'executiveComment'"
         :review-comment-list="reviewCommentList"
         :active-comment="activeComment"
+        :permissions="['FUNCTIONAL_CASE:READ+COMMENT']"
       />
       <template v-else>
         <MsComment
@@ -41,7 +42,6 @@
       v-permission="['FUNCTIONAL_CASE:READ+COMMENT']"
       :preview-url="PreviewEditorImageUrl"
       :is-active="isActive"
-      mode="textarea"
       is-show-avatar
       is-use-bottom
       :upload-image="handleUploadImage"

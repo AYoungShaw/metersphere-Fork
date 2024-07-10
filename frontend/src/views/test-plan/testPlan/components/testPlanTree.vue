@@ -123,6 +123,7 @@
     'dragUpdate',
     'getNodeName',
     'update:groupKeyword',
+    'deleteNode',
   ]);
 
   const currentProjectId = computed(() => appStore.currentProjectId);
@@ -206,8 +207,9 @@
       onBeforeOk: async () => {
         try {
           await deletePlanModuleTree(node.id);
+          initModules();
+          emits('deleteNode');
           Message.success(t('common.deleteSuccess'));
-          initModules(true);
         } catch (error) {
           console.log(error);
         }
@@ -351,15 +353,6 @@
       buffer: 15,
     };
   });
-
-  watch(
-    () => props.activeFolder,
-    (val) => {
-      if (val === 'all') {
-        initModules();
-      }
-    }
-  );
 
   /**
    * 初始化模块文件数量

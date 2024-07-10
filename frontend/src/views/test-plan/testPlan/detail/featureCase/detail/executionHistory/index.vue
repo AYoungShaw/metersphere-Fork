@@ -1,7 +1,7 @@
 <template>
   <a-spin :loading="loading" class="w-full">
     <div class="execute-history-list">
-      <div v-for="item of executeHistoryList" :key="item.status" class="execute-history-list-item">
+      <div v-for="item of props.executeList" :key="item.status" class="execute-history-list-item">
         <div class="flex items-center">
           <MsAvatar :avatar="item.userLogo" />
           <div class="ml-[8px] flex items-center">
@@ -24,6 +24,15 @@
           </div>
         </div>
         <div class="markdown-body" style="margin-left: 48px" v-html="item.contentText"></div>
+        <div v-if="props.showStepResult" class="ml-[48px] mt-[8px]">
+          <StepDetail
+            :step-list="getStepData(item.stepsExecResult)"
+            is-disabled
+            is-preview
+            is-test-plan
+            :is-disabled-test-plan="false"
+          />
+        </div>
         <div class="ml-[48px] mt-[8px] flex text-[var(--color-text-4)]">
           {{ dayjs(item.createTime).format('YYYY-MM-DD HH:mm:ss') }}
           <div>
@@ -35,63 +44,46 @@
           </div>
         </div>
       </div>
-      <MsEmpty v-if="executeHistoryList.length === 0" />
+      <MsEmpty v-if="props.executeList.length === 0" />
     </div>
   </a-spin>
 </template>
 
 <script setup lang="ts">
   import { ref } from 'vue';
-  import { useRoute } from 'vue-router';
   import dayjs from 'dayjs';
 
   import MsAvatar from '@/components/pure/ms-avatar/index.vue';
   import MsEmpty from '@/components/pure/ms-empty/index.vue';
+  import StepDetail from '@/views/case-management/caseManagementFeature/components/addStep.vue';
 
-  import { executeHistory } from '@/api/modules/test-plan/testPlan';
   import { useI18n } from '@/hooks/useI18n';
   import { characterLimit } from '@/utils';
 
   import type { ExecuteHistoryItem } from '@/models/testPlan/testPlan';
 
   const { t } = useI18n();
+
   const props = defineProps<{
-    caseId: string;
-    testPlanCaseId: string;
+    executeList: ExecuteHistoryItem[];
+    loading: boolean;
+    showStepResult?: boolean; // 是否展示执行步骤
   }>();
 
-  const executeHistoryList = ref<ExecuteHistoryItem[]>([]);
-
-  const route = useRoute();
-  const loading = ref<boolean>(false);
-
-  async function initList() {
-    loading.value = true;
-    try {
-      executeHistoryList.value = await executeHistory({
-        caseId: props.caseId,
-        id: props.testPlanCaseId,
-        testPlanId: route.query.id as string,
+  function getStepData(steps: string) {
+    if (steps) {
+      return JSON.parse(steps).map((item: any) => {
+        return {
+          id: item.id,
+          step: item.desc,
+          expected: item.result,
+          actualResult: item.actualResult,
+          executeResult: item.executeResult,
+        };
       });
-    } catch (error) {
-      console.log(error);
-    } finally {
-      loading.value = false;
     }
+    return [];
   }
-
-  onBeforeMount(() => {
-    initList();
-  });
-
-  watch(
-    () => props.caseId,
-    (val) => {
-      if (val) {
-        initList();
-      }
-    }
-  );
 </script>
 
 <style scoped lang="less">

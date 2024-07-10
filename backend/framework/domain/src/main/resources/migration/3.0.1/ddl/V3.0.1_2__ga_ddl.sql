@@ -35,7 +35,6 @@ CREATE INDEX idx_create_user ON mind_additional_node(create_user);
 CREATE INDEX idx_update_user ON mind_additional_node(update_user);
 CREATE INDEX idx_create_time ON mind_additional_node(create_time);
 CREATE INDEX idx_update_time ON mind_additional_node(update_time);
-CREATE UNIQUE INDEX uq_name_project_parent ON mind_additional_node(project_id,name,parent_id);
 
 -- 测试计划增加排序字段
 alter table test_plan
@@ -184,7 +183,7 @@ CREATE TABLE IF NOT EXISTS test_plan_report_api_case(
     `api_case_id` VARCHAR(50) NOT NULL   COMMENT '接口用例ID' ,
     `api_case_num` BIGINT NOT NULL   COMMENT '接口用例业务ID' ,
     `api_case_name` VARCHAR(255) NOT NULL   COMMENT '接口用例名称' ,
-    `api_case_module` VARCHAR(255)    COMMENT '接口用例所属模块' ,
+    `api_case_module` VARCHAR(500) COMMENT '接口用例所属模块',
     `api_case_priority` VARCHAR(255)    COMMENT '接口用例等级' ,
     `api_case_execute_user` VARCHAR(50)    COMMENT '接口用例执行人' ,
     `api_case_execute_result` VARCHAR(50)    COMMENT '接口用例执行结果' ,
@@ -206,7 +205,7 @@ CREATE TABLE IF NOT EXISTS test_plan_report_api_scenario(
     `api_scenario_id` VARCHAR(50) NOT NULL   COMMENT '场景用例ID' ,
     `api_scenario_num` BIGINT NOT NULL   COMMENT '场景用例业务ID' ,
     `api_scenario_name` VARCHAR(255) NOT NULL   COMMENT '场景用例名称' ,
-    `api_scenario_module` VARCHAR(255)    COMMENT '场景用例所属模块' ,
+    `api_scenario_module` VARCHAR(500) COMMENT '场景用例所属模块',
     `api_scenario_priority` VARCHAR(255)    COMMENT '场景用例等级' ,
     `api_scenario_execute_user` VARCHAR(50)    COMMENT '场景用例执行人' ,
     `api_scenario_execute_result` VARCHAR(50)    COMMENT '场景用例执行结果' ,
@@ -222,6 +221,8 @@ CREATE INDEX idx_pos ON test_plan_report_api_scenario(pos);
 ALTER TABLE test_plan_report ADD `execute_rate` DECIMAL(10, 4) COMMENT '执行率';
 ALTER TABLE test_plan_report ADD `parent_id` VARCHAR(50)  COMMENT '独立报告的父级ID';
 ALTER TABLE test_plan_report DROP `execute_time`;
+ALTER TABLE test_plan_report ADD `test_plan_name` VARCHAR(255) NOT NULL COMMENT '测试计划名称';
+ALTER TABLE test_plan_report MODIFY `pass_threshold` DECIMAL(10, 2) NULL COMMENT '通过阈值';
 
 -- 计划报告功能用例明细表
 ALTER TABLE test_plan_report_function_case ADD `test_plan_collection_id` VARCHAR(50) NOT NULL  COMMENT '测试集ID';

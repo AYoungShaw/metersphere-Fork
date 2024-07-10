@@ -11,10 +11,15 @@ public class FilterChainUtils {
         filterChainDefinitionMap.put("/login", "anon");
         filterChainDefinitionMap.put("/ldap/login", "anon");
         filterChainDefinitionMap.put("/authentication/get-list", "anon");
+        filterChainDefinitionMap.put("/authentication/get/by/type/**", "anon");
         filterChainDefinitionMap.put("/we_com/info", "anon");
         filterChainDefinitionMap.put("/ding_talk/info", "anon");
+        filterChainDefinitionMap.put("/lark/info", "anon");
+        filterChainDefinitionMap.put("/lark_suite/info", "anon");
         filterChainDefinitionMap.put("/sso/callback/we_com", "anon");
         filterChainDefinitionMap.put("/sso/callback/ding_talk", "anon");
+        filterChainDefinitionMap.put("/sso/callback/lark", "anon");
+        filterChainDefinitionMap.put("/sso/callback/lark_suite", "anon");
         filterChainDefinitionMap.put("/setting/get/platform/param", "anon");
         filterChainDefinitionMap.put("/signout", "anon");
         filterChainDefinitionMap.put("/is-login", "anon");
@@ -41,6 +46,8 @@ public class FilterChainUtils {
         filterChainDefinitionMap.put("/review/functional/case/download/file/**", "anon");
         //缺陷管理富文本访问
         filterChainDefinitionMap.put("/bug/attachment/preview/md/**", "anon");
+        //计划报告富文本访问
+        filterChainDefinitionMap.put("/test-plan/report/preview/md/**", "anon");
 
         filterChainDefinitionMap.put("/system/version/current", "anon");
 
@@ -91,6 +98,7 @@ public class FilterChainUtils {
         // 测试计划报告分享接口
         filterChainDefinitionMap.put("/test-plan/report/share/detail/**", "anon");
         filterChainDefinitionMap.put("/test-plan/report/share/get/**", "anon");
+        filterChainDefinitionMap.put("/test-plan/report/share/get-layout/**", "anon");
 
         return filterChainDefinitionMap;
     }

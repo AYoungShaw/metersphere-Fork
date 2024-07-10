@@ -17,7 +17,6 @@
         </a-form-item>
         <MsFormCreate
           v-if="formRules.length"
-          ref="formCreateRef"
           v-model:api="fApi"
           v-model:form-item="formItem"
           :form-rule="formRules"
@@ -48,6 +47,7 @@
   import MsFormCreate from '@/components/pure/ms-form-create/ms-form-create.vue';
   import { FormItem, FormRuleItem } from '@/components/pure/ms-form-create/types';
   import { MinderJsonNode } from '@/components/pure/ms-minder-editor/props';
+  import { setPriorityView } from '@/components/pure/ms-minder-editor/script/tool/utils';
   import MsTagsInput from '@/components/pure/ms-tags-input/index.vue';
 
   import {
@@ -60,7 +60,7 @@
   import useUserStore from '@/store/modules/user';
   import { hasAnyPermission } from '@/utils/permission';
 
-  import { OptionsFieldId } from '@/models/caseManagement/featureCase';
+  import { customFieldsItem, OptionsField } from '@/models/caseManagement/featureCase';
 
   import { initFormCreate } from '@/views/case-management/caseManagementFeature/components/utils';
   import { Api } from '@form-create/arco-design';
@@ -72,6 +72,7 @@
   const emit = defineEmits<{
     (e: 'initTemplate', id: string): void;
     (e: 'cancel'): void;
+    (e: 'saved'): void;
   }>();
 
   const appStore = useAppStore();
@@ -84,9 +85,11 @@
     name: '',
     tags: [] as string[],
     templateId: '',
-    moduleId: 'root',
+    moduleId: props.activeCase.moduleId || 'root',
   });
   const baseInfoLoading = ref(false);
+
+  const priorityField = ref('');
 
   const formRules = ref<FormItem[]>([]);
   const formItem = ref<FormRuleItem[]>([]);
@@ -102,14 +105,15 @@
       const result = customFields.map((item: any) => {
         const memberType = ['MEMBER', 'MULTIPLE_MEMBER'];
         let initValue = item.defaultValue;
-        const optionsValue: OptionsFieldId[] = item.options;
+        const optionsValue: OptionsField[] = item.options;
         if (memberType.includes(item.type)) {
           if (item.defaultValue === 'CREATE_USER' || item.defaultValue.includes('CREATE_USER')) {
             initValue = item.type === 'MEMBER' ? userStore.id : [userStore.id];
           }
         }
         if (item.internal && item.type === 'SELECT') {
-          // TODO:过滤用例等级字段，等级字段后续可自定义，需要调整
+          priorityField.value = item.fieldId;
+          // 这里不需要再展示用例等级字段。TODO:过滤用例等级字段，等级字段后续可自定义，需要调整
           return false;
         }
         return {
@@ -141,55 +145,96 @@
   const saveLoading = ref(false);
 
   function makeParams() {
+    const priority = formItem.value.find((item) => item.title === 'Case Priority' || item.title === '用例等级')?.field;
+    const selectedNode: MinderJsonNode = window.minder.getSelectedNode();
+    const customFields = formItem.value.map((item: any) => {
+      return {
+        fieldId: item.field,
+        value: Array.isArray(item.value) ? JSON.stringify(item.value) : item.value,
+      };
+    });
+    const selectedNodePriorityNumber = selectedNode?.data?.priority ? selectedNode?.data?.priority : 0;
+    const realPriorityNumber = selectedNodePriorityNumber > 0 ? selectedNodePriorityNumber - 1 : 0;
+    const priorityNumber = `P${realPriorityNumber}`;
+    if (!priority) {
+      customFields.push({ fieldId: priorityField.value, value: priorityNumber });
+    }
     return {
       ...baseInfoForm.value,
+      moduleId: props.activeCase.moduleId || 'root',
       id: props.activeCase.id,
       projectId: appStore.currentProjectId,
       caseEditType: props.activeCase.caseEditType || 'STEP',
-      customFields: formItem.value.map((item: any) => {
-        return {
-          fieldId: item.field,
-          value: Array.isArray(item.value) ? JSON.stringify(item.value) : item.value,
-        };
-      }),
+      customFields,
     };
+  }
+
+  async function realSave() {
+    try {
+      saveLoading.value = true;
+      const params = makeParams();
+      if (props.activeCase.isNew !== false) {
+        const res = await createCaseRequest({
+          request: params,
+          fileList: [],
+        });
+        const selectedNode: MinderJsonNode = window.minder.getSelectedNode();
+        if (selectedNode?.data) {
+          selectedNode.data.id = res.data.id;
+        }
+      } else {
+        await updateCaseRequest({
+          request: params,
+          fileList: [],
+        });
+      }
+      const selectedNode: MinderJsonNode = window.minder.getSelectedNode();
+      const priority = (formItem.value.find((item) => item.title === 'Case Priority' || item.title === '用例等级')
+        ?.value || 'P0') as string;
+
+      const selectedNodePriorityNumber = selectedNode?.data?.priority ? selectedNode?.data?.priority : 0;
+      const realPriorityNumber = selectedNodePriorityNumber > 0 ? selectedNodePriorityNumber - 1 : 0;
+      const priorityNumber = Number(priority.match(/\d+/)?.[0]) || realPriorityNumber || 0;
+      formItem.value.forEach((item) => {
+        formRules.value.forEach((rule) => {
+          if (item.field === rule.name) {
+            rule.value = item.value;
+          }
+        });
+      });
+      if (selectedNode?.data) {
+        selectedNode.data = {
+          ...selectedNode.data,
+          text: baseInfoForm.value.name,
+          priority: priorityNumber,
+          isNew: false,
+        };
+        window.minder.execCommand('priority', priorityNumber + 1);
+        setPriorityView(true, 'P');
+        selectedNode.data.changed = false;
+      }
+      Message.success(t('common.saveSuccess'));
+      emit('saved');
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    } finally {
+      saveLoading.value = false;
+    }
   }
 
   function handleSave() {
     baseInfoFormRef.value?.validate((errors) => {
       if (!errors) {
-        fApi.value?.validate(async (valid) => {
-          if (valid === true) {
-            try {
-              saveLoading.value = true;
-              if (props.activeCase.isNew !== false) {
-                const res = await createCaseRequest({
-                  request: makeParams(),
-                  fileList: [],
-                });
-                const selectedNode: MinderJsonNode = window.minder.getSelectedNode();
-                if (selectedNode?.data) {
-                  selectedNode.data.id = res.id;
-                }
-              } else {
-                await updateCaseRequest({
-                  request: makeParams(),
-                  fileList: [],
-                });
-              }
-              const selectedNode: MinderJsonNode = window.minder.getSelectedNode();
-              if (selectedNode?.data) {
-                selectedNode.data.text = baseInfoForm.value.name;
-              }
-              Message.success(t('common.saveSuccess'));
-            } catch (error) {
-              // eslint-disable-next-line no-console
-              console.log(error);
-            } finally {
-              saveLoading.value = false;
+        if (formRules.value.length > 0) {
+          fApi.value?.validate(async (valid) => {
+            if (valid === true) {
+              realSave();
             }
-          }
-        });
+          });
+        } else {
+          realSave();
+        }
       }
     });
   }
@@ -202,7 +247,18 @@
     () => {
       baseInfoForm.value.name = props.activeCase.name;
       baseInfoForm.value.tags = props.activeCase.tags || [];
-      formRules.value = initFormCreate(props.activeCase.customFields || [], ['FUNCTIONAL_CASE:READ+UPDATE']);
+      if (props.activeCase.customFields) {
+        formRules.value = initFormCreate(
+          (props.activeCase.customFields || []).filter((item: customFieldsItem) => {
+            if (item.internal && item.type === 'SELECT') {
+              // 这里不需要再展示用例等级字段。TODO:过滤用例等级字段，等级字段后续可自定义，需要调整
+              return false;
+            }
+            return true;
+          }),
+          ['FUNCTIONAL_CASE:READ+UPDATE']
+        );
+      }
     },
     {
       immediate: true,

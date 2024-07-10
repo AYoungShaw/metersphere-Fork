@@ -140,29 +140,40 @@
               <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl+ Enter)</div> -->
             </div>
           </a-doption>
-          <a-doption value="copy">
-            <div class="flex items-center">
-              <div>{{ t('minder.hotboxMenu.copy') }}</div>
-              <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + C)</div> -->
-            </div>
-          </a-doption>
-          <a-doption value="cut">
-            <div class="flex items-center">
-              <div>{{ t('minder.hotboxMenu.cut') }}</div>
-              <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + X)</div> -->
-            </div>
-          </a-doption>
-          <a-doption v-if="props.canShowPasteMenu && minderStore.clipboard.length > 0" value="paste">
-            <div class="flex items-center">
-              <div>{{ t('minder.hotboxMenu.paste') }}</div>
-              <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + V)</div> -->
-            </div>
-          </a-doption>
-          <a-doption value="delete">
-            <div class="flex items-center">
-              <div>{{ t('minder.hotboxMenu.delete') }}</div>
-              <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Backspace)</div> -->
-            </div>
+          <template v-if="props.canShowMoreMenuNodeOperation">
+            <a-doption value="copy">
+              <div class="flex items-center">
+                <div>{{ t('minder.hotboxMenu.copy') }}</div>
+                <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + C)</div> -->
+              </div>
+            </a-doption>
+            <a-doption value="cut">
+              <div class="flex items-center">
+                <div>{{ t('minder.hotboxMenu.cut') }}</div>
+                <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + X)</div> -->
+              </div>
+            </a-doption>
+            <a-doption v-if="props.canShowPasteMenu && minderStore.clipboard.length > 0" value="paste">
+              <div class="flex items-center">
+                <div>{{ t('minder.hotboxMenu.paste') }}</div>
+                <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + V)</div> -->
+              </div>
+            </a-doption>
+            <a-doption value="delete">
+              <div class="flex items-center">
+                <div>{{ t('minder.hotboxMenu.delete') }}</div>
+                <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Backspace)</div> -->
+              </div>
+            </a-doption>
+          </template>
+          <a-doption
+            v-for="item in props.moreMenuOtherOperationList"
+            :key="item.value"
+            v-permission="item.permission || []"
+            :value="item.value"
+            @click="item.onClick()"
+          >
+            <div>{{ item.label }}</div>
           </a-doption>
         </template>
       </a-dropdown>
@@ -184,11 +195,19 @@
   import { useI18n } from '@/hooks/useI18n';
   import useMinderStore from '@/store/modules/components/minder-editor/index';
   import { MinderNodePosition } from '@/store/modules/components/minder-editor/types';
-  import { getGenerateId, sleep, traverseTree } from '@/utils';
+  import { getGenerateId, sleep } from '@/utils';
 
   import { MinderEventName } from '@/enums/minderEnum';
 
-  import { floatMenuProps, insertProps, mainEditorProps, MinderJsonNode, priorityProps, tagProps } from '../props';
+  import {
+    floatMenuProps,
+    insertProps,
+    mainEditorProps,
+    MinderJsonNode,
+    MinderJsonNodeData,
+    priorityProps,
+    tagProps,
+  } from '../props';
   import { isDisableNode, isNodeInMinderView, setPriorityView } from '../script/tool/utils';
 
   const props = defineProps({
@@ -208,7 +227,9 @@
   const currentNodeTags = ref<string[]>([]);
   const tags = ref<string[]>([]);
 
-  const menuVisible = ref(false);
+  const menuVisible = defineModel<boolean>('visible', {
+    default: false,
+  });
   const menuPopupOffset = ref<TriggerPopupTranslate>([0, 0]);
 
   watch(
@@ -310,6 +331,9 @@
       }
       window.minder.execCommand('resource', origin);
       minderStore.dispatchEvent(MinderEventName.SET_TAG, undefined, undefined, undefined, selectedNodes);
+      if (props.afterTagEdit) {
+        props.afterTagEdit(selectedNodes, value);
+      }
     }
   }
 
@@ -362,22 +386,25 @@
         case 'paste':
           minderStore.dispatchEvent(MinderEventName.PASTE_NODE, undefined, undefined, undefined, selectedNodes);
           window.minder.execCommand('Paste');
-          const pastedNode: MinderJsonNode = window.minder.getSelectedNode();
-          if (pastedNode) {
-            pastedNode.data = {
-              ...pastedNode.data,
-              text: pastedNode.data?.text || '',
-              isNew: true,
-              id: getGenerateId(),
-            };
-            traverseTree(pastedNode.children || [], (node) => {
-              node.data = {
-                ...node.data,
-                text: node.data?.text || '',
-                isNew: true,
-                id: getGenerateId(),
-              };
-            });
+          let pastedNodes: MinderJsonNode[] = window.minder.getSelectedNodes();
+          if (pastedNodes.length > 0) {
+            pastedNodes = pastedNodes
+              .filter((e) => {
+                if (e.data?.id !== 'fakeNode' && e.data?.type !== 'tmp') {
+                  return true;
+                }
+                window.minder.removeNode(e);
+                return false;
+              })
+              .map((e) => {
+                e.data = {
+                  ...(e.data as MinderJsonNodeData),
+                  isNew: true,
+                  id: getGenerateId(),
+                  count: e.children?.length || 0,
+                };
+                return e;
+              });
           }
           break;
         case 'delete':

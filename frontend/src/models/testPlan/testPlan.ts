@@ -6,7 +6,6 @@ import type { TableQueryParams } from '@/models/common';
 import { BatchApiParams, DragSortParams } from '@/models/common';
 import { LastExecuteResults } from '@/enums/caseEnum';
 import {
-  type FailRetry,
   type PlanMinderAssociateType,
   type PlanMinderCollectionType,
   type RunMode,
@@ -187,7 +186,7 @@ export interface DisassociateCaseParams {
 export interface BatchFeatureCaseParams extends BatchActionQueryParams {
   testPlanId: string;
   moduleIds?: string[];
-  projectId: string;
+  projectId?: string;
 }
 
 export interface ExecuteFeatureCaseFormParams {
@@ -239,6 +238,7 @@ export interface PassRateCountDetail {
     };
   };
   nextTriggerTime: number;
+  status: planStatusType;
 }
 
 // 执行历史
@@ -397,7 +397,6 @@ export interface PlanMinderNodeData extends MinderJsonNodeData {
   environmentId: string;
   testResourcePoolId: string;
   retryOnFail: boolean;
-  retryType: FailRetry; // 失败重试类型(步骤/场景)
   retryTimes: number;
   retryInterval: number;
   stopOnFail: boolean;

@@ -105,6 +105,8 @@
   </MsCard>
   <we-com-modal v-model:visible="showWeComModal" @success="loadList()" />
   <ding-talk-modal v-model:visible="showDingTalkModal" @success="loadList()" />
+  <lark-modal v-model:visible="showLarkModal" @success="loadList()" />
+  <lark-suite-modal v-model:visible="showLarkSuiteModal" @success="loadList()" />
 </template>
 
 <script setup lang="ts">
@@ -113,13 +115,23 @@
   import MsCard from '@/components/pure/ms-card/index.vue';
   import MsIcon from '@/components/pure/ms-icon-font/index.vue';
   import DingTalkModal from '@/views/setting/system/config/components/dingTalkModal.vue';
+  import LarkModal from '@/views/setting/system/config/components/larkModal.vue';
+  import LarkSuiteModal from '@/views/setting/system/config/components/larkSuiteModal.vue';
   import WeComModal from '@/views/setting/system/config/components/weComModal.vue';
 
   import {
+    closeValidateDingTalk,
+    closeValidateLark,
+    closeValidateLarkSuite,
+    closeValidateWeCom,
     enableDingTalk,
+    enableLark,
+    enableLarkSuite,
     enableWeCom,
     getPlatformSourceList,
     validateDingTalkConfig,
+    validateLarkConfig,
+    validateLarkSuiteConfig,
     validateWeComConfig,
   } from '@/api/modules/setting/qrCode';
   import { useI18n } from '@/hooks/useI18n';
@@ -128,6 +140,7 @@
   import {
     DingTalkInfo,
     EnableEditorRequest,
+    LarkInfo,
     PlatformConfigItem,
     PlatformConfigList,
     PlatformSource,
@@ -158,11 +171,31 @@
       logo: 'icon-logo_dingtalk',
       edit: false,
     },
+    {
+      key: 'LARK',
+      title: t('project.messageManagement.LARK'),
+      description: '先进企业合作与管理平台',
+      enable: false,
+      valid: false,
+      logo: 'icon-logo_lark',
+      edit: false,
+    },
+    {
+      key: 'LARK_SUITE',
+      title: t('project.messageManagement.LARK_SUITE'),
+      description: '先进企业合作与管理平台',
+      enable: false,
+      valid: false,
+      logo: 'icon-logo_lark',
+      edit: false,
+    },
   ]);
   const data = ref<PlatformSourceList>([]);
   const loading = ref<boolean>(false);
   const showWeComModal = ref<boolean>(false);
   const showDingTalkModal = ref<boolean>(false);
+  const showLarkModal = ref<boolean>(false);
+  const showLarkSuiteModal = ref<boolean>(false);
 
   const weComInfo = ref<WeComInfo>({
     corpId: '',
@@ -176,6 +209,14 @@
   const dingTalkInfo = ref<DingTalkInfo>({
     agentId: '',
     appKey: '',
+    appSecret: '',
+    callBack: '',
+    enable: false,
+    valid: false,
+  });
+
+  const larkInfo = ref<LarkInfo>({
+    agentId: '',
     appSecret: '',
     callBack: '',
     enable: false,
@@ -197,6 +238,7 @@
         });
       });
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.log(error);
     } finally {
       loading.value = false;
@@ -208,9 +250,23 @@
     if (key === 'WE_COM') {
       showWeComModal.value = true;
       showDingTalkModal.value = false;
+      showLarkModal.value = false;
+      showLarkSuiteModal.value = false;
     } else if (key === 'DING_TALK') {
       showWeComModal.value = false;
       showDingTalkModal.value = true;
+      showLarkModal.value = false;
+      showLarkSuiteModal.value = false;
+    } else if (key === 'LARK') {
+      showWeComModal.value = false;
+      showDingTalkModal.value = false;
+      showLarkModal.value = true;
+      showLarkSuiteModal.value = false;
+    } else if (key === 'LARK_SUITE') {
+      showWeComModal.value = false;
+      showDingTalkModal.value = false;
+      showLarkModal.value = false;
+      showLarkSuiteModal.value = true;
     }
   };
 
@@ -222,12 +278,27 @@
         await validateWeComConfig(weComInfo.value);
       } else if (key === 'DING_TALK') {
         await validateDingTalkConfig(dingTalkInfo.value);
+      } else if (key === 'LARK') {
+        await validateLarkConfig(larkInfo.value);
+      } else if (key === 'LARK_SUITE') {
+        await validateLarkSuiteConfig(larkInfo.value);
       }
       Message.success(t('organization.service.testLinkStatusTip'));
-      loadList();
     } catch (error) {
+      if (key === 'WE_COM') {
+        await closeValidateWeCom();
+      } else if (key === 'DING_TALK') {
+        await closeValidateDingTalk();
+      } else if (key === 'LARK') {
+        await closeValidateLark();
+      } else if (key === 'LARK_SUITE') {
+        await closeValidateLarkSuite();
+      }
+
+      // eslint-disable-next-line no-console
       console.log(error);
     } finally {
+      loadList();
       loading.value = false;
     }
   };
@@ -244,10 +315,15 @@
         await enableWeCom(params);
       } else if (key === 'DING_TALK') {
         await enableDingTalk(params);
+      } else if (key === 'LARK') {
+        await enableLark(params);
+      } else if (key === 'LARK_SUITE') {
+        await enableLarkSuite(params);
       }
       Message.success(t(message));
       loadList();
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.log(error);
     } finally {
       loading.value = false;
@@ -267,14 +343,12 @@
     min-height: 300px;
     border-radius: var(--border-radius-small);
     background: var(--color-text-n9);
-
     .list {
       display: flex;
       flex-wrap: wrap;
       justify-content: flex-start;
       align-content: flex-start;
       width: 100%;
-
       .item {
         margin: 8px;
         padding: 24px;
@@ -282,7 +356,6 @@
         border-radius: 4px;
         background: white;
         @apply flex flex-col justify-between;
-
         .ms-enable {
           font-size: 12px;
           border-radius: var(--border-radius-small);

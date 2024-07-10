@@ -20,6 +20,8 @@ import io.metersphere.api.utils.ApiDataUtils;
 import io.metersphere.plan.constants.AssociateCaseType;
 import io.metersphere.plan.domain.TestPlanApiScenario;
 import io.metersphere.plan.domain.TestPlanApiScenarioExample;
+import io.metersphere.plan.dto.ModuleSelectDTO;
+import io.metersphere.plan.dto.TestPlanCollectionAssociateDTO;
 import io.metersphere.plan.dto.request.*;
 import io.metersphere.plan.dto.response.TestPlanOperationResponse;
 import io.metersphere.plan.mapper.TestPlanApiScenarioMapper;
@@ -30,7 +32,7 @@ import io.metersphere.project.mapper.ExtBaseProjectVersionMapper;
 import io.metersphere.sdk.constants.ApiBatchRunMode;
 import io.metersphere.sdk.constants.MsAssertionCondition;
 import io.metersphere.sdk.constants.PermissionConstants;
-import io.metersphere.sdk.constants.ReportStatus;
+import io.metersphere.sdk.constants.ResultStatus;
 import io.metersphere.sdk.dto.api.task.GetRunScriptRequest;
 import io.metersphere.sdk.dto.api.task.TaskItem;
 import io.metersphere.sdk.util.JSON;
@@ -268,7 +270,7 @@ public class TestPlanApiScenarioControllerTests extends BaseTest {
         List<BaseCollectionAssociateRequest> baseCollectionAssociateRequests = new ArrayList<>();
         BaseCollectionAssociateRequest baseCollectionAssociateRequest = new BaseCollectionAssociateRequest();
         baseCollectionAssociateRequest.setCollectionId("wxxx_collection_3");
-        baseCollectionAssociateRequest.setIds(List.of("wxxx_api_scenario_1"));
+        baseCollectionAssociateRequest.setModules(buildModulesAll());
         baseCollectionAssociateRequests.add(baseCollectionAssociateRequest);
         collectionAssociates.put(AssociateCaseType.API_SCENARIO, baseCollectionAssociateRequests);
 
@@ -278,6 +280,38 @@ public class TestPlanApiScenarioControllerTests extends BaseTest {
         userDTO.setLastOrganizationId("wxx_1234");
         SessionUser user = SessionUser.fromUser(userDTO, sessionId);
         testPlanApiScenarioService.associateCollection("wxxx_plan_2", collectionAssociates, user);
+
+        baseCollectionAssociateRequest.setModules(buildModules());
+        testPlanApiScenarioService.associateCollection("wxxx_plan_2", collectionAssociates, user);
+    }
+
+    private TestPlanCollectionAssociateDTO buildModules() {
+        TestPlanCollectionAssociateDTO associateDTO = new TestPlanCollectionAssociateDTO();
+        associateDTO.setSelectAllModule(false);
+        associateDTO.setAssociateType(AssociateCaseType.API_SCENARIO);
+        associateDTO.setProjectId("wxx_project_1234");
+        associateDTO.setModuleMaps(buildModuleMap());
+        return associateDTO;
+    }
+
+    private List<Map<String, ModuleSelectDTO>> buildModuleMap() {
+        List<Map<String, ModuleSelectDTO>> moduleMaps = new ArrayList<>();
+        Map<String, ModuleSelectDTO> moduleMap = new HashMap<>();
+        ModuleSelectDTO moduleSelectDTO = new ModuleSelectDTO();
+        moduleSelectDTO.setSelectAll(false);
+        moduleSelectDTO.setSelectIds(List.of("wxxx_api_scenario_1"));
+        moduleMap.put("wx_scenario_module_123", moduleSelectDTO);
+        moduleMaps.add(moduleMap);
+        return moduleMaps;
+    }
+
+
+    private TestPlanCollectionAssociateDTO buildModulesAll() {
+        TestPlanCollectionAssociateDTO associateDTO = new TestPlanCollectionAssociateDTO();
+        associateDTO.setSelectAllModule(true);
+        associateDTO.setAssociateType(AssociateCaseType.API_SCENARIO);
+        associateDTO.setProjectId("wxx_project_1234");
+        return associateDTO;
     }
 
     @Test
@@ -330,7 +364,7 @@ public class TestPlanApiScenarioControllerTests extends BaseTest {
         TestPlanOperationResponse response = JSON.parseObject(JSON.toJSONString(resultHolder.getData()), TestPlanOperationResponse.class);
         Assertions.assertEquals(response.getOperationCount(), 1);
         scenarioList = testPlanApiScenarioMapper.selectByExample(testPlanApiScenarioExample);
-        Assertions.assertEquals(scenarioList.get(0).getId(), request.getMoveId());
+        Assertions.assertEquals(scenarioList.getFirst().getId(), request.getMoveId());
         Assertions.assertEquals(scenarioList.get(1).getId(), request.getTargetId());
 
         //将这时的第30个放到第一位之后
@@ -342,7 +376,7 @@ public class TestPlanApiScenarioControllerTests extends BaseTest {
         response = JSON.parseObject(JSON.toJSONString(resultHolder.getData()), TestPlanOperationResponse.class);
         Assertions.assertEquals(response.getOperationCount(), 1);
         scenarioList = testPlanApiScenarioMapper.selectByExample(testPlanApiScenarioExample);
-        Assertions.assertEquals(scenarioList.get(0).getId(), request.getTargetId());
+        Assertions.assertEquals(scenarioList.getFirst().getId(), request.getTargetId());
         Assertions.assertEquals(scenarioList.get(1).getId(), request.getMoveId());
 
     }
@@ -459,7 +493,7 @@ public class TestPlanApiScenarioControllerTests extends BaseTest {
             apiReportDetail.setStepId("plan-test-scenario-report-step-id" + i);
             apiReportDetail.setSort((long) i);
             if (i % 2 == 0) {
-                apiReportDetail.setStatus(ReportStatus.SUCCESS.name());
+                apiReportDetail.setStatus(ResultStatus.SUCCESS.name());
                 apiReportDetail.setResponseSize(1L);
                 apiReportDetail.setRequestTime(2L);
             } else if (i % 3 == 0) {
@@ -467,7 +501,7 @@ public class TestPlanApiScenarioControllerTests extends BaseTest {
                 apiReportDetail.setResponseSize(0L);
                 apiReportDetail.setRequestTime(2L);
             } else {
-                apiReportDetail.setStatus(ReportStatus.FAKE_ERROR.name());
+                apiReportDetail.setStatus(ResultStatus.FAKE_ERROR.name());
                 apiReportDetail.setResponseSize(1L);
                 apiReportDetail.setRequestTime(2L);
             }

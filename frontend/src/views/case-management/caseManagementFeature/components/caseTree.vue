@@ -99,7 +99,7 @@
   import useModal from '@/hooks/useModal';
   import useAppStore from '@/store/modules/app';
   import useFeatureCaseStore from '@/store/modules/case/featureCase';
-  import { mapTree } from '@/utils';
+  import { mapTree, traverseTree } from '@/utils';
   import { hasAnyPermission } from '@/utils/permission';
 
   import type { CreateOrUpdateModule, UpdateModule } from '@/models/caseManagement/featureCase';
@@ -123,7 +123,14 @@
     groupKeyword: string; // 搜索关键字
   }>();
 
-  const emits = defineEmits(['update:selectedKeys', 'caseNodeSelect', 'init', 'dragUpdate', 'update:groupKeyword']);
+  const emits = defineEmits([
+    'update:selectedKeys',
+    'caseNodeSelect',
+    'init',
+    'dragUpdate',
+    'update:groupKeyword',
+    'deleteNode',
+  ]);
 
   const currentProjectId = computed(() => appStore.currentProjectId);
 
@@ -220,12 +227,9 @@
       onBeforeOk: async () => {
         try {
           await deleteCaseModuleTree(node.id);
+          initModules();
+          emits('deleteNode');
           Message.success(t('caseManagement.featureCase.deleteSuccess'));
-          emits(
-            'init',
-            caseTree.value.map((e) => e.name),
-            true
-          );
         } catch (error) {
           console.log(error);
         }
@@ -386,12 +390,9 @@
   watch(
     () => props.modulesCount,
     (obj) => {
-      caseTree.value = mapTree<ModuleTreeNode>(caseTree.value, (node) => {
-        return {
-          ...node,
-          hideMoreAction: node.id === 'root' || props.isModal,
-          count: obj?.[node.id] || 0,
-        };
+      traverseTree(caseTree.value, (node) => {
+        node.count = obj?.[node.id] || 0;
+        node.hideMoreAction = node.id === 'root' || props.isModal;
       });
     }
   );

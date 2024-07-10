@@ -12,7 +12,6 @@ import io.metersphere.plan.dto.response.TestPlanOperationResponse;
 import io.metersphere.plan.service.TestPlanApiScenarioBatchRunService;
 import io.metersphere.plan.service.TestPlanApiScenarioLogService;
 import io.metersphere.plan.service.TestPlanApiScenarioService;
-import io.metersphere.plan.service.TestPlanService;
 import io.metersphere.sdk.constants.HttpMethodConstants;
 import io.metersphere.sdk.constants.PermissionConstants;
 import io.metersphere.sdk.dto.api.task.TaskRequestDTO;
@@ -46,8 +45,6 @@ public class TestPlanApiScenarioController {
     @Resource
     private TestPlanApiScenarioBatchRunService testPlanApiScenarioBatchRunService;
     @Resource
-    private TestPlanService testPlanService;
-    @Resource
     private ApiScenarioReportService apiScenarioReportService;
 
     @PostMapping("/page")
@@ -56,7 +53,7 @@ public class TestPlanApiScenarioController {
     @CheckOwner(resourceId = "#request.getTestPlanId()", resourceType = "test_plan")
     public Pager<List<TestPlanApiScenarioPageResponse>> page(@Validated @RequestBody TestPlanApiScenarioRequest request) {
         Page<Object> page = PageHelper.startPage(request.getCurrent(), request.getPageSize(),
-                StringUtils.isNotBlank(request.getSortString("id")) ? request.getSortString("id") : "test_plan_api_scenario.pos asc");
+                StringUtils.isNotBlank(request.getSortString("id")) ? request.getSortString("id") : "test_plan_api_scenario.pos desc");
         return PageUtils.setPageInfo(page, testPlanApiScenarioService.hasRelateApiScenarioList(request, false));
     }
 
@@ -79,7 +76,7 @@ public class TestPlanApiScenarioController {
     @GetMapping("/run/{id}")
     @Operation(summary = "接口测试-接口场景管理-场景执行")
     @RequiresPermissions(PermissionConstants.TEST_PLAN_READ_EXECUTE)
-//    @CheckOwner(resourceId = "#id", resourceType = "test_plan_api_scenario")
+    @CheckOwner(resourceId = "#id", resourceType = "test_plan", relationType = "test_plan_api_scenario")
     public TaskRequestDTO run(@PathVariable String id, @RequestParam(required = false) String reportId) {
         return testPlanApiScenarioService.run(id, reportId, SessionUtils.getUserId());
     }
@@ -87,7 +84,7 @@ public class TestPlanApiScenarioController {
     @PostMapping("/batch/run")
     @Operation(summary = "批量执行")
     @RequiresPermissions(PermissionConstants.TEST_PLAN_READ_EXECUTE)
-//    @CheckOwner(resourceId = "#request.getId()", resourceType = "test_plan_api_case") todo
+    @CheckOwner(resourceId = "#request.getSelectIds()", resourceType = "test_plan", relationType = "test_plan_api_scenario")
     public void batchRun(@Validated @RequestBody TestPlanApiScenarioBatchRunRequest request) {
         testPlanApiScenarioBatchRunService.asyncBatchRun(request, SessionUtils.getUserId());
     }
@@ -101,7 +98,6 @@ public class TestPlanApiScenarioController {
         batchRequest.setTestPlanId(request.getTestPlanId());
         batchRequest.setSelectIds(List.of(request.getId()));
         TestPlanAssociationResponse response = testPlanApiScenarioService.disassociate(batchRequest, new LogInsertModule(SessionUtils.getUserId(), "/test-plan/api/scenario/disassociate", HttpMethodConstants.POST.name()));
-        testPlanService.refreshTestPlanStatus(request.getTestPlanId());
         return response;
     }
 
@@ -112,7 +108,6 @@ public class TestPlanApiScenarioController {
     @CheckOwner(resourceId = "#request.getTestPlanId()", resourceType = "test_plan")
     public TestPlanAssociationResponse batchDisassociate(@Validated @RequestBody BasePlanCaseBatchRequest request) {
         TestPlanAssociationResponse response = testPlanApiScenarioService.disassociate(request, new LogInsertModule(SessionUtils.getUserId(), "/test-plan/api/scenario/batch/disassociate", HttpMethodConstants.POST.name()));
-        testPlanService.refreshTestPlanStatus(request.getTestPlanId());
         return response;
     }
 

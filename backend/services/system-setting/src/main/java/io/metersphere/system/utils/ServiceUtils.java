@@ -10,6 +10,8 @@ import jakarta.validation.Validator;
 import org.apache.commons.collections.CollectionUtils;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -115,5 +117,31 @@ public class ServiceUtils {
             tips.append(fieldName + message).append("; ");
         }
         throw new MSException(MsHttpResultCode.VALIDATE_FAILED, tips.toString());
+    }
+
+    public static String compressName(String name, int maxSize) {
+        String newName = name;
+        // 限制名称长度 （数据库里最大的长度是255，这里判断超过250时截取到200附近）
+        if (newName.length() > maxSize) {
+            newName = newName.substring(0, maxSize - 3) + "...";
+        }
+        return newName;
+    }
+
+
+    /**
+     * 解析Tag，只保留默认长度
+     *
+     * @param tags 标签集合
+     */
+    private static final int MAX_TAG_SIZE = 10;
+
+    public static List<String> parseTags(List<String> tags) {
+        if (CollectionUtils.isNotEmpty(tags) && tags.size() > MAX_TAG_SIZE) {
+            List<String> returnTags = new ArrayList<>(tags.stream().distinct().toList());
+            return returnTags.subList(0, MAX_TAG_SIZE);
+        } else {
+            return tags;
+        }
     }
 }

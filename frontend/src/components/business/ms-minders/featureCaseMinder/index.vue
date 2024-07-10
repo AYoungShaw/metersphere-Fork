@@ -49,6 +49,7 @@
           :active-case="activeCase"
           @init-template="(id) => (templateId = id)"
           @cancel="handleBaseInfoCancel"
+          @saved="handleBaseInfoSaved"
         />
         <attachment
           v-else-if="activeExtraKey === 'attachment'"
@@ -87,7 +88,7 @@
   import useAppStore from '@/store/modules/app';
   import useMinderStore from '@/store/modules/components/minder-editor/index';
   import { MinderCustomEvent } from '@/store/modules/components/minder-editor/types';
-  import { filterTree, getGenerateId, mapTree, replaceNodeInTree } from '@/utils';
+  import { filterTree, findNodeByKey, getGenerateId, mapTree, replaceNodeInTree } from '@/utils';
   import { hasAnyPermission } from '@/utils/permission';
 
   import {
@@ -156,69 +157,65 @@
   /**
    * 初始化用例模块树
    */
-  async function initCaseTree(notRemote = false) {
+  async function initCaseTree() {
     try {
       loading.value = true;
-      if (!notRemote) {
-        const res = await getCaseMinderTree({
-          projectId: appStore.currentProjectId,
-          moduleId: '', // 始终加载全部，然后再进入对应的模块节点
-        });
-        caseTree.value = mapTree<MinderJsonNode>(res, (e) => ({
-          ...e,
-          data: {
-            ...e.data,
-            id: e.id || e.data?.id || '',
-            text: e.name || e.data?.text || '',
-            resource: props.modulesCount[e.id] !== undefined ? [moduleTag] : e.data?.resource,
-            expandState: e.level === 1 ? 'expand' : 'collapse',
-            count: props.modulesCount[e.id],
-            isNew: false,
-            changed: false,
-          },
-          children:
-            props.modulesCount[e.id] > 0 && !e.children?.length
-              ? [
-                  {
-                    data: {
-                      id: 'fakeNode',
-                      text: 'fakeNode',
-                      resource: ['fakeNode'],
-                      isNew: false,
-                      changed: false,
-                    },
+      const res = await getCaseMinderTree({
+        projectId: appStore.currentProjectId,
+        moduleId: '', // 始终加载全部，然后再进入对应的模块节点
+      });
+      caseTree.value = mapTree<MinderJsonNode>(res, (e) => ({
+        ...e,
+        data: {
+          ...e.data,
+          id: e.id || e.data?.id || '',
+          text: e.name || e.data?.text || '',
+          resource: props.modulesCount[e.id] !== undefined ? [moduleTag] : e.data?.resource,
+          expandState: e.level === 0 ? 'expand' : 'collapse',
+          count: props.modulesCount[e.id],
+          isNew: false,
+          changed: false,
+        },
+        children:
+          props.modulesCount[e.id] > 0 && !e.children?.length
+            ? [
+                {
+                  data: {
+                    id: 'fakeNode',
+                    text: 'fakeNode',
+                    resource: ['fakeNode'],
+                    isNew: false,
+                    changed: false,
                   },
-                ]
-              : e.children,
-        }));
-        importJson.value.root = {
-          children: caseTree.value,
-          data: {
-            id: 'NONE',
-            text: t('ms.minders.allModule'),
-            resource: [moduleTag],
-            disabled: true,
-          },
-        };
-        importJson.value.treePath = [];
-        window.minder.importJson(importJson.value);
-      }
-      if (notRemote) {
-        if (props.moduleId !== 'all') {
-          // 携带具体的模块 ID 加载时，进入该模块内
-          nextTick(() => {
-            minderStore.dispatchEvent(MinderEventName.ENTER_NODE, undefined, undefined, undefined, [
-              window.minder.getNodeById(props.moduleId),
-            ]);
-          });
-        } else {
-          // 携带具体的模块 ID 加载时，进入该模块内
-          nextTick(() => {
-            minderStore.dispatchEvent(MinderEventName.ENTER_NODE, undefined, undefined, undefined, [
-              importJson.value.root,
-            ]);
-          });
-        }
+                },
+              ]
+            : e.children,
+      }));
+      importJson.value.root = {
+        children: caseTree.value,
+        data: {
+          id: 'NONE',
+          text: t('ms.minders.allModule'),
+          resource: [moduleTag],
+          disabled: true,
+        },
+      };
+      importJson.value.treePath = [];
+      window.minder.importJson(importJson.value);
+      if (props.moduleId !== 'all') {
+        // 携带具体的模块 ID 加载时，进入该模块内
+        nextTick(() => {
+          minderStore.dispatchEvent(MinderEventName.ENTER_NODE, undefined, undefined, undefined, [
+            findNodeByKey(importJson.value.root.children || [], props.moduleId, 'id', 'data') as MinderJsonNode,
+          ]);
+        });
+      } else {
+        // 刷新时不需要重新请求数据，进入根节点
+        nextTick(() => {
+          minderStore.dispatchEvent(MinderEventName.ENTER_NODE, undefined, undefined, undefined, [
+            importJson.value.root,
+          ]);
+        });
       }
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -291,7 +288,10 @@
     try {
       baseInfoLoading.value = true;
       const res = await getCaseDetail(data?.id || activeCase.value.id);
-      activeCase.value = res;
+      activeCase.value = {
+        ...res,
+        isNew: false,
+      };
       const fileIds = (res.attachments || []).map((item: any) => item.id) || [];
       if (fileIds.length) {
         checkUpdateFileIds.value = await checkFileIsUpdateRequest(fileIds);
@@ -328,6 +328,13 @@
     resetExtractInfo();
   }
 
+  function handleBaseInfoSaved() {
+    const node: MinderJsonNode = window.minder.getSelectedNode();
+    if (node.data) {
+      initCaseDetail(node.data);
+    }
+  }
+
   /**
    * 切换用例详情显示
    */
@@ -346,10 +353,204 @@
           activeCase.value = {
             id: data.id,
             name: data.text,
+            moduleId: node.parent?.data?.id || '',
             isNew: true,
           };
         }
       }
+    }
+  }
+
+  /**
+   * 初始化模块节点下的用例节点
+   * @param node 选中节点
+   */
+  async function initNodeCases(node: MinderJsonNode) {
+    try {
+      const { data } = node;
+      if (!data) return;
+      loading.value = true;
+      const { list, total } = await getCaseMinder({
+        projectId: appStore.currentProjectId,
+        moduleId: data.id,
+        current: 1,
+      });
+      const fakeNode = node.children?.find((e) => e.data?.id === 'fakeNode'); // 移除占位的虚拟节点
+      if (fakeNode) {
+        window.minder.removeNode(fakeNode);
+      }
+      if ((!list || list.length === 0) && node.children?.length) {
+        // 如果模块下没有用例且有别的模块节点，正常展开
+        node.expand();
+        window.minder.renderNodeBatch(node.children);
+        node.layout();
+        data.isLoaded = true;
+        return;
+      }
+      // TODO:递归渲染存在的子节点
+      let waitingRenderNodes: MinderJsonNode[] = [];
+      list.forEach((e) => {
+        // 用例节点
+        const child = window.minder.createNode(
+          {
+            ...e.data,
+            expandState: 'collapse',
+            isNew: false,
+          },
+          node
+        );
+        waitingRenderNodes.push(child);
+        const grandChildren: MinderJsonNode[] = [];
+        e.children?.forEach((item) => {
+          // 前置/步骤/备注节点
+          const grandChild = window.minder.createNode(
+            {
+              ...item.data,
+              expandState: 'collapse',
+              isNew: false,
+            },
+            child
+          );
+          grandChildren.push(grandChild);
+          const greatGrandChildren: MinderJsonNode[] = [];
+          item.children?.forEach((subItem) => {
+            // 预期结果节点
+            const greatGrandChild = window.minder.createNode(
+              {
+                ...subItem.data,
+                expandState: 'collapse',
+                isNew: false,
+              },
+              grandChild
+            );
+            greatGrandChildren.push(greatGrandChild);
+          });
+          window.minder.renderNodeBatch(greatGrandChildren);
+        });
+        window.minder.renderNodeBatch(grandChildren);
+      });
+      node.expand();
+      // node.renderTree();
+      if (node.children && node.children.length > 0) {
+        waitingRenderNodes = waitingRenderNodes.concat(node.children);
+      }
+      if (total > list.length) {
+        // 有更多用例
+        const moreNode = window.minder.createNode(
+          {
+            id: `tmp-${data.id}`,
+            text: '...',
+            type: 'tmp',
+            expandState: 'collapse',
+            current: 1,
+          },
+          node
+        );
+        waitingRenderNodes.push(moreNode);
+      }
+      window.minder.renderNodeBatch(waitingRenderNodes);
+      node.layout();
+      data.isLoaded = true;
+      // 加载完用例数据后，更新当前importJson数据
+      replaceNodeInTree([importJson.value.root], node.data?.id || '', window.minder.exportNode(node), 'data', 'id');
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
+   * 加载模块下更多用例
+   * @param node 模块节点
+   * @param current 当前页码
+   */
+  async function loadMoreCases(node: MinderJsonNode, current: number) {
+    try {
+      const { data } = node;
+      if (!data) return;
+      loading.value = true;
+      const { list, total } = await getCaseMinder({
+        projectId: appStore.currentProjectId,
+        moduleId: data.id,
+        current: current + 1,
+      });
+      const fakeNode = node.children?.find((e) => e.data?.id === `tmp-${data.id}`); // 移除占位的虚拟节点
+      if (fakeNode) {
+        window.minder.removeNode(fakeNode);
+      }
+      // TODO:递归渲染存在的子节点
+      let waitingRenderNodes: MinderJsonNode[] = [];
+      list.forEach((e) => {
+        // 用例节点
+        const child = window.minder.createNode(
+          {
+            ...e.data,
+            expandState: 'collapse',
+            isNew: false,
+          },
+          node
+        );
+        waitingRenderNodes.push(child);
+        const grandChildren: MinderJsonNode[] = [];
+        e.children?.forEach((item) => {
+          // 前置/步骤/备注节点
+          const grandChild = window.minder.createNode(
+            {
+              ...item.data,
+              expandState: 'collapse',
+              isNew: false,
+            },
+            child
+          );
+          grandChildren.push(grandChild);
+          const greatGrandChildren: MinderJsonNode[] = [];
+          item.children?.forEach((subItem) => {
+            // 预期结果节点
+            const greatGrandChild = window.minder.createNode(
+              {
+                ...subItem.data,
+                expandState: 'collapse',
+                isNew: false,
+              },
+              grandChild
+            );
+            greatGrandChildren.push(greatGrandChild);
+          });
+          window.minder.renderNodeBatch(greatGrandChildren);
+        });
+        window.minder.renderNodeBatch(grandChildren);
+      });
+      node.expand();
+      // node.renderTree();
+      if (node.children && node.children.length > 0) {
+        waitingRenderNodes = waitingRenderNodes.concat(node.children);
+      }
+      if (total > 100 * (current + 1)) {
+        // 有更多用例
+        const moreNode = window.minder.createNode(
+          {
+            id: `tmp-${data.id}`,
+            text: '...',
+            type: 'tmp',
+            expandState: 'collapse',
+            current: current + 1,
+          },
+          node
+        );
+        waitingRenderNodes.push(moreNode);
+      }
+      window.minder.renderNodeBatch(waitingRenderNodes);
+      node.layout();
+      data.isLoaded = true;
+      // 加载完用例数据后，更新当前importJson数据
+      replaceNodeInTree([importJson.value.root], node.data?.id || '', window.minder.exportNode(node), 'data', 'id');
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    } finally {
+      loading.value = false;
     }
   }
 
@@ -360,8 +561,14 @@
    * @param node 被激活/点击的节点
    */
   async function handleNodeSelect(node: MinderJsonNode) {
-    checkNodeCanShowMenu(node);
     const { data } = node;
+    checkNodeCanShowMenu(node);
+    if (data?.type === 'tmp' && node.parent?.data?.resource?.includes(moduleTag)) {
+      // 点击更多节点，加载更多用例
+      await loadMoreCases(node.parent, data.current);
+      setPriorityView(true, 'P');
+      return;
+    }
     if (
       data?.resource?.includes(moduleTag) &&
       (node.children || []).length > 0 &&
@@ -381,89 +588,18 @@
       }
     } else if (data?.resource?.includes(moduleTag) && data.count > 0 && data.isLoaded !== true) {
       // 模块节点且有用例且未加载过用例数据
-      try {
-        loading.value = true;
-        showDetailMenu.value = false;
-        extraVisible.value = false;
-        const res = await getCaseMinder({
-          projectId: appStore.currentProjectId,
-          moduleId: data.id,
-        });
-        const fakeNode = node.children?.find((e) => e.data?.id === undefined); // 移除占位的虚拟节点
-        if (fakeNode) {
-          window.minder.removeNode(fakeNode);
-        }
-        if ((!res || res.length === 0) && node.children?.length) {
-          // 如果模块下没有用例且有别的模块节点，正常展开
-          node.expand();
-          window.minder.renderNodeBatch(node.children);
-          node.layout();
-          data.isLoaded = true;
-          return;
-        }
-        // TODO:递归渲染存在的子节点
-        let waitingRenderNodes: MinderJsonNode[] = [];
-        res.forEach((e) => {
-          // 用例节点
-          const child = window.minder.createNode(
-            {
-              ...e.data,
-              expandState: 'collapse',
-              isNew: false,
-            },
-            node
-          );
-          waitingRenderNodes.push(child);
-          const grandChildren: MinderJsonNode[] = [];
-          e.children?.forEach((item) => {
-            // 前置/步骤/备注节点
-            const grandChild = window.minder.createNode(
-              {
-                ...item.data,
-                expandState: 'collapse',
-                isNew: false,
-              },
-              child
-            );
-            grandChildren.push(grandChild);
-            const greatGrandChildren: MinderJsonNode[] = [];
-            item.children?.forEach((subItem) => {
-              // 预期结果节点
-              const greatGrandChild = window.minder.createNode(
-                {
-                  ...subItem.data,
-                  expandState: 'collapse',
-                  isNew: false,
-                },
-                grandChild
-              );
-              greatGrandChildren.push(greatGrandChild);
-            });
-            window.minder.renderNodeBatch(greatGrandChildren);
-          });
-          window.minder.renderNodeBatch(grandChildren);
-        });
-        node.expand();
-        // node.renderTree();
-        if (node.children && node.children.length > 0) {
-          waitingRenderNodes = waitingRenderNodes.concat(node.children);
-        }
-        window.minder.renderNodeBatch(waitingRenderNodes);
-        node.layout();
-        data.isLoaded = true;
-        // 加载完用例数据后，更新当前importJson数据
-        replaceNodeInTree([importJson.value.root], node.data?.id || '', window.minder.exportNode(node), 'data', 'id');
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.log(error);
-      } finally {
-        loading.value = false;
-      }
+      await initNodeCases(node);
+      showDetailMenu.value = false;
+      extraVisible.value = false;
     } else {
       // 文本节点或已加载过用例数据的模块节点
       extraVisible.value = false;
       showDetailMenu.value = false;
       resetExtractInfo();
+      const fakeNode = node.children?.find((e) => e.data?.id === 'fakeNode'); // 移除占位的虚拟节点
+      if (fakeNode) {
+        window.minder.removeNode(fakeNode);
+      }
     }
     setPriorityView(true, 'P');
   }
@@ -483,20 +619,16 @@
         node.data.isNew = true;
         window.minder.execCommand('priority');
         if (index === nodes.length - 1) {
-          nextTick(() => {
-            handleNodeSelect(node);
-          });
+          window.minder.toggleSelect(node);
         }
-      } else if (node.data?.resource?.includes(caseTag)) {
+      } else if (tag === caseTag && node.data) {
         // 排除是从模块节点切换到用例节点的数据
         tempMinderParams.value.updateModuleList = tempMinderParams.value.updateModuleList.filter(
           (e) => e.id !== node.data?.id
         );
         node.data.isNew = true;
         if (index === nodes.length - 1) {
-          nextTick(() => {
-            handleNodeSelect(node);
-          });
+          window.minder.toggleSelect(node);
         }
       } else if (node.data?.resource?.some((e) => caseOffspringTags.includes(e))) {
         // 用例子孙节点更新，标记用例节点变化
@@ -522,7 +654,13 @@
         case MinderEventName.CUT_NODE:
           // TODO:循环优化
           nodes.forEach((node) => {
-            if (!caseOffspringTags.some((e) => node.data?.resource?.includes(e))) {
+            if (!node.data?.resource || node.data?.resource.length === 0) {
+              // 删除文本节点
+              tempMinderParams.value.deleteResourceList.push({
+                id: node.data?.id || '',
+                type: 'NONE',
+              });
+            } else if (!caseOffspringTags.some((e) => node.data?.resource?.includes(e))) {
               // 非用例下的子孙节点的移除，才加入删除资源队列
               tempMinderParams.value.deleteResourceList.push({
                 id: node.data?.id || '',
@@ -613,13 +751,13 @@
     };
   }
 
-  function resetMinderParams() {
+  function resetMinderParams(clearDeleteResource = true) {
     tempMinderParams.value = {
       projectId: appStore.currentProjectId,
       versionId: '',
       updateCaseList: [],
       updateModuleList: [],
-      deleteResourceList: [],
+      deleteResourceList: clearDeleteResource ? [] : tempMinderParams.value.deleteResourceList, // 请求错误的时候，删除的资源不清空，因为此时节点已经被脑图删除
       additionalNodeList: [],
     };
   }
@@ -629,7 +767,7 @@
    */
   function makeMinderParams(fullJson: MinderJson): FeatureCaseMinderUpdateParams {
     filterTree(fullJson.root.children, (node, nodeIndex, parent) => {
-      if (node.data.isNew !== false || node.data.changed === true) {
+      if (node.data?.type !== 'tmp' && (node.data.isNew !== false || node.data.changed === true)) {
         if (node.data.resource?.includes(moduleTag)) {
           // 处理模块节点
           tempMinderParams.value.updateModuleList.push({
@@ -670,7 +808,16 @@
           });
         }
       }
-
+      const minderNode: MinderJsonNode = window.minder.getNodeById(node.data.id);
+      if (minderNode?.data) {
+        // 能找到对应的脑图节点，重置 isNew 和 changed 状态
+        minderNode.data.isNew = false;
+        minderNode.data.changed = false;
+      } else {
+        // 找不到对应的脑图节点，说明当前是进入了模块层级，之前更改的节点没有渲染，重置源数据 isNew 和 changed 状态
+        node.data.isNew = false;
+        node.data.changed = false;
+      }
       return true;
     });
     return tempMinderParams.value;
@@ -681,7 +828,7 @@
    * @param fullJson 脑图导出的完整数据
    * @param callback 保存成功回调
    */
-  async function handleMinderSave(fullJson: MinderJson, callback: () => void) {
+  async function handleMinderSave(fullJson: MinderJson, callback: (refersh: boolean) => void) {
     try {
       loading.value = true;
       await saveCaseMinder(makeMinderParams(fullJson));
@@ -689,11 +836,11 @@
       Message.success(t('common.saveSuccess'));
       resetMinderParams();
       emit('save');
-      callback();
+      callback(true);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
-      resetMinderParams();
+      resetMinderParams(false);
     } finally {
       loading.value = false;
     }
@@ -702,7 +849,7 @@
   watch(
     () => props.moduleId,
     () => {
-      initCaseTree(true);
+      initCaseTree();
     },
     {
       deep: true,

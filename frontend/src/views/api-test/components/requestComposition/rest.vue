@@ -28,6 +28,7 @@
     :params="innerParams"
     :disabled="props.disabledExceptParam"
     :default-param-item="defaultRequestParamsItem"
+    has-standard
     @apply="handleBatchParamApply"
   />
 </template>
@@ -74,7 +75,7 @@
       dataIndex: 'paramType',
       slotName: 'paramType',
       hasRequired: true,
-      typeOptions: Object.values(RequestParamsType)
+      options: Object.values(RequestParamsType)
         .filter((val) => ![RequestParamsType.JSON, RequestParamsType.FILE].includes(val as RequestParamsType))
         .map((val) => ({
           label: val,

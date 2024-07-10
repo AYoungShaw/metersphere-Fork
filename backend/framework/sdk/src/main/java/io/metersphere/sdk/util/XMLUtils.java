@@ -108,7 +108,7 @@ public class XMLUtils {
     }
 
     public static Document stringToDocument(String xml) throws Exception {
-        return getDocument(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8.name())));
+        return getDocument(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
     }
 
     public static Map<String, Object> xmlStringToJson(String xml) {
@@ -131,7 +131,7 @@ public class XMLUtils {
                 list.add(jsonObject);
             }
             if (list.size() == 1) {
-                result.put(node.getName(), list.get(0));
+                result.put(node.getName(), list.getFirst());
             } else {
                 result.put(node.getName(), list);
             }

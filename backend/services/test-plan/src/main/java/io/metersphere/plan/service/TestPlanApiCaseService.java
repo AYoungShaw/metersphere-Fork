@@ -2,10 +2,13 @@ package io.metersphere.plan.service;
 
 import io.metersphere.api.domain.*;
 import io.metersphere.api.dto.definition.ApiDefinitionDTO;
+import io.metersphere.api.dto.definition.ApiModuleRequest;
 import io.metersphere.api.dto.definition.ApiTestCaseDTO;
+import io.metersphere.api.dto.definition.ApiTestCasePageRequest;
 import io.metersphere.api.mapper.ApiReportMapper;
 import io.metersphere.api.mapper.ApiTestCaseMapper;
 import io.metersphere.api.mapper.ExtApiDefinitionModuleMapper;
+import io.metersphere.api.mapper.ExtApiTestCaseMapper;
 import io.metersphere.api.service.ApiBatchRunBaseService;
 import io.metersphere.api.service.ApiExecuteService;
 import io.metersphere.api.service.definition.ApiDefinitionModuleService;
@@ -31,6 +34,7 @@ import io.metersphere.project.mapper.ProjectMapper;
 import io.metersphere.sdk.constants.*;
 import io.metersphere.sdk.domain.Environment;
 import io.metersphere.sdk.domain.EnvironmentExample;
+import io.metersphere.sdk.dto.AssociateCaseDTO;
 import io.metersphere.sdk.dto.api.task.*;
 import io.metersphere.sdk.exception.MSException;
 import io.metersphere.sdk.mapper.EnvironmentMapper;
@@ -40,16 +44,13 @@ import io.metersphere.sdk.util.Translator;
 import io.metersphere.system.dto.LogInsertModule;
 import io.metersphere.system.dto.sdk.BaseTreeNode;
 import io.metersphere.system.dto.sdk.SessionUser;
-import io.metersphere.system.log.constants.OperationLogModule;
-import io.metersphere.system.log.constants.OperationLogType;
-import io.metersphere.system.log.dto.LogDTO;
-import io.metersphere.system.log.service.OperationLogService;
 import io.metersphere.system.service.UserLoginService;
 import io.metersphere.system.uid.IDGenerator;
 import io.metersphere.system.utils.ServiceUtils;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.ExecutorType;
 import org.apache.ibatis.session.SqlSession;
@@ -59,10 +60,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -73,8 +71,6 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
 
     @Resource
     private TestPlanMapper testPlanMapper;
-    @Resource
-    private ExtTestPlanMapper extTestPlanMapper;
     @Resource
     private TestPlanApiCaseMapper testPlanApiCaseMapper;
     @Resource
@@ -115,9 +111,16 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
     @Resource
     private ApiReportMapper apiReportMapper;
     @Resource
-    private OperationLogService operationLogService;
-    @Resource
     private ExtApiDefinitionModuleMapper extApiDefinitionModuleMapper;
+    @Resource
+    private TestPlanConfigMapper testPlanConfigMapper;
+    private static final String DEBUG_MODULE_COUNT_ALL = "all";
+    @Resource
+    private ExtApiTestCaseMapper extApiTestCaseMapper;
+
+    public List<TestPlanResourceExecResultDTO> selectDistinctExecResult(String projectId) {
+        return extTestPlanApiCaseMapper.selectDistinctExecResult(projectId);
+    }
 
     @Override
     public void deleteBatchByTestPlanId(List<String> testPlanIdList) {
@@ -213,7 +216,9 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
         if (CollectionUtils.isEmpty(request.getProtocols())) {
             return new ArrayList<>();
         }
-        return apiTestCaseService.page(request, false, isRepeat, request.getTestPlanId());
+        ApiTestCasePageRequest pageRequest = new ApiTestCasePageRequest();
+        BeanUtils.copyBean(pageRequest, request);
+        return apiTestCaseService.page(pageRequest, false, isRepeat, request.getTestPlanId());
     }
 
 
@@ -245,9 +250,8 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
     private Map<String, String> getModuleName(List<TestPlanApiCasePageResponse> apiCaseList) {
         List<String> moduleIds = apiCaseList.stream().map(TestPlanApiCasePageResponse::getModuleId).toList();
         List<ApiDefinitionModule> modules = extApiDefinitionModuleMapper.getNameInfoByIds(moduleIds);
-        Map<String, String> moduleNameMap = modules.stream()
+        return modules.stream()
                 .collect(Collectors.toMap(ApiDefinitionModule::getId, ApiDefinitionModule::getName));
-        return moduleNameMap;
     }
 
     private void handleCaseAndEnv(List<TestPlanApiCasePageResponse> apiCaseList, Map<String, String> projectMap, Map<String, String> userMap, String testPlanId, Map<String, String> moduleNameMap) {
@@ -325,6 +329,9 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
 
 
     public Map<String, Long> moduleCount(TestPlanApiCaseModuleRequest request) {
+        if (CollectionUtils.isEmpty(request.getProtocols())) {
+            return Collections.emptyMap();
+        }
         switch (request.getTreeType()) {
             case TreeTypeEnums.MODULE:
                 return getModuleCount(request);
@@ -363,7 +370,12 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
         request.setModuleIds(null);
         List<FunctionalCaseModuleCountDTO> projectModuleCountDTOList = extTestPlanApiCaseMapper.countModuleIdByRequest(request, false);
         Map<String, List<FunctionalCaseModuleCountDTO>> projectCountMap = projectModuleCountDTOList.stream().collect(Collectors.groupingBy(FunctionalCaseModuleCountDTO::getProjectId));
-        Map<String, Long> projectModuleCountMap = new HashMap<>();
+        //projectModuleCountDTOList转新的map key 是moduleId value是数量 stream实现
+        Map<String, Long> projectModuleCountMap = projectModuleCountDTOList.stream()
+                .collect(Collectors.groupingBy(
+                        FunctionalCaseModuleCountDTO::getModuleId,
+                        Collectors.summingLong(FunctionalCaseModuleCountDTO::getDataCount)));
+
         projectCountMap.forEach((projectId, moduleCountDTOList) -> {
             List<ModuleCountDTO> moduleCountDTOS = new ArrayList<>();
             for (FunctionalCaseModuleCountDTO functionalCaseModuleCountDTO : moduleCountDTOList) {
@@ -444,27 +456,37 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
      */
     private List<BaseTreeNode> getModuleTree(String testPlanId) {
         List<BaseTreeNode> returnList = new ArrayList<>();
-        List<ProjectOptionDTO> rootIds = extTestPlanApiCaseMapper.selectRootIdByTestPlanId(testPlanId);
-        Map<String, List<ProjectOptionDTO>> projectRootMap = rootIds.stream().collect(Collectors.groupingBy(ProjectOptionDTO::getName));
+        List<ProjectOptionDTO> moduleLists = extTestPlanApiCaseMapper.selectRootIdByTestPlanId(testPlanId);
+        // 获取所有的项目id
+        List<String> projectIds = moduleLists.stream().map(ProjectOptionDTO::getName).distinct().toList();
+        // moduleLists中id=root的数据
+        List<ProjectOptionDTO> rootModuleList = moduleLists.stream().filter(item -> StringUtils.equals(item.getId(), ModuleConstants.DEFAULT_NODE_ID)).toList();
+
+        Map<String, List<ProjectOptionDTO>> projectRootMap = rootModuleList.stream().collect(Collectors.groupingBy(ProjectOptionDTO::getName));
         List<ApiCaseModuleDTO> apiCaseModuleIds = extTestPlanApiCaseMapper.selectBaseByProjectIdAndTestPlanId(testPlanId);
         Map<String, List<ApiCaseModuleDTO>> projectModuleMap = apiCaseModuleIds.stream().collect(Collectors.groupingBy(ApiCaseModuleDTO::getProjectId));
-        if (MapUtils.isEmpty(projectModuleMap)) {
-            projectRootMap.forEach((projectId, projectOptionDTOList) -> {
-                BaseTreeNode projectNode = new BaseTreeNode(projectId, projectOptionDTOList.get(0).getProjectName(), Project.class.getName());
-                returnList.add(projectNode);
-                BaseTreeNode defaultNode = apiDefinitionModuleService.getDefaultModule(Translator.get("functional_case.module.default.name"));
-                projectNode.addChild(defaultNode);
-            });
-            return returnList;
-        }
-        projectModuleMap.forEach((projectId, moduleList) -> {
-            BaseTreeNode projectNode = new BaseTreeNode(projectId, moduleList.get(0).getProjectName(), Project.class.getName());
+        projectIds.forEach(projectId -> {
+            // 如果projectRootMap中没有projectId，说明该项目没有根节点 不需要创建
+            // projectModuleMap中没有projectId，说明该项目没有模块 不需要创建
+            // 如果都有  需要创建完整的数结构
+            boolean needCreateRoot = MapUtils.isNotEmpty(projectRootMap) && projectRootMap.containsKey(projectId);
+            boolean needCreateModule = MapUtils.isNotEmpty(projectModuleMap) && projectModuleMap.containsKey(projectId);
+            // 项目名称是
+            String projectName = needCreateModule ? projectModuleMap.get(projectId).getFirst().getProjectName() : projectRootMap.get(projectId).getFirst().getProjectName();
+            // 构建项目那一层级
+            BaseTreeNode projectNode = new BaseTreeNode(projectId, projectName, "PROJECT");
             returnList.add(projectNode);
-            List<String> projectModuleIds = moduleList.stream().map(ApiCaseModuleDTO::getId).toList();
-            List<BaseTreeNode> nodeByNodeIds = apiDefinitionModuleService.getNodeByNodeIds(projectModuleIds);
-            boolean haveVirtualRootNode = CollectionUtils.isEmpty(projectRootMap.get(projectId));
-            List<BaseTreeNode> baseTreeNodes = apiDefinitionModuleService.buildTreeAndCountResource(nodeByNodeIds, !haveVirtualRootNode, Translator.get("functional_case.module.default.name"));
+            List<BaseTreeNode> nodeByNodeIds = new ArrayList<>();
+            if (needCreateModule) {
+                List<String> projectModuleIds = projectModuleMap.get(projectId).stream().map(ApiCaseModuleDTO::getId).toList();
+                nodeByNodeIds = apiDefinitionModuleService.getNodeByNodeIds(projectModuleIds);
+            }
+            List<BaseTreeNode> baseTreeNodes = apiDefinitionModuleService.buildTreeAndCountResource(nodeByNodeIds, needCreateRoot, Translator.get("api_unplanned_request"));
             for (BaseTreeNode baseTreeNode : baseTreeNodes) {
+                if (StringUtils.equals(baseTreeNode.getId(), ModuleConstants.DEFAULT_NODE_ID)) {
+                    // 默认拼项目id
+                    baseTreeNode.setId(projectId + "_" + ModuleConstants.DEFAULT_NODE_ID);
+                }
                 projectNode.addChild(baseTreeNode);
             }
         });
@@ -550,64 +572,72 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
     @Override
     public void associateCollection(String planId, Map<String, List<BaseCollectionAssociateRequest>> collectionAssociates, SessionUser user) {
         List<TestPlanApiCase> testPlanApiCaseList = new ArrayList<>();
-        List<LogDTO> logDTOS = new ArrayList<>();
         TestPlan testPlan = testPlanMapper.selectByPrimaryKey(planId);
+        boolean isRepeat = testPlanConfigService.isRepeatCase(testPlan.getId());
         //处理数据
-        handleApiData(collectionAssociates.get(AssociateCaseType.API), user, testPlanApiCaseList, testPlan, logDTOS);
-        handleApiCaseData(collectionAssociates.get(AssociateCaseType.API_CASE), user, testPlanApiCaseList, testPlan, logDTOS);
+        handleApiData(collectionAssociates.get(AssociateCaseType.API), user, testPlanApiCaseList, testPlan, isRepeat);
+        handleApiCaseData(collectionAssociates.get(AssociateCaseType.API_CASE), user, testPlanApiCaseList, testPlan, isRepeat);
         if (CollectionUtils.isNotEmpty(testPlanApiCaseList)) {
             testPlanApiCaseMapper.batchInsert(testPlanApiCaseList);
-            operationLogService.batchAdd(logDTOS);
         }
     }
 
-    private void handleApiCaseData(List<BaseCollectionAssociateRequest> apiCaseList, SessionUser user, List<TestPlanApiCase> testPlanApiCaseList, TestPlan testPlan, List<LogDTO> logDTOS) {
+    private void handleApiCaseData(List<BaseCollectionAssociateRequest> apiCaseList, SessionUser user, List<TestPlanApiCase> testPlanApiCaseList, TestPlan testPlan, boolean isRepeat) {
         if (CollectionUtils.isNotEmpty(apiCaseList)) {
-            List<String> ids = apiCaseList.stream().flatMap(item -> item.getIds().stream()).toList();
-            ApiTestCaseExample example = new ApiTestCaseExample();
-            example.createCriteria().andIdIn(ids);
-            List<ApiTestCase> apiTestCaseList = apiTestCaseMapper.selectByExample(example);
             apiCaseList.forEach(apiCase -> {
-                List<String> apiCaseIds = apiCase.getIds();
-                if (CollectionUtils.isNotEmpty(apiCaseIds)) {
-                    List<ApiTestCase> apiTestCases = apiTestCaseList.stream().filter(item -> apiCaseIds.contains(item.getId())).collect(Collectors.toList());
-                    buildTestPlanApiCase(testPlan, apiTestCases, apiCase.getCollectionId(), user, testPlanApiCaseList, logDTOS);
+                super.checkCollection(testPlan.getId(), apiCase.getCollectionId(), CaseType.API_CASE.getKey());
+                boolean selectAllModule = apiCase.getModules().isSelectAllModule();
+                List<Map<String, ModuleSelectDTO>> moduleMaps = apiCase.getModules().getModuleMaps();
+
+                if (selectAllModule) {
+                    // 选择了全部模块
+                    List<ApiTestCase> apiTestCaseList = extApiTestCaseMapper.selectAllApiCase(isRepeat, apiCase.getModules().getProjectId(), testPlan.getId());
+                    buildTestPlanApiCaseDTO(apiCase, apiTestCaseList, testPlan, user, testPlanApiCaseList);
+                } else {
+                    AssociateCaseDTO dto = super.getCaseIds(moduleMaps);
+                    List<ApiTestCase> apiTestCaseList = extApiTestCaseMapper.selectCaseByModules(isRepeat, apiCase.getModules().getProjectId(), dto, testPlan.getId());
+                    buildTestPlanApiCaseDTO(apiCase, apiTestCaseList, testPlan, user, testPlanApiCaseList);
                 }
             });
         }
     }
 
-    private void handleApiData(List<BaseCollectionAssociateRequest> apiCaseList, SessionUser user, List<TestPlanApiCase> testPlanApiCaseList, TestPlan testPlan, List<LogDTO> logDTOS) {
+
+    private void handleApiData(List<BaseCollectionAssociateRequest> apiCaseList, SessionUser user, List<TestPlanApiCase> testPlanApiCaseList, TestPlan testPlan, boolean isRepeat) {
         if (CollectionUtils.isNotEmpty(apiCaseList)) {
-            List<String> ids = apiCaseList.stream().flatMap(item -> item.getIds().stream()).toList();
-            boolean isRepeat = testPlanConfigService.isRepeatCase(testPlan.getId());
-            List<ApiTestCase> apiTestCaseList = extTestPlanApiCaseMapper.selectApiCaseByDefinitionIds(ids, isRepeat, testPlan.getId());
             apiCaseList.forEach(apiCase -> {
-                List<String> apiCaseIds = apiCase.getIds();
-                if (CollectionUtils.isNotEmpty(apiCaseIds)) {
-                    List<ApiTestCase> apiTestCases = apiTestCaseList.stream().filter(item -> apiCaseIds.contains(item.getApiDefinitionId())).collect(Collectors.toList());
-                    buildTestPlanApiCase(testPlan, apiTestCases, apiCase.getCollectionId(), user, testPlanApiCaseList, logDTOS);
+                super.checkCollection(testPlan.getId(), apiCase.getCollectionId(), CaseType.API_CASE.getKey());
+                boolean selectAllModule = apiCase.getModules().isSelectAllModule();
+                List<Map<String, ModuleSelectDTO>> moduleMaps = apiCase.getModules().getModuleMaps();
+                if (selectAllModule) {
+                    // 选择了全部模块
+                    List<ApiTestCase> apiTestCaseList = extApiTestCaseMapper.selectAllApiCase(isRepeat, apiCase.getModules().getProjectId(), testPlan.getId());
+                    buildTestPlanApiCaseDTO(apiCase, apiTestCaseList, testPlan, user, testPlanApiCaseList);
+                } else {
+                    AssociateCaseDTO dto = super.getCaseIds(moduleMaps);
+                    List<ApiTestCase> apiTestCaseList = extApiTestCaseMapper.selectCaseByApiModules(isRepeat, apiCase.getModules().getProjectId(), dto, testPlan.getId());
+                    buildTestPlanApiCaseDTO(apiCase, apiTestCaseList, testPlan, user, testPlanApiCaseList);
                 }
             });
         }
     }
+
 
     /**
      * 构建测试计划接口用例对象
      *
+     * @param apiCase
+     * @param apiTestCaseList
      * @param testPlan
-     * @param apiTestCases
-     * @param collectionId
      * @param user
      * @param testPlanApiCaseList
      */
-    private void buildTestPlanApiCase(TestPlan testPlan, List<ApiTestCase> apiTestCases, String collectionId, SessionUser user, List<TestPlanApiCase> testPlanApiCaseList, List<LogDTO> logDTOS) {
-        super.checkCollection(testPlan.getId(), collectionId, CaseType.API_CASE.getKey());
-        AtomicLong nextOrder = new AtomicLong(getNextOrder(collectionId));
-        apiTestCases.forEach(apiTestCase -> {
+    public void buildTestPlanApiCaseDTO(BaseCollectionAssociateRequest apiCase, List<ApiTestCase> apiTestCaseList, TestPlan testPlan, SessionUser user, List<TestPlanApiCase> testPlanApiCaseList) {
+        AtomicLong nextOrder = new AtomicLong(getNextOrder(apiCase.getCollectionId()));
+        apiTestCaseList.forEach(apiTestCase -> {
             TestPlanApiCase testPlanApiCase = new TestPlanApiCase();
             testPlanApiCase.setId(IDGenerator.nextStr());
-            testPlanApiCase.setTestPlanCollectionId(collectionId);
+            testPlanApiCase.setTestPlanCollectionId(apiCase.getCollectionId());
             testPlanApiCase.setTestPlanId(testPlan.getId());
             testPlanApiCase.setApiCaseId(apiTestCase.getId());
             testPlanApiCase.setEnvironmentId(apiTestCase.getEnvironmentId());
@@ -617,29 +647,13 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
             testPlanApiCase.setExecuteUser(apiTestCase.getCreateUser());
             testPlanApiCase.setLastExecResult(ExecStatus.PENDING.name());
             testPlanApiCaseList.add(testPlanApiCase);
-            buildLog(logDTOS, testPlan, user, apiTestCase);
         });
-    }
-
-    private void buildLog(List<LogDTO> logDTOS, TestPlan testPlan, SessionUser user, ApiTestCase apiTestCase) {
-        LogDTO dto = new LogDTO(
-                testPlan.getProjectId(),
-                user.getLastOrganizationId(),
-                testPlan.getId(),
-                user.getId(),
-                OperationLogType.ASSOCIATE.name(),
-                OperationLogModule.TEST_PLAN,
-                Translator.get("log.test_plan.api_case") + ":" + apiTestCase.getName());
-        dto.setHistory(true);
-        dto.setPath("/test-plan/mind/data/edit");
-        dto.setMethod(HttpMethodConstants.POST.name());
-        logDTOS.add(dto);
     }
 
     @Override
     public void initResourceDefaultCollection(String planId, List<TestPlanCollectionDTO> defaultCollections) {
         TestPlanCollectionDTO defaultCollection = defaultCollections.stream().filter(collection -> StringUtils.equals(collection.getType(), CaseType.API_CASE.getKey())
-                && !StringUtils.equals(collection.getParentId(), "NONE")).toList().get(0);
+                && !StringUtils.equals(collection.getParentId(), "NONE")).toList().getFirst();
         SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
         TestPlanApiCaseMapper apiBatchMapper = sqlSession.getMapper(TestPlanApiCaseMapper.class);
         TestPlanApiCase record = new TestPlanApiCase();
@@ -673,7 +687,6 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
     public TaskRequestDTO run(String id, String reportId, String userId) {
         TestPlanApiCase testPlanApiCase = checkResourceExist(id);
         TestPlanService testPlanService = CommonBeanFactory.getBean(TestPlanService.class);
-        testPlanService.setTestPlanUnderway(testPlanApiCase.getTestPlanId());
         testPlanService.setActualStartTime(testPlanApiCase.getTestPlanId());
         ApiTestCase apiTestCase = apiTestCaseService.checkResourceExist(testPlanApiCase.getApiCaseId());
         ApiRunModeConfigDTO runModeConfig = testPlanApiBatchRunBaseService.getApiRunModeConfig(testPlanApiCase.getTestPlanCollectionId());
@@ -785,4 +798,35 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
         sqlSession.flushStatements();
         SqlSessionUtils.closeSqlSession(sqlSession, sqlSessionFactory);
     }
+
+    public Map<String, Long> getApiCaseModuleCount(ApiModuleRequest request, boolean deleted) {
+        if (CollectionUtils.isEmpty(request.getProtocols())) {
+            return Collections.emptyMap();
+        }
+        boolean isRepeat = true;
+        if (StringUtils.isNotEmpty(request.getTestPlanId())) {
+            isRepeat = this.checkTestPlanRepeatCase(request);
+        }
+        request.setModuleIds(null);
+        //查找根据moduleIds查找模块下的接口数量 查非delete状态的
+        List<ModuleCountDTO> moduleCountDTOList = extApiDefinitionModuleMapper.apiCaseCountModuleIdByRequest(request, deleted, isRepeat);
+        long allCount = getAllCount(moduleCountDTOList);
+        Map<String, Long> moduleCountMap = apiDefinitionModuleService.getModuleCountMap(request, moduleCountDTOList);
+        moduleCountMap.put(DEBUG_MODULE_COUNT_ALL, allCount);
+        return moduleCountMap;
+    }
+
+    private boolean checkTestPlanRepeatCase(ApiModuleRequest request) {
+        TestPlanConfig testPlanConfig = testPlanConfigMapper.selectByPrimaryKey(request.getTestPlanId());
+        return BooleanUtils.isTrue(testPlanConfig.getRepeatCase());
+    }
+
+    public long getAllCount(List<ModuleCountDTO> moduleCountDTOList) {
+        long count = 0;
+        for (ModuleCountDTO countDTO : moduleCountDTOList) {
+            count += countDTO.getDataCount();
+        }
+        return count;
+    }
+
 }

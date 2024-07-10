@@ -2,9 +2,10 @@ export default {
   'caseManagement.caseReview.create': '创建评审',
   'caseManagement.caseReview.waitMyReview': '我评审的',
   'caseManagement.caseReview.myCreate': '我创建的',
-  'caseManagement.caseReview.searchPlaceholder': '通过 ID 或名称搜索',
-  'caseManagement.caseReview.list.searchPlaceholder': '通过ID、名称或标签搜索',
+  'caseManagement.caseReview.searchPlaceholder': '通过 ID/名称搜索',
+  'caseManagement.caseReview.list.searchPlaceholder': '通过 ID/名称/标签搜索',
   'caseManagement.caseReview.archive': '归档',
+  'caseManagement.caseReview.cannotReviewTip': 'Tips:非评审人不可评审',
   'caseManagement.caseReview.tableNoData': '暂无数据，请',
   'caseManagement.caseReview.tableNoDataNoPermission': '暂无数据',
   'caseManagement.caseReview.name': '评审名称',
@@ -134,4 +135,5 @@ export default {
   'caseManagement.caseReview.updateCase': '更新用例',
   'caseManagement.caseReview.reviewSuccess.widthAdmin':
     '提交成功！ 您不是当前项目指定的评审人，系统只会记录您的评审，不影响最终评审结果',
+  'caseManagement.caseReview.reviewFormTip': '添加操作人的评审结果，多人评审需所有评审人评审通过',
 };

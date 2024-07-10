@@ -10,7 +10,7 @@
     hide-back
   >
     <template #headerLeft>
-      <MsStatusTag :status="detail.status || 'PREPARED'" />
+      <MsStatusTag :status="countDetail.status" />
       <a-tooltip :content="`[${detail.num}]${detail.name}`">
         <div class="one-line-text ml-[8px] max-w-[360px] gap-[4px] font-medium text-[var(--color-text-1)]">
           <span>[{{ detail.num }}]</span>
@@ -33,20 +33,22 @@
         <MsIcon type="icon-icon_edit_outlined" class="mr-[8px]" />
         {{ t('common.edit') }}
       </MsButton>
-      <MsButton
-        v-if="hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE']) && detail.status !== 'ARCHIVED'"
-        type="button"
-        status="default"
-        @click="handleGenerateReport"
-      >
-        <MsIcon type="icon-icon_generate_report" class="mr-[8px]" />
-        {{ t('testPlan.testPlanDetail.generateReport') }}
-      </MsButton>
+      <MsTableMoreAction :list="reportMoreAction" @select="handleMoreReportSelect">
+        <MsButton
+          v-if="hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE']) && detail.status !== 'ARCHIVED'"
+          type="button"
+          status="default"
+        >
+          <MsIcon type="icon-icon_generate_report" class="mr-[8px]" />
+          {{ t('testPlan.testPlanDetail.generateReport') }}
+        </MsButton>
+      </MsTableMoreAction>
       <MsButton
         v-if="hasAnyPermission(['PROJECT_TEST_PLAN:READ+ADD']) && detail.status !== 'ARCHIVED'"
         type="button"
         status="default"
-        @click="editorCopyHandler(true)"
+        :loading="copyLoading"
+        @click="copyHandler"
       >
         <MsIcon type="icon-icon_copy_outlined" class="mr-[8px]" />
         {{ t('common.copy') }}
@@ -104,28 +106,32 @@
   <MsCard class="mt-[16px]" :special-height="174" simple has-breadcrumb no-content-padding>
     <Plan v-if="activeTab === 'plan'" :plan-id="planId" :status="detail.status || 'PREPARED'" @refresh="initDetail" />
     <FeatureCase
-      v-if="activeTab === 'featureCase'"
+      v-else-if="activeTab === 'featureCase'"
       ref="featureCaseRef"
       :tree-type="treeType"
       :can-edit="detail.status !== 'ARCHIVED'"
       @refresh="initDetail"
     />
-    <BugManagement v-if="activeTab === 'defectList'" :can-edit="detail.status !== 'ARCHIVED'" @refresh="initDetail" />
+    <BugManagement
+      v-else-if="activeTab === 'defectList'"
+      :can-edit="detail.status !== 'ARCHIVED'"
+      @refresh="initDetail"
+    />
     <ApiCase
-      v-if="activeTab === 'apiCase'"
+      v-else-if="activeTab === 'apiCase'"
       ref="apiCaseRef"
       :tree-type="treeType"
       :can-edit="detail.status !== 'ARCHIVED'"
       @refresh="initDetail"
     />
     <ApiScenario
-      v-if="activeTab === 'apiScenario'"
+      v-else-if="activeTab === 'apiScenario'"
       ref="apiScenarioRef"
       :tree-type="treeType"
       :can-edit="detail.status !== 'ARCHIVED'"
       @refresh="initDetail"
     />
-    <ExecuteHistory v-if="activeTab === 'executeHistory'" />
+    <ExecuteHistory v-else-if="activeTab === 'executeHistory'" />
   </MsCard>
   <CreateAndEditPlanDrawer
     v-model:visible="showPlanDrawer"
@@ -166,6 +172,7 @@
     getPlanPassRate,
     getTestPlanDetail,
     getTestPlanModule,
+    testPlanAndGroupCopy,
   } from '@/api/modules/test-plan/testPlan';
   import { defaultDetailCount, testPlanDefaultDetail } from '@/config/testPlan';
   import { useI18n } from '@/hooks/useI18n';
@@ -178,6 +185,8 @@
 
   import { ModuleTreeNode } from '@/models/common';
   import type { PassRateCountDetail, TestPlanDetail, TestPlanItem } from '@/models/testPlan/testPlan';
+  import { TestPlanRouteEnum } from '@/enums/routeEnum';
+  import { testPlanTypeEnum } from '@/enums/testPlanEnum';
 
   const userStore = useUserStore();
   const appStore = useAppStore();
@@ -373,7 +382,7 @@
 
   const showPlanDrawer = ref(false);
 
-  // 生成报告
+  // 生成报告  TODO 等待联调 后台要改接口
   async function handleGenerateReport() {
     try {
       loading.value = true;
@@ -388,6 +397,52 @@
       console.log(error);
     } finally {
       loading.value = false;
+    }
+  }
+  // 自定义报告  TODO 等待联调 后台缺接口
+  function configReportHandler() {
+    try {
+      // await generateReport({
+      //   projectId: appStore.currentProjectId,
+      //   testPlanId: record.id,
+      //   triggerMode: 'MANUAL',
+      // });
+      router.push({
+        name: TestPlanRouteEnum.TEST_PLAN_INDEX_CONFIG,
+        query: {
+          id: detail.value.id,
+          type: detail.value.type === testPlanTypeEnum.GROUP ? 'GROUP' : 'TEST_PLAN',
+        },
+      });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    }
+  }
+
+  const reportMoreAction: ActionsItem[] = [
+    {
+      label: t('testPlan.planAutomaticGeneration'),
+      eventTag: 'autoGeneration',
+      permission: ['PROJECT_TEST_PLAN:READ+EXECUTE'],
+    },
+    {
+      label: t('testPlan.planConfigReport'),
+      eventTag: 'configReport',
+      permission: ['PROJECT_TEST_PLAN:READ+EXECUTE'],
+    },
+  ];
+
+  function handleMoreReportSelect(item: ActionsItem) {
+    switch (item.eventTag) {
+      case 'autoGeneration':
+        handleGenerateReport();
+        break;
+      case 'configReport':
+        configReportHandler();
+        break;
+      default:
+        break;
     }
   }
 
@@ -473,6 +528,30 @@
       return;
     }
     done();
+  }
+
+  // 复制 TODO:待联调
+  const copyLoading = ref<boolean>(false);
+  async function copyHandler() {
+    copyLoading.value = true;
+    try {
+      const res = await testPlanAndGroupCopy(route.query.id as string);
+      Message.success(t('common.copySuccess'));
+      router.push({
+        name: TestPlanRouteEnum.TEST_PLAN_INDEX_DETAIL,
+        // TODO 后台需要补id
+        query: {
+          id: res.id,
+        },
+      });
+      initDetail();
+      initPlanTree();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    } finally {
+      copyLoading.value = false;
+    }
   }
 
   onBeforeMount(() => {

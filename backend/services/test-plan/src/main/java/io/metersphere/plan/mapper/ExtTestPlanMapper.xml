@@ -75,6 +75,10 @@
         t.type,
         t.description,
         t.pos,
+        t.actual_start_time AS actualStartTime,
+        t.actual_end_time AS actualEndTime,
+        t.planned_start_time AS plannedStartTime,
+        t.planned_end_time AS plannedEndTime,
         t.group_id AS parent,
         t.tags
         FROM test_plan t
@@ -83,33 +87,32 @@
         <foreach collection="groupIds" item="groupId" separator="," open="(" close=")">
             #{groupId}
             </foreach>
-        ORDER BY t.pos ASC
+        ORDER BY t.pos DESC
     </select>
 
     <sql id="queryByTableRequest">
         <include refid="baseConditionQuery"/>
+
         <if test="request.keyword != null and request.keyword != ''">
             and (
             t.name like concat('%', #{request.keyword},'%')
             or t.num like concat('%', #{request.keyword},'%')
             or t.tags like concat('%', #{request.keyword}, '%')
+            <if test="request.keywordFilterIds != null and request.keywordFilterIds.size() > 0">
+                or t.id in
+                <foreach collection="request.keywordFilterIds" item="id" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </if>
             )
         </if>
-        <if test="request.type != null and request.type != ''">
-            <choose>
-                <when test="request.type == 'ALL'">
-                    and t.group_id = 'NONE'
-                </when>
-                <when test="request.type == 'TEST_PLAN'">
-                    and t.group_id = 'NONE'
-                    and t.type = 'TEST_PLAN'
-                </when>
-                <when test="request.type == 'GROUP'">
-                    and t.group_id = 'NONE'
-                    and t.type = 'GROUP'
-                </when>
-            </choose>
+        <if test="request.innerIds != null and request.innerIds.size() > 0">
+            and t.id in
+            <foreach collection="request.innerIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
         </if>
+
         <choose>
             <when test='request.searchMode == "AND"'>
                 AND <include refid="queryCombine"/>
@@ -456,6 +459,12 @@
         FROM test_plan
         WHERE group_id = #{0}
     </select>
+    <select id="selectMaxPosByProjectIdAndGroupId" resultType="java.lang.Long">
+        SELECT IF(MAX(pos) IS NULL, 0, MAX(pos)) AS pos
+        FROM test_plan
+        WHERE project_id = #{projectId}
+          AND group_id = #{groupId}
+    </select>
     <select id="selectRightfulIdsForExecute" resultType="java.lang.String">
         SELECT id FROM test_plan WHERE id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">
@@ -466,9 +475,41 @@
 
     <select id="listHis" resultType="io.metersphere.plan.dto.TestPlanExecuteHisDTO">
         select tpr.id, from_unixtime(tpr.create_time / 1000, '%Y%m%d%H%i%s') as num, tpr.trigger_mode triggerMode, tpr.exec_status execStatus, tpr.result_status execResult,
-               tpr.create_user operationUser, tpr.start_time startTime, tpr.end_time endTime, tpr.deleted deleted from test_plan_report tpr
+               tpr.create_user operationUser, tpr.start_time startTime, tpr.end_time endTime, tpr.deleted as deleted from test_plan_report tpr
         where tpr.test_plan_id = #{request.testPlanId}
         <include refid="filter"/>
+    </select>
+
+    <select id="selectGroupIdByKeyword" resultType="java.lang.String">
+        SELECT t.group_id
+        FROM test_plan t
+        WHERE t.project_id = #{projectId}
+          AND (
+            t.name like concat('%', #{keyword}, '%')
+                or t.num like concat('%', #{keyword}, '%')
+                or t.tags like concat('%', #{keyword}, '%')
+            )
+    </select>
+    <select id="countByGroupPlan" resultType="io.metersphere.plan.dto.TestPlanGroupCountDTO">
+        SELECT group_id AS groupId, count(id) AS count
+        FROM test_plan
+        WHERE project_id = #{0}
+          AND status != 'ARCHIVED'
+          AND group_id != 'NONE'
+        GROUP BY group_id;
+    </select>
+    <select id="selectIdByProjectIdAndWithoutList" resultType="java.lang.String">
+        SELECT id
+        FROM test_plan
+        WHERE project_id = #{projectId}
+        AND status != 'ARCHIVED'
+        AND group_id = 'NONE'
+        <if test="withoutList != null and withoutList.size() != ''">
+            AND id not in
+            <foreach collection="withoutList" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
     </select>
 
     <update id="batchUpdate">

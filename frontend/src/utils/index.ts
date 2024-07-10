@@ -2,6 +2,7 @@ import { cloneDeep } from 'lodash-es';
 import JSEncrypt from 'jsencrypt';
 
 import { BatchActionQueryParams, MsTableColumnData } from '@/components/pure/ms-table/type';
+import type { MsTreeNodeData } from '@/components/business/ms-tree/types';
 
 import { BugEditCustomField, CustomFieldItem } from '@/models/bug-management';
 
@@ -267,7 +268,7 @@ export function mapTree<T>(
         }
         return newNode;
       })
-      .filter(Boolean);
+      .filter((node: TreeNode<T> | null) => node !== null);
   }
   return mapFunc(cloneTree, parentPath, level, parent);
 }
@@ -674,18 +675,52 @@ export const getHashParameters = (): Record<string, string> => {
   return params;
 };
 
+export function getQueryVariable(variable: string) {
+  const urlString = window.location.href;
+  const queryIndex = urlString.indexOf('?');
+  if (queryIndex !== -1) {
+    const query = urlString.substring(queryIndex + 1);
+
+    // 分割查询参数
+    const params = query.split('&');
+    // 遍历参数，找到 _token 参数的值
+    let variableValue;
+    params.forEach((param) => {
+      const equalIndex = param.indexOf('=');
+      const variableName = param.substring(0, equalIndex);
+      if (variableName === variable) {
+        variableValue = param.substring(equalIndex + 1);
+      }
+    });
+    return variableValue;
+  }
+}
+
+let lastTimestamp = 0;
+let sequence = 0;
+
 /**
  * 生成 id 序列号
  * @returns
  */
 export const getGenerateId = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    // eslint-disable-next-line no-bitwise
-    const r = (Math.random() * 16) | 0;
-    // eslint-disable-next-line no-bitwise
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  let timestamp = new Date().getTime();
+  if (timestamp === lastTimestamp) {
+    sequence++;
+    if (sequence >= 100000) {
+      // 如果超过999，则重置为0，等待下一秒
+      sequence = 0;
+      while (timestamp <= lastTimestamp) {
+        timestamp = new Date().getTime();
+      }
+    }
+  } else {
+    sequence = 0;
+  }
+
+  lastTimestamp = timestamp;
+
+  return timestamp.toString() + sequence.toString().padStart(5, '0');
 };
 
 /**
@@ -1043,3 +1078,12 @@ export function formatDuration(ms: number) {
 
 export const operationWidth = (enWidth: number, zhWidth: number) =>
   localStorage.getItem('MS-locale') === 'en-US' ? enWidth : zhWidth;
+
+/**
+ * 下拉树查询检索
+ * @param searchValue 搜索关键字
+ * @param nodeData 树节点
+ */
+export function filterTreeNode(searchValue: string, nodeData: MsTreeNodeData, nameKey = 'name') {
+  return nodeData[nameKey].toLowerCase().includes(searchValue.toLowerCase());
+}

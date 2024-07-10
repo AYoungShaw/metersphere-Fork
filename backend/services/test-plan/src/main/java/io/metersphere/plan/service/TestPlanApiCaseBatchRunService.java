@@ -85,7 +85,6 @@ public class TestPlanApiCaseBatchRunService {
      */
     public void asyncBatchRun(TestPlanApiCaseBatchRunRequest request, String userId) {
         TestPlanService testPlanService = CommonBeanFactory.getBean(TestPlanService.class);
-        testPlanService.setTestPlanUnderway(request.getTestPlanId());
         testPlanService.setActualStartTime(request.getTestPlanId());
         Thread.startVirtualThread(() -> batchRun(request, userId));
     }
@@ -260,6 +259,7 @@ public class TestPlanApiCaseBatchRunService {
         TaskBatchRequestDTO taskRequest = getTaskBatchRequestDTO(projectId, runModeConfig);
         taskRequest.setTaskItems(taskItems);
         taskRequest.getTaskInfo().setParentQueueId(parentQueueId);
+        taskRequest.getTaskInfo().setUserId(userId);
         apiExecuteService.batchExecute(taskRequest);
     }
 
@@ -297,6 +297,7 @@ public class TestPlanApiCaseBatchRunService {
         TaskRequestDTO taskRequest = getTaskRequestDTO(reportId, testPlanApiCase.getId(), apiTestCase, runModeConfig);
         taskRequest.getTaskInfo().setQueueId(queue.getQueueId());
         taskRequest.getTaskInfo().setParentQueueId(queue.getParentQueueId());
+        taskRequest.getTaskInfo().setUserId(queue.getUserId());
         taskRequest.getTaskItem().setRequestCount(1L);
 
         apiExecuteService.execute(taskRequest);

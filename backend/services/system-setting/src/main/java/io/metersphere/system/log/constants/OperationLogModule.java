@@ -26,7 +26,7 @@ public class OperationLogModule {
     // 场景管理
     public static final String API_SCENARIO_MANAGEMENT_SCENARIO = "API_TEST_SCENARIO_MANAGEMENT_SCENARIO";
     public static final String API_SCENARIO_MANAGEMENT_MODULE = "API_TEST_SCENARIO_MANAGEMENT_MODULE";
-    public static final String API_TEST_SCENARIO_RECYCLE = "API_TEST_SCENARIO_RECYCLE";
+    public static final String API_TEST_SCENARIO_RECYCLE = "API_TEST_SCENARIO_MANAGEMENT_RECYCLE";
     public static final String API_TEST_MANAGEMENT_RECYCLE = "API_TEST_MANAGEMENT_RECYCLE";
 
     public static final String API_REPORT = "API_TEST_REPORT_CASE";
@@ -154,7 +154,8 @@ public class OperationLogModule {
     public static final String BUG_MANAGEMENT_RECYCLE = "BUG_MANAGEMENT_BUG_RECYCLE";
     //测试计划
     public static final String TEST_PLAN = "TEST_PLAN";
-    public static final String TEST_PLAN_INDEX = "TEST_PLAN_INDEX";
+    public static final String TEST_PLAN_TEST_PLAN = "TEST_PLAN_PLAN";
+    public static final String TEST_PLAN_TEST_PLAN_GROUP = "TEST_PLAN_GROUP";
     public static final String TEST_PLAN_MODULE = "TEST_PLAN_MODULE";
     public static final String TEST_PLAN_REPORT = "TEST_PLAN_REPORT_TEST_PLAN";
     public static final String TEST_PLAN_GROUP_REPORT = "TEST_PLAN_REPORT_TEST_PLAN_GROUP";

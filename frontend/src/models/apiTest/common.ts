@@ -1,4 +1,5 @@
 import { Language } from '@/components/pure/ms-code-editor/types';
+import type { JsonSchema, JsonSchemaTableItem } from '@/components/pure/ms-json-schema/types';
 
 import {
   type FullResponseAssertionType,
@@ -118,37 +119,16 @@ export interface ExecuteBinaryBody {
   file?: RequestFileInfo;
   sendAsBody?: boolean; // 是否作为正文发送，只有 定义/mock 的响应体有此字段
 }
-// 接口请求-JsonSchema
-export interface JsonSchema {
-  example: Record<string, any>;
-  id: string;
-  title: string;
-  type: string;
-  description: string;
-  items: string;
-  mock: Record<string, any>;
-  properties: Record<string, any>;
-  additionalProperties: string;
-  required: string[];
-  pattern: string;
-  maxLength: number;
-  minLength: number;
-  minimum: number;
-  maximum: number;
-  schema: string;
-  format: string;
-  enumString: string[];
-  enumInteger: number[];
-  enumNumber: number[];
-  extensions: Record<string, any>;
-}
 
 // 接口请求json-body参数集合信息
 export interface ExecuteJsonBody {
   enableJsonSchema?: boolean;
   enableTransition?: boolean;
-  jsonSchema?: JsonSchema[];
+  jsonSchema?: JsonSchema;
   jsonValue: string;
+  // 前端渲染字段
+  jsonSchemaTableData?: JsonSchemaTableItem[];
+  jsonSchemaTableSelectedRowKeys?: string[];
 }
 // 执行请求配置
 export interface ExecuteOtherConfig {

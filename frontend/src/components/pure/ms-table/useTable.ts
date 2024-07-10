@@ -57,7 +57,7 @@ export default function useTableProps<T>(
     columns: [] as MsTableColumn,
     rowKey: 'id', // 表格行的key
     /** 选择器相关 */
-    rowSelection: null, // 禁用表格默认的选择器
+    rowSelection: undefined, // 禁用表格默认的选择器
     selectable: false, // 是否显示选择器
     selectorType: 'checkbox', // 选择器类型
     selectedKeys: new Set<string>(), // 选中的key, 多选
@@ -66,7 +66,6 @@ export default function useTableProps<T>(
     selectorStatus: SelectAllEnum.NONE, // 选择器状态
     showSelectorAll: true, // 是否显示全选
     /** end */
-    enableDrag: false, // 是否可拖拽
     showSetting: false, // 是否展示列选择器
     columnResizable: true,
     pagination: false, // 禁用 arco-table 的分页
@@ -112,11 +111,6 @@ export default function useTableProps<T>(
       hideOnSinglePage: appStore.hideOnSinglePage,
       simple: defaultProps.pageSimple,
     };
-  }
-
-  // 是否可拖拽
-  if (propsRes.value.enableDrag) {
-    propsRes.value.draggable = { type: 'handle' };
   }
 
   // 加载效果
@@ -307,7 +301,7 @@ export default function useTableProps<T>(
         propsRes.value.excludeKeys.delete(item[rowKey]);
       }
 
-      if (item.children && item.children.length > 0) {
+      if (item.children && item.children.length > 0 && !props?.rowSelectionDisabledConfig?.disabledChildren) {
         processChildren(item.children as MsTableDataItem<T>[], rowKey);
       }
     });
@@ -350,7 +344,7 @@ export default function useTableProps<T>(
         propsRes.value.selectedKeys.add(item[rowKey]);
         propsRes.value.excludeKeys.delete(item[rowKey]);
       }
-      if (item.children) {
+      if (item.children && !props?.rowSelectionDisabledConfig?.disabledChildren) {
         collectIds(item.children, rowKey);
       }
     });
@@ -381,7 +375,7 @@ export default function useTableProps<T>(
   watch(
     () => props?.draggableCondition,
     () => {
-      setTableDraggable();
+      setTableDraggable(Object.keys(sortItem.value).length === 0 && Object.keys(filterItem.value).length === 0);
     },
     {
       immediate: true,
@@ -408,6 +402,10 @@ export default function useTableProps<T>(
         filterItem.value = { [`custom_${multiple ? 'multiple' : 'single'}_${dataIndex}`]: filteredValues };
       } else {
         filterItem.value = { ...getTableQueryParams().filter, [dataIndex]: filteredValues };
+        loadListParams.value.filter = {
+          ...loadListParams.value.filter,
+          [dataIndex]: filteredValues,
+        };
       }
       propsRes.value.filter = cloneDeep(filterItem.value);
       setTableDraggable((filterItem.value[dataIndex] || []).length === 0);
@@ -453,12 +451,20 @@ export default function useTableProps<T>(
 
     // 表格SelectAll change
     selectAllChange: (v: SelectAllEnum, onlyCurrent: boolean) => {
-      const { data, rowKey } = propsRes.value;
-      if (v === SelectAllEnum.NONE) {
+      const { data, rowKey, selectorStatus } = propsRes.value;
+      if (v === SelectAllEnum.CANCEL_ALL) {
+        // 清空全选
+        resetSelector(true);
+      } else if (v === SelectAllEnum.NONE) {
         // 清空选中项
         resetSelector(false);
       } else if (v === SelectAllEnum.CURRENT) {
-        // 选中当前页面所有数据
+        // 如果是全选先清空选中项选和排除项，再选中当前页面所有数据,
+        if (selectorStatus === SelectAllEnum.ALL) {
+          propsRes.value.selectedKeys.clear();
+          propsRes.value.excludeKeys.clear();
+        }
+
         collectIds(data as MsTableDataItem<T>[], rowKey);
       } else if (v === SelectAllEnum.ALL) {
         // 全选所有页的时候先清空排除项，再选中所有数据
@@ -485,6 +491,20 @@ export default function useTableProps<T>(
       const { rowKey } = propsRes.value;
       const key = record[rowKey || 'id'];
       const { selectedKeys, excludeKeys, data } = propsRes.value;
+      if (props?.rowSelectionDisabledConfig?.disabledChildren) {
+        if (selectedKeys.has(key)) {
+          // 当前已选中，取消选中
+          selectedKeys.delete(key);
+          excludeKeys.add(key);
+        } else {
+          // 当前未选中，选中
+          selectedKeys.add(key);
+          if (excludeKeys.has(key)) {
+            excludeKeys.delete(key);
+          }
+        }
+        return;
+      }
       // 是否包含子级
       const isHasChildrenData = data.some((item) => item.children);
       let isSelectChildren;

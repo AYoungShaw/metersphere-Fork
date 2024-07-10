@@ -129,6 +129,12 @@ export interface InsertMenuItem {
   value: string;
   label: string;
 }
+export interface MoreMenuOtherOperationItem {
+  value: string;
+  label: string;
+  permission?: string[];
+  onClick: () => void;
+}
 export const floatMenuProps = {
   // 插入同级选项
   insertSiblingMenus: {
@@ -149,6 +155,11 @@ export const floatMenuProps = {
     type: Boolean,
     default: true,
   },
+  // 是否显示更多菜单里的[复制、粘贴、剪切、删除]操作
+  canShowMoreMenuNodeOperation: {
+    type: Boolean,
+    default: true,
+  },
   // 不显示更多菜单时，是否显示删除菜单
   canShowDeleteMenu: {
     type: Boolean,
@@ -163,6 +174,13 @@ export const floatMenuProps = {
   canShowPasteMenu: {
     type: Boolean,
     default: true,
+  },
+  // 更多菜单里自定义操作
+  moreMenuOtherOperationList: {
+    type: Array as PropType<MoreMenuOtherOperationItem[]>,
+    default() {
+      return [];
+    },
   },
   // 是否显示等级菜单
   canShowPriorityMenu: {

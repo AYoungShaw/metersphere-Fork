@@ -23,6 +23,7 @@
           :upload-image="props.uploadImage"
           :preview-url="props.previewUrl"
           class="w-full"
+          :limit-length="1000"
           placeholder="ms.comment.enterPlaceHolderTip"
         />
         <a-textarea
@@ -40,8 +41,6 @@
 </template>
 
 <script lang="ts" setup>
-  import { defineModel, ref } from 'vue';
-
   import MsAvatar from '@/components/pure/ms-avatar/index.vue';
   import MsRichText from '@/components/pure/ms-rich-text/MsRichText.vue';
 

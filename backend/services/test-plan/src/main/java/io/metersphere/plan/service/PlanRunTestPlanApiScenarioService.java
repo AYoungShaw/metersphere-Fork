@@ -27,6 +27,7 @@ import io.metersphere.sdk.dto.queue.TestPlanExecutionQueue;
 import io.metersphere.sdk.util.JSON;
 import io.metersphere.sdk.util.LogUtils;
 import io.metersphere.sdk.util.SubListUtils;
+import io.metersphere.system.uid.IDGenerator;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.stereotype.Service;
@@ -83,8 +84,10 @@ public class PlanRunTestPlanApiScenarioService {
             return true;
         }
 
+        String queueId = testPlanExecutionQueue.getPrepareReportId() + "_" + collection.getId();
+
         // 先初始化集成报告，设置好报告ID，再初始化执行队列
-        ExecutionQueue queue = apiBatchRunBaseService.initExecutionqueue(ids, runModeConfig, ApiExecuteResourceType.PLAN_RUN_API_SCENARIO.name(), parentQueueId, userId);
+        ExecutionQueue queue = apiBatchRunBaseService.initExecutionqueue(queueId, ids, runModeConfig, ApiExecuteResourceType.PLAN_RUN_API_SCENARIO.name(), parentQueueId, userId);
         // 执行第一个任务
         ExecutionQueueDetail nextDetail = apiExecutionQueueService.getNextDetail(queue.getQueueId());
         executeNextTask(queue, nextDetail);
@@ -98,7 +101,7 @@ public class PlanRunTestPlanApiScenarioService {
      * @return 是否执行完毕
      */
     public boolean parallelExecute(TestPlanExecutionQueue testPlanExecutionQueue) {
-        String parentQueueId = testPlanExecutionQueue.getQueueId();
+        String parentQueueId = testPlanExecutionQueue.getQueueId() + "_" + IDGenerator.nextStr();
         String testPlanReportId = testPlanExecutionQueue.getPrepareReportId();
         String userId = testPlanExecutionQueue.getCreateUser();
         TestPlanCollection collection = JSON.parseObject(testPlanExecutionQueue.getTestPlanCollectionJson(), TestPlanCollection.class);

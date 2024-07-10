@@ -16,6 +16,8 @@ public class ReportDetailCasePageDTO {
 	private Long num;
 	@Schema(description = "用例名称")
 	private String name;
+	@Schema(description = "所属计划名称")
+	private String planName;
 	@Schema(description = "所属模块")
 	private String moduleName;
 	@Schema(description = "用例等级")
@@ -28,4 +30,6 @@ public class ReportDetailCasePageDTO {
 	private Long bugCount;
 	@Schema(description = "报告详情ID")
 	private String reportId;
+	@Schema(description = "项目ID")
+	private String projectId;
 }

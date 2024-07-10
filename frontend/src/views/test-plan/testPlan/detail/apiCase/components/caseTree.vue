@@ -14,7 +14,6 @@
     <TreeFolderAll
       v-model:isExpandAll="isExpandAll"
       v-model:selectedProtocols="selectedProtocols"
-      :not-show-operation="props.treeType === 'COLLECTION'"
       :active-folder="activeFolder"
       :folder-name="t('testPlan.testPlanIndex.apiCase')"
       :all-count="allCount"
@@ -65,6 +64,7 @@
   import { getApiCaseModule } from '@/api/modules/test-plan/testPlan';
   import { useI18n } from '@/hooks/useI18n';
   import { mapTree } from '@/utils';
+  import { getNodeParentId } from '@/utils/tree';
 
   import { ModuleTreeNode } from '@/models/common';
 
@@ -74,7 +74,7 @@
     treeType: 'MODULE' | 'COLLECTION';
   }>();
   const emit = defineEmits<{
-    (e: 'folderNodeSelect', ids: string[], _offspringIds: string[], nodeName?: string): void;
+    (e: 'folderNodeSelect', ids: string[], _offspringIds: string[], nodeName?: string, parentId?: string): void;
     (e: 'init', params: ModuleTreeNode[]): void;
     (e: 'changeProtocol', selectedProtocols: string[]): void;
   }>();
@@ -93,7 +93,20 @@
 
   const activeFolder = ref<string>('all');
   const allCount = ref(0);
-  const isExpandAll = ref<boolean | undefined>(false);
+  const isExpandAll = ref<boolean | undefined>(undefined);
+  function setIsExpandAll() {
+    if (props.treeType === 'COLLECTION') {
+      isExpandAll.value = undefined;
+    } else {
+      isExpandAll.value = false;
+    }
+  }
+  watch(
+    () => props.treeType,
+    () => {
+      setIsExpandAll();
+    }
+  );
 
   function setActiveFolder(id: string) {
     activeFolder.value = id;
@@ -134,7 +147,7 @@
       return e;
     });
     activeFolder.value = node.id;
-    emit('folderNodeSelect', _selectedKeys as string[], offspringIds, node.name);
+    emit('folderNodeSelect', _selectedKeys as string[], offspringIds, node.name, getNodeParentId(node));
   }
 
   // 初始化模块文件数量
@@ -155,6 +168,10 @@
     emit('changeProtocol', selectedProtocols.value);
     initModules();
   }
+
+  onBeforeMount(() => {
+    setIsExpandAll();
+  });
 
   defineExpose({
     initModules,

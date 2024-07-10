@@ -3,6 +3,7 @@ package io.metersphere.plan.controller;
 import io.metersphere.api.domain.ApiScenario;
 import io.metersphere.api.domain.ApiTestCase;
 import io.metersphere.functional.domain.FunctionalCase;
+import io.metersphere.functional.mapper.FunctionalCaseMapper;
 import io.metersphere.plan.constants.TestPlanResourceConfig;
 import io.metersphere.plan.domain.*;
 import io.metersphere.plan.dto.request.*;
@@ -18,7 +19,6 @@ import io.metersphere.plan.utils.TestPlanTestUtils;
 import io.metersphere.project.domain.Project;
 import io.metersphere.project.dto.filemanagement.request.FileModuleCreateRequest;
 import io.metersphere.project.dto.filemanagement.request.FileModuleUpdateRequest;
-import io.metersphere.project.utils.NodeSortUtils;
 import io.metersphere.sdk.constants.*;
 import io.metersphere.sdk.util.BeanUtils;
 import io.metersphere.sdk.util.CommonBeanFactory;
@@ -38,6 +38,7 @@ import io.metersphere.system.log.constants.OperationLogType;
 import io.metersphere.system.mapper.TestPlanModuleMapper;
 import io.metersphere.system.service.CommonProjectService;
 import io.metersphere.system.uid.IDGenerator;
+import io.metersphere.system.uid.NumGenerator;
 import io.metersphere.system.utils.CheckLogModel;
 import io.metersphere.system.utils.Pager;
 import jakarta.annotation.Resource;
@@ -122,7 +123,6 @@ public class TestPlanTests extends BaseTest {
     private static final String URL_POST_TEST_PLAN_SCHEDULE_DELETE = "/test-plan/schedule-config-delete/%s";
 
     //测试计划资源-功能用例
-    private static final String URL_POST_RESOURCE_CASE_ASSOCIATION = "/test-plan/association";
     private static final String URL_POST_RESOURCE_FUNCTIONAL_CASE_SORT = "/test-plan/functional/case/sort";
 
     private static final String URL_TEST_PLAN_EDIT_FOLLOWER = "/test-plan/edit/follower";
@@ -134,9 +134,13 @@ public class TestPlanTests extends BaseTest {
     private static final String URL_TEST_PLAN_BATCH_ARCHIVED = "/test-plan/batch-archived";
     private static final String URL_TEST_PLAN_BATCH_EDIT = "/test-plan/batch-edit";
 
+    private static String testPlanId6 = null;
+    private static String testPlanId16 = null;
     private static String groupTestPlanId7 = null;
     private static String groupTestPlanId15 = null;
     private static String groupTestPlanId35 = null;
+    private static String groupTestPlanId45 = null;
+    private static String groupTestPlanId46 = null;
 
     private static List<String> rootPlanIds = new ArrayList<>();
 
@@ -150,6 +154,10 @@ public class TestPlanTests extends BaseTest {
     private ExtTestPlanMapper extTestPlanMapper;
     @Resource
     private TestPlanFunctionalCaseMapper testPlanFunctionalCaseMapper;
+    @Resource
+    private FunctionalCaseMapper functionalCaseMapper;
+
+    private static List<String> functionalCaseId = new ArrayList<>();
 
     @BeforeEach
     public void initTestData() {
@@ -226,7 +234,6 @@ public class TestPlanTests extends BaseTest {
         testPlanTableRequest.setProjectId(DEFAULT_PROJECT_ID);
         this.requestPostPermissionTest(PermissionConstants.TEST_PLAN_READ, URL_POST_TEST_PLAN_PAGE, testPlanTableRequest);
     }
-
     @Test
     @Order(2)
     public void addModuleTest() throws Exception {
@@ -539,7 +546,7 @@ public class TestPlanTests extends BaseTest {
             String moduleId;
             if (i < 50) {
                 moduleId = a1Node.getId();
-                if (i == 7 || i == 15 || i == 35) {
+                if (i == 7 || i == 15 || i == 35 || i == 45 || i == 46) {
                     request.setType(TestPlanConstants.TEST_PLAN_TYPE_GROUP);
                 }
                 a1NodeCount++;
@@ -571,17 +578,24 @@ public class TestPlanTests extends BaseTest {
             ResultHolder holder = JSON.parseObject(returnStr, ResultHolder.class);
             String returnId = JSON.parseObject(JSON.toJSONString(holder.getData()), TestPlan.class).getId();
             Assertions.assertNotNull(returnId);
-
-            if (i == 7) {
+            if (i == 6) {
+                testPlanId6 = returnId;
+            } else if (i == 7) {
                 groupTestPlanId7 = returnId;
             } else if (i == 15) {
                 groupTestPlanId15 = returnId;
+            } else if (i == 16) {
+                testPlanId16 = returnId;
             } else if (i == 35) {
                 groupTestPlanId35 = returnId;
-            } else if (i > 700 && i < 750) {
+            } else if (i == 45) {
+                groupTestPlanId45 = returnId;
+            } else if (i == 46) {
+                groupTestPlanId46 = returnId;
+            } else if (i > 700 && i < 725) {
+                // 701-749 要创建测试计划报告   每个测试计划创建250个报告
                 SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
                 TestPlanReportMapper batchInsert = sqlSession.getMapper(TestPlanReportMapper.class);
-                // 701-749 要创建测试计划报告   每个测试计划创建250个报告
                 for (int reportCount = 0; reportCount < 250; reportCount++) {
                     TestPlanReport testPlanReport = new TestPlanReport();
                     testPlanReport.setId(IDGenerator.nextStr());
@@ -599,6 +613,8 @@ public class TestPlanTests extends BaseTest {
                     testPlanReport.setProjectId(project.getId());
                     testPlanReport.setIntegrated(false);
                     testPlanReport.setDeleted(false);
+                    testPlanReport.setTestPlanName("test");
+                    testPlanReport.setDefaultLayout(true);
                     batchInsert.insert(testPlanReport);
                 }
                 sqlSession.flushStatements();
@@ -633,11 +649,6 @@ public class TestPlanTests extends BaseTest {
         testPlanTestService.checkTestPlanByAddTest();
         simpleTestPlan = testPlanTestService.selectTestPlanByName("testPlan_13");
         repeatCaseTestPlan = testPlanTestService.selectTestPlanByName("testPlan_123");
-        //测试继续创建10个
-        for (int i = 0; i < 10; i++) {
-            request.setName("testPlan_1000_" + i);
-            this.requestPost(URL_POST_TEST_PLAN_ADD, request);
-        }
 
         //在groupTestPlanId7、groupTestPlanId15下面各创建20条数据（并且校验第21条不能创建成功）
         for (int i = 0; i < 21; i++) {
@@ -677,6 +688,32 @@ public class TestPlanTests extends BaseTest {
             }
         }
 
+        //        testPlanId6关联两条已完成用例
+        this.associationFuncCase(testPlanId6, true);
+        //        testPlanId16 关联未开始用例
+        this.associationFuncCase(testPlanId16, false);
+        //在groupTestPlanId35 和 groupTestPlanId46下面各创建2条测试计划并关联已完成用例
+        for (int i = 0; i < 4; i++) {
+            TestPlanCreateRequest itemRequest = new TestPlanCreateRequest();
+            itemRequest.setProjectId(project.getId());
+            itemRequest.setModuleId(a1Node.getId());
+            if (i > 2) {
+                itemRequest.setGroupId(groupTestPlanId46);
+                itemRequest.setName("testPlan_group46_" + i);
+            } else {
+                itemRequest.setGroupId(groupTestPlanId35);
+                itemRequest.setName("testPlan_group35_" + i);
+            }
+            itemRequest.setBaseAssociateCaseRequest(associateCaseRequest);
+            MvcResult mvcResult = this.requestPostWithOkAndReturn(URL_POST_TEST_PLAN_ADD, itemRequest);
+            String returnStr = mvcResult.getResponse().getContentAsString();
+            ResultHolder holder = JSON.parseObject(returnStr, ResultHolder.class);
+            Assertions.assertNotNull(JSON.parseObject(JSON.toJSONString(holder.getData()), TestPlan.class).getId());
+            String returnId = JSON.parseObject(JSON.toJSONString(holder.getData()), TestPlan.class).getId();
+            this.associationFuncCase(returnId, true);
+        }
+
+
         //校验Group数量
         List<TestPlan> groupList = JSON.parseArray(
                 JSON.toJSONString(
@@ -684,7 +721,7 @@ public class TestPlanTests extends BaseTest {
                                 this.requestGetWithOkAndReturn(String.format(URL_POST_TEST_PLAN_GROUP_LIST, project.getId()))
                                         .getResponse().getContentAsString(), ResultHolder.class).getData()),
                 TestPlan.class);
-        Assertions.assertEquals(groupList.size(), 3);
+        Assertions.assertEquals(groupList.size(), 5);
 
         /*
         反例
@@ -702,8 +739,8 @@ public class TestPlanTests extends BaseTest {
         request.setModuleId(IDGenerator.nextStr());
         this.requestPost(URL_POST_TEST_PLAN_ADD, request).andExpect(status().is5xxServerError());
         request.setModuleId(a1Node.getId());
-        request.setGroupId(testPlanTestService.selectTestPlanByName("testPlan_60").getGroupId());
-        this.requestPost(URL_POST_TEST_PLAN_ADD, request);
+        request.setGroupId(testPlanTestService.selectTestPlanByName("testPlan_60").getId());
+        this.requestPost(URL_POST_TEST_PLAN_ADD, request).andExpect(status().is5xxServerError());
         request.setGroupId(TestPlanConstants.TEST_PLAN_DEFAULT_GROUP_ID);
         request.setPassThreshold(100.11);
         this.requestPost(URL_POST_TEST_PLAN_ADD, request).andExpect(status().isBadRequest());
@@ -715,9 +752,52 @@ public class TestPlanTests extends BaseTest {
         request.setPassThreshold(100);
         this.requestPostPermissionTest(PermissionConstants.TEST_PLAN_READ_ADD, URL_POST_TEST_PLAN_ADD, request);
 
+        this.checkTestPlanSortWithOutGroup();
         this.checkTestPlanSortInGroup(groupTestPlanId7);
         this.checkTestPlanMoveToGroup();
-        this.checkTestPlanGroupArchived(groupTestPlanId7);
+        this.checkTestPlanGroupArchived(groupTestPlanId35);
+    }
+
+    private void associationFuncCase(String testPlanId, boolean isFinish) {
+        FunctionalCase functionalCase = new FunctionalCase();
+        functionalCase.setProjectId(project.getId());
+        functionalCase.setName(String.valueOf(System.currentTimeMillis()));
+        functionalCase.setId(IDGenerator.nextStr());
+        functionalCase.setModuleId("root");
+        functionalCase.setTemplateId("root");
+        functionalCase.setReviewStatus("PREPARED");
+        functionalCase.setCaseEditType("STEP");
+        functionalCase.setPos(4096L);
+        functionalCase.setVersionId("root");
+        functionalCase.setRefId(functionalCase.getId());
+        functionalCase.setLastExecuteResult("PREPARED");
+        functionalCase.setDeleted(false);
+        functionalCase.setPublicCase(false);
+        functionalCase.setLatest(true);
+        functionalCase.setCreateUser("admin");
+        functionalCase.setCreateTime(System.currentTimeMillis());
+        functionalCase.setUpdateTime(System.currentTimeMillis());
+        functionalCase.setNum(NumGenerator.nextNum(project.getId(), ApplicationNumScope.CASE_MANAGEMENT));
+        functionalCaseMapper.insert(functionalCase);
+        functionalCaseId.add(functionalCase.getId());
+
+        TestPlanFunctionalCase testPlanFunctionalCase = new TestPlanFunctionalCase();
+        testPlanFunctionalCase.setId(IDGenerator.nextStr());
+        testPlanFunctionalCase.setTestPlanId(testPlanId);
+        testPlanFunctionalCase.setFunctionalCaseId(functionalCase.getId());
+        testPlanFunctionalCase.setCreateTime(System.currentTimeMillis());
+        testPlanFunctionalCase.setCreateUser("admin");
+        testPlanFunctionalCase.setPos(4096L);
+        testPlanFunctionalCase.setLastExecResult("SUCCESS");
+        testPlanFunctionalCase.setTestPlanCollectionId("root");
+        testPlanFunctionalCaseMapper.insert(testPlanFunctionalCase);
+
+        if (!isFinish) {
+            testPlanFunctionalCase.setId(IDGenerator.nextStr());
+            testPlanFunctionalCase.setPos(8192L);
+            testPlanFunctionalCase.setLastExecResult("PENDING");
+            testPlanFunctionalCaseMapper.insert(testPlanFunctionalCase);
+        }
     }
 
     private List<TestPlanResponse> selectByGroupId(String groupId) throws Exception {
@@ -729,6 +809,65 @@ public class TestPlanTests extends BaseTest {
                 TestPlanResponse.class);
     }
 
+
+    protected void checkTestPlanSortWithOutGroup() throws Exception {
+        TestPlanTableRequest dataRequest = new TestPlanTableRequest();
+        dataRequest.setProjectId(project.getId());
+        dataRequest.setType("ALL");
+        dataRequest.setPageSize(10);
+        dataRequest.setCurrent(1);
+        //提前校验
+        List<TestPlanResponse> tableList = testPlanTestService.getTestPlanResponse(this.requestPostWithOkAndReturn(
+                URL_POST_TEST_PLAN_PAGE, dataRequest).getResponse().getContentAsString(StandardCharsets.UTF_8));
+        Assertions.assertTrue(tableList.getFirst().getId().equals(rootPlanIds.getLast()));
+
+        /*
+         排序校验用例设计：
+         1.第一个移动到最后一个。
+         2.最后一个移动到第一个（还原为原来的顺序）
+         3.第三个移动到第二个
+         4.修改第一个和第二个之间的pos差小于2，将第三个移动到第二个（还原为原来的顺序），并检查pos有没有初始化
+         */
+
+
+        //        1.第一个移动到最后一个
+        PosRequest posRequest = new PosRequest(project.getId(), rootPlanIds.getLast(), rootPlanIds.getFirst(), MoveTypeEnum.AFTER.name());
+        this.requestPostWithOk(URL_POST_TEST_PLAN_SORT, posRequest);
+        tableList = testPlanTestService.getTestPlanResponse(this.requestPostWithOkAndReturn(
+                URL_POST_TEST_PLAN_PAGE, dataRequest).getResponse().getContentAsString(StandardCharsets.UTF_8));
+        Assertions.assertTrue(tableList.getFirst().getId().equals(rootPlanIds.get(rootPlanIds.size() - 2)));
+        //        2.最后一个移动到第一个（还原为原来的顺序）
+        posRequest.setTargetId(tableList.getFirst().getId());
+        posRequest.setMoveMode(MoveTypeEnum.BEFORE.name());
+        this.requestPostWithOk(URL_POST_TEST_PLAN_SORT, posRequest);
+        tableList = testPlanTestService.getTestPlanResponse(this.requestPostWithOkAndReturn(
+                URL_POST_TEST_PLAN_PAGE, dataRequest).getResponse().getContentAsString(StandardCharsets.UTF_8));
+        Assertions.assertTrue(tableList.getFirst().getId().equals(rootPlanIds.getLast()));
+        //        3.第三个移动到第二个
+        posRequest = new PosRequest(project.getId(), rootPlanIds.get(rootPlanIds.size() - 3), rootPlanIds.get(rootPlanIds.size() - 2), MoveTypeEnum.BEFORE.name());
+        this.requestPostWithOk(URL_POST_TEST_PLAN_SORT, posRequest);
+        tableList = testPlanTestService.getTestPlanResponse(this.requestPostWithOkAndReturn(
+                URL_POST_TEST_PLAN_PAGE, dataRequest).getResponse().getContentAsString(StandardCharsets.UTF_8));
+        Assertions.assertTrue(tableList.getFirst().getId().equals(rootPlanIds.getLast()));
+        Assertions.assertTrue(tableList.get(1).getId().equals(posRequest.getMoveId()));
+        Assertions.assertTrue(tableList.get(2).getId().equals(posRequest.getTargetId()));
+
+        //        4.修改第一个只比第二个大1，将第三个移动到第二个（还原为原来的顺序），并检查pos有没有初始化
+        TestPlan updatePlan = new TestPlan();
+        updatePlan.setId(rootPlanIds.getLast());
+        updatePlan.setPos(tableList.get(1).getPos() + 1);
+        testPlanMapper.updateByPrimaryKeySelective(updatePlan);
+
+        posRequest.setMoveId(rootPlanIds.get(rootPlanIds.size() - 2));
+        posRequest.setTargetId(rootPlanIds.get(rootPlanIds.size() - 3));
+        posRequest.setMoveMode(MoveTypeEnum.BEFORE.name());
+        this.requestPostWithOk(URL_POST_TEST_PLAN_SORT, posRequest);
+        tableList = testPlanTestService.getTestPlanResponse(this.requestPostWithOkAndReturn(
+                URL_POST_TEST_PLAN_PAGE, dataRequest).getResponse().getContentAsString(StandardCharsets.UTF_8));
+        Assertions.assertTrue(tableList.getFirst().getId().equals(rootPlanIds.getLast()));
+        Assertions.assertTrue(tableList.get(1).getId().equals(posRequest.getMoveId()));
+        Assertions.assertTrue(tableList.get(2).getId().equals(posRequest.getTargetId()));
+    }
     protected void checkTestPlanSortInGroup(String groupId) throws Exception {
         /*
          排序校验用例设计：
@@ -812,7 +951,7 @@ public class TestPlanTests extends BaseTest {
         targetPlan = lastTestPlanInGroup.get(1);
         TestPlan updatePlan = new TestPlan();
         updatePlan.setId(targetPlan.getId());
-        updatePlan.setPos(lastTestPlanInGroup.get(0).getPos() + 2);
+        updatePlan.setPos(lastTestPlanInGroup.getFirst().getPos() - 2);
         testPlanMapper.updateByPrimaryKeySelective(updatePlan);
 
         posRequest = new PosRequest(project.getId(), movePlan.getId(), targetPlan.getId(), MoveTypeEnum.BEFORE.name());
@@ -826,11 +965,9 @@ public class TestPlanTests extends BaseTest {
         newTestPlanInGroup = this.selectByGroupId(groupId);
         Assertions.assertEquals(response.getOperationCount(), 1);
         Assertions.assertEquals(newTestPlanInGroup.size(), lastTestPlanInGroup.size());
-        long lastPos = 0;
         for (int newListIndex = 0; newListIndex < newTestPlanInGroup.size(); newListIndex++) {
             Assertions.assertEquals(newTestPlanInGroup.get(newListIndex).getId(), defaultTestPlanInGroup.get(newListIndex).getId());
-            Assertions.assertTrue(newTestPlanInGroup.get(newListIndex).getPos() == (lastPos + NodeSortUtils.DEFAULT_NODE_INTERVAL_POS));
-            lastPos = newTestPlanInGroup.get(newListIndex).getPos();
+            Assertions.assertEquals(newTestPlanInGroup.get(newListIndex).getPos(), defaultTestPlanInGroup.get(newListIndex).getPos());
         }
 
         //测试权限
@@ -855,16 +992,16 @@ public class TestPlanTests extends BaseTest {
 
         //判断组归档
         TestPlan updatePlan = new TestPlan();
-        updatePlan.setId(groupTestPlanId35);
+        updatePlan.setId(groupTestPlanId45);
         updatePlan.setStatus(TestPlanConstants.TEST_PLAN_STATUS_ARCHIVED);
         testPlanMapper.updateByPrimaryKeySelective(updatePlan);
         this.requestPost(URL_TEST_PLAN_BATCH_MOVE, request).andExpect(status().is5xxServerError());
         //改回来
-        updatePlan.setStatus(TestPlanConstants.TEST_PLAN_STATUS_PREPARED);
+        updatePlan.setStatus(TestPlanConstants.TEST_PLAN_STATUS_NOT_ARCHIVED);
         testPlanMapper.updateByPrimaryKeySelective(updatePlan);
 
         //正式测试
-        groupId = groupTestPlanId35;
+        groupId = groupTestPlanId45;
         request.setTargetId(groupId);
         this.requestPostWithOkAndReturn(URL_TEST_PLAN_BATCH_MOVE, request);
         List<TestPlanResponse> groups = this.selectByGroupId(groupId);
@@ -893,20 +1030,21 @@ public class TestPlanTests extends BaseTest {
         // 测试计划组内的测试计划不能归档
         List<TestPlanResponse> testPlanResponseList = this.selectByGroupId(groupId);
         TestPlanResponse cannotArchivedPlan = testPlanResponseList.getFirst();
-        testPlanMapper.updateByPrimaryKeySelective(new TestPlan() {{
-            this.setId(cannotArchivedPlan.getId());
-            this.setStatus(TestPlanConstants.TEST_PLAN_STATUS_COMPLETED);
-        }});
         this.requestGet(String.format(URL_TEST_PLAN_ARCHIVED, cannotArchivedPlan.getId())).andExpect(status().is5xxServerError());
 
         //归档测试组内的测试计划
-        for (TestPlanResponse testPlanResponse : testPlanResponseList) {
-            testPlanMapper.updateByPrimaryKeySelective(new TestPlan() {{
-                this.setId(testPlanResponse.getId());
-                this.setStatus(TestPlanConstants.TEST_PLAN_STATUS_COMPLETED);
-            }});
-        }
         this.requestGetWithOk(String.format(URL_TEST_PLAN_ARCHIVED, groupId));
+
+        //归档不能归档的测试计划
+        this.requestGet(String.format(URL_TEST_PLAN_ARCHIVED, rootPlanIds.getFirst())).andExpect(status().is5xxServerError());
+
+        //归档普通测试计划
+        this.requestGetWithOk(String.format(URL_TEST_PLAN_ARCHIVED, testPlanId6));
+        // testPlan6更改回去
+        TestPlan testPlan = new TestPlan();
+        testPlan.setId(testPlanId6);
+        testPlan.setStatus(TestPlanConstants.TEST_PLAN_STATUS_NOT_ARCHIVED);
+        testPlanMapper.updateByPrimaryKeySelective(testPlan);
     }
 
 
@@ -946,11 +1084,103 @@ public class TestPlanTests extends BaseTest {
             TestPlanTableRequest groupRequest = new TestPlanTableRequest();
             //查询游离态测试计划
             TestPlanTableRequest onlyPlanRequest = new TestPlanTableRequest();
+            // 状态过滤的测试计划
+            TestPlanTableRequest statusRequest = new TestPlanTableRequest();
             BeanUtils.copyBean(groupRequest, dataRequest);
             BeanUtils.copyBean(onlyPlanRequest, dataRequest);
+            BeanUtils.copyBean(statusRequest, dataRequest);
             groupRequest.setType(TestPlanConstants.TEST_PLAN_TYPE_GROUP);
             onlyPlanRequest.setType(TestPlanConstants.TEST_PLAN_TYPE_PLAN);
 
+
+            //进行状态筛选 -- 空状态
+            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
+                            URL_POST_TEST_PLAN_PAGE, statusRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
+                    dataRequest.getCurrent(),
+                    dataRequest.getPageSize(),
+                    999 - 1);
+            /*
+                现有数据状态：
+                已完成的   6  47（组）
+                进行中的  16
+                已归档的 35（组）
+             */
+            //进行状态筛选 -- 未开始
+            statusRequest.setFilter(new HashMap<>() {{
+                this.put("status", Collections.singletonList(TestPlanConstants.TEST_PLAN_SHOW_STATUS_PREPARED));
+            }});
+            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
+                            URL_POST_TEST_PLAN_PAGE, statusRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
+                    dataRequest.getCurrent(),
+                    dataRequest.getPageSize(),
+                    999 - 1 - 1 - 2);
+            //进行状态筛选 -- 已完成
+            statusRequest.setFilter(new HashMap<>() {{
+                this.put("status", Collections.singletonList(TestPlanConstants.TEST_PLAN_SHOW_STATUS_COMPLETED));
+            }});
+            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
+                            URL_POST_TEST_PLAN_PAGE, statusRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
+                    dataRequest.getCurrent(),
+                    dataRequest.getPageSize(),
+                    2);
+            //进行状态筛选 -- 进行中
+            statusRequest.setFilter(new HashMap<>() {{
+                this.put("status", Collections.singletonList(TestPlanConstants.TEST_PLAN_SHOW_STATUS_UNDERWAY));
+            }});
+            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
+                            URL_POST_TEST_PLAN_PAGE, statusRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
+                    dataRequest.getCurrent(),
+                    dataRequest.getPageSize(),
+                    1);
+            //进行状态筛选 -- 已完成和未开始
+            statusRequest.setFilter(new HashMap<>() {{
+                this.put("status", new ArrayList<String>() {{
+                    this.add(TestPlanConstants.TEST_PLAN_SHOW_STATUS_COMPLETED);
+                    this.add(TestPlanConstants.TEST_PLAN_SHOW_STATUS_PREPARED);
+                }});
+            }});
+            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
+                            URL_POST_TEST_PLAN_PAGE, statusRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
+                    dataRequest.getCurrent(),
+                    dataRequest.getPageSize(),
+                    999 - 1 - 1);
+            //进行状态筛选 -- 已完成和进行中
+            statusRequest.setFilter(new HashMap<>() {{
+                this.put("status", new ArrayList<String>() {{
+                    this.add(TestPlanConstants.TEST_PLAN_SHOW_STATUS_COMPLETED);
+                    this.add(TestPlanConstants.TEST_PLAN_SHOW_STATUS_UNDERWAY);
+                }});
+            }});
+            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
+                            URL_POST_TEST_PLAN_PAGE, statusRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
+                    dataRequest.getCurrent(),
+                    dataRequest.getPageSize(),
+                    3);
+            //进行状态筛选 -- 进行中和未开始
+            statusRequest.setFilter(new HashMap<>() {{
+                this.put("status", new ArrayList<String>() {{
+                    this.add(TestPlanConstants.TEST_PLAN_SHOW_STATUS_UNDERWAY);
+                    this.add(TestPlanConstants.TEST_PLAN_SHOW_STATUS_PREPARED);
+                }});
+            }});
+            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
+                            URL_POST_TEST_PLAN_PAGE, statusRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
+                    dataRequest.getCurrent(),
+                    dataRequest.getPageSize(),
+                    999 - 1 - 2);
+            //进行状态筛选 -- 已完成、未开始、进行中
+            statusRequest.setFilter(new HashMap<>() {{
+                this.put("status", new ArrayList<String>() {{
+                    this.add(TestPlanConstants.TEST_PLAN_SHOW_STATUS_UNDERWAY);
+                    this.add(TestPlanConstants.TEST_PLAN_SHOW_STATUS_PREPARED);
+                    this.add(TestPlanConstants.TEST_PLAN_SHOW_STATUS_COMPLETED);
+                }});
+            }});
+            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
+                            URL_POST_TEST_PLAN_PAGE, statusRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
+                    dataRequest.getCurrent(),
+                    dataRequest.getPageSize(),
+                    999 - 1);
 
             BaseTreeNode a1Node = TestPlanTestUtils.getNodeByName(preliminaryTreeNodes, "a1");
             BaseTreeNode a2Node = TestPlanTestUtils.getNodeByName(preliminaryTreeNodes, "a2");
@@ -959,33 +1189,48 @@ public class TestPlanTests extends BaseTest {
             BaseTreeNode a1b1Node = TestPlanTestUtils.getNodeByName(preliminaryTreeNodes, "a1-b1");
             assert a1Node != null & a2Node != null & a3Node != null & a1a1Node != null & a1b1Node != null;
 
+            TestPlanExample example = new TestPlanExample();
+            example.createCriteria().andProjectIdEqualTo(project.getId()).andGroupIdEqualTo("NONE").andStatusEqualTo(TestPlanConstants.TEST_PLAN_STATUS_ARCHIVED);
+            long count = testPlanMapper.countByExample(example);
+            //此时有一个归档的
             testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
                             URL_POST_TEST_PLAN_PAGE, dataRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
                     dataRequest.getCurrent(),
                     dataRequest.getPageSize(),
-                    1010);
-            //只查询组
-            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
-                            URL_POST_TEST_PLAN_PAGE, groupRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
-                    dataRequest.getCurrent(),
-                    dataRequest.getPageSize(),
-                    3);
-            //只查询计划
-            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
-                            URL_POST_TEST_PLAN_PAGE, onlyPlanRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
-                    dataRequest.getCurrent(),
-                    dataRequest.getPageSize(),
-                    1007);
+                    999 - 1);
 
-            //按照名称倒叙
-            dataRequest.setSort(new HashMap<>() {{
-                this.put("name", "desc");
+            //查询归档的
+            dataRequest.setFilter(new HashMap<>() {{
+                this.put("status", Collections.singletonList(TestPlanConstants.TEST_PLAN_STATUS_ARCHIVED));
             }});
             testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
                             URL_POST_TEST_PLAN_PAGE, dataRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
                     dataRequest.getCurrent(),
                     dataRequest.getPageSize(),
-                    1010);
+                    1);
+            //只查询组
+            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
+                            URL_POST_TEST_PLAN_PAGE, groupRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
+                    dataRequest.getCurrent(),
+                    dataRequest.getPageSize(),
+                    5 - 1);
+            //只查询计划
+            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
+                            URL_POST_TEST_PLAN_PAGE, onlyPlanRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
+                    dataRequest.getCurrent(),
+                    dataRequest.getPageSize(),
+                    999 - 5);
+
+            //按照名称倒叙
+            dataRequest.setSort(new HashMap<>() {{
+                this.put("name", "desc");
+            }});
+            dataRequest.setFilter(null);
+            testPlanTestService.checkTestPlanPage(this.requestPostWithOkAndReturn(
+                            URL_POST_TEST_PLAN_PAGE, dataRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
+                    dataRequest.getCurrent(),
+                    dataRequest.getPageSize(),
+                    999 - 1);
 
 
             //指定模块ID查询 (查询count时，不会因为选择了模块而更改了总量
@@ -998,7 +1243,7 @@ public class TestPlanTests extends BaseTest {
                             URL_POST_TEST_PLAN_PAGE, dataRequest).getResponse().getContentAsString(StandardCharsets.UTF_8),
                     dataRequest.getCurrent(),
                     dataRequest.getPageSize(),
-                    910);
+                    899 - 1);
 
             //测试根据名称模糊查询： Plan_2  预期结果： a1Node下有11条（testPlan_2,testPlan_20~testPlan_29), a1b1Node下有100条（testPlan_200~testPlan_299）
             dataRequest.setModuleIds(null);
@@ -1173,19 +1418,18 @@ public class TestPlanTests extends BaseTest {
 
         //修改a2节点下的数据（91,92）的所属测试计划组
         updateRequest = testPlanTestService.generateUpdateRequest(testPlanTestService.selectTestPlanByName("testPlan_91").getId());
-        updateRequest.setGroupId(groupTestPlanId7);
+        updateRequest.setGroupId(groupTestPlanId45);
         this.requestPostWithOk(URL_POST_TEST_PLAN_UPDATE, updateRequest);
         a2NodeCount--;
         updateRequest = testPlanTestService.generateUpdateRequest(testPlanTestService.selectTestPlanByName("testPlan_92").getId());
-        updateRequest.setGroupId(groupTestPlanId7);
+        updateRequest.setGroupId(groupTestPlanId45);
         this.requestPostWithOk(URL_POST_TEST_PLAN_UPDATE, updateRequest);
         a2NodeCount--;
 
         TestPlan updatePlan = new TestPlan();
         updatePlan.setId(groupTestPlanId7);
-        updatePlan.setStatus(TestPlanConstants.TEST_PLAN_STATUS_UNDERWAY);
+        updatePlan.setStatus(TestPlanConstants.TEST_PLAN_STATUS_NOT_ARCHIVED);
         testPlanMapper.updateByPrimaryKeySelective(updatePlan);
-
         //修改测试计划组信息
         updateRequest = testPlanTestService.generateUpdateRequest(groupTestPlanId7);
         updateRequest.setName(IDGenerator.nextStr());
@@ -1226,137 +1470,6 @@ public class TestPlanTests extends BaseTest {
         updateRequest = testPlanTestService.generateUpdateRequest(testPlan.getId());
         updateRequest.setId(IDGenerator.nextStr());
         this.requestPost(URL_POST_TEST_PLAN_UPDATE, updateRequest).andExpect(status().is5xxServerError());
-
-    }
-
-    @Test
-    @Order(21)
-    public void testPlanAssociationFunctionCase() throws Exception {
-        if (ObjectUtils.anyNull(simpleTestPlan, repeatCaseTestPlan)) {
-            this.testPlanAddTest();
-        }
-        //创建20个功能测试用例
-        FUNCTIONAL_CASES.addAll(testPlanTestService.createFunctionCase(20, project.getId()));
-
-        //测试不开启用例重复的测试计划多次关联
-        TestPlanAssociationRequest request = new TestPlanAssociationRequest();
-        request.setTestPlanId(simpleTestPlan.getId());
-        request.setFunctionalSelectIds(FUNCTIONAL_CASES.stream().map(FunctionalCase::getId).collect(Collectors.toList()));
-        MvcResult result = this.requestPostWithOkAndReturn(URL_POST_RESOURCE_CASE_ASSOCIATION, request);
-        String returnData = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        ResultHolder resultHolder = JSON.parseObject(returnData, ResultHolder.class);
-        Assertions.assertNotNull(resultHolder);
-
-        //先测试一下没有开启模块时能否使用
-        testPlanTestService.removeProjectModule(project, PROJECT_MODULE, "caseManagement");
-        this.requestPost(URL_POST_RESOURCE_CASE_ASSOCIATION, request).andExpect(status().is5xxServerError());
-        //恢复
-        testPlanTestService.resetProjectModule(project, PROJECT_MODULE);
-
-        result = this.requestPostWithOkAndReturn(URL_POST_RESOURCE_CASE_ASSOCIATION, request);
-        returnData = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        resultHolder = JSON.parseObject(returnData, ResultHolder.class);
-        Assertions.assertNotNull(resultHolder);
-
-        //测试开启用例重复的测试计划多次关联
-        request.setTestPlanId(repeatCaseTestPlan.getId());
-        result = this.requestPostWithOkAndReturn(URL_POST_RESOURCE_CASE_ASSOCIATION, request);
-        returnData = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        resultHolder = JSON.parseObject(returnData, ResultHolder.class);
-        Assertions.assertNotNull(resultHolder);
-
-        result = this.requestPostWithOkAndReturn(URL_POST_RESOURCE_CASE_ASSOCIATION, request);
-        returnData = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        resultHolder = JSON.parseObject(returnData, ResultHolder.class);
-        Assertions.assertNotNull(resultHolder);
-
-    }
-
-    @Test
-    @Order(22)
-    public void testPlanFunctionCaseSort() throws Exception {
-        if (FUNCTIONAL_CASES.isEmpty()) {
-            this.testPlanAssociationFunctionCase();
-        }
-        String collectionId = IDGenerator.nextStr();
-        List<TestPlanFunctionalCase> funcList = testPlanTestService.selectTestPlanFunctionalCaseByTestPlanId(repeatCaseTestPlan.getId());
-        funcList.forEach(item -> {
-            TestPlanFunctionalCase updateModel = new TestPlanFunctionalCase();
-            updateModel.setId(item.getId());
-            updateModel.setTestPlanCollectionId(collectionId);
-            testPlanFunctionalCaseMapper.updateByPrimaryKeySelective(updateModel);
-        });
-        //将第30个移动到第一位之前
-        ResourceSortRequest request = new ResourceSortRequest();
-        request.setTestCollectionId(funcList.getFirst().getTestPlanCollectionId());
-        request.setProjectId(DEFAULT_PROJECT_ID);
-        request.setMoveId(funcList.get(29).getId());
-        request.setTargetId(funcList.get(0).getId());
-        request.setMoveMode(MoveTypeEnum.BEFORE.name());
-
-        //恢复
-        testPlanTestService.resetProjectModule(project, PROJECT_MODULE);
-
-        MvcResult result = this.requestPostWithOkAndReturn(URL_POST_RESOURCE_FUNCTIONAL_CASE_SORT, request);
-        ResultHolder resultHolder = JSON.parseObject(result.getResponse().getContentAsString(StandardCharsets.UTF_8), ResultHolder.class);
-        TestPlanOperationResponse response = JSON.parseObject(JSON.toJSONString(resultHolder.getData()), TestPlanOperationResponse.class);
-        Assertions.assertEquals(response.getOperationCount(), 1);
-        funcList = testPlanTestService.selectTestPlanFunctionalCaseByTestPlanId(repeatCaseTestPlan.getId());
-        Assertions.assertEquals(funcList.get(0).getId(), request.getMoveId());
-        Assertions.assertEquals(funcList.get(1).getId(), request.getTargetId());
-        LOG_CHECK_LIST.add(
-                new CheckLogModel(request.getMoveId(), OperationLogType.UPDATE, URL_POST_RESOURCE_FUNCTIONAL_CASE_SORT)
-        );
-
-        //将这时的第30个放到第一位之后
-        request.setMoveId(funcList.get(29).getId());
-        request.setTargetId(funcList.get(0).getId());
-        request.setMoveMode(MoveTypeEnum.AFTER.name());
-        result = this.requestPostWithOkAndReturn(URL_POST_RESOURCE_FUNCTIONAL_CASE_SORT, request);
-        resultHolder = JSON.parseObject(result.getResponse().getContentAsString(StandardCharsets.UTF_8), ResultHolder.class);
-        response = JSON.parseObject(JSON.toJSONString(resultHolder.getData()), TestPlanOperationResponse.class);
-        Assertions.assertEquals(response.getOperationCount(), 1);
-        funcList = testPlanTestService.selectTestPlanFunctionalCaseByTestPlanId(repeatCaseTestPlan.getId());
-        Assertions.assertEquals(funcList.get(0).getId(), request.getTargetId());
-        Assertions.assertEquals(funcList.get(1).getId(), request.getMoveId());
-        LOG_CHECK_LIST.add(
-                new CheckLogModel(request.getMoveId(), OperationLogType.UPDATE, URL_POST_RESOURCE_FUNCTIONAL_CASE_SORT)
-        );
-
-        //再将这时的第30个放到第一位之前,但是第一个的pos为2，检查能否触发ref操作
-        request.setMoveId(funcList.get(29).getId());
-        request.setTargetId(funcList.get(0).getId());
-        request.setMoveMode(MoveTypeEnum.BEFORE.name());
-        testPlanTestService.setResourcePos(funcList.get(0).getId(), TestPlanResourceConstants.RESOURCE_FUNCTIONAL_CASE, 2);
-        result = this.requestPostWithOkAndReturn(URL_POST_RESOURCE_FUNCTIONAL_CASE_SORT, request);
-        resultHolder = JSON.parseObject(result.getResponse().getContentAsString(StandardCharsets.UTF_8), ResultHolder.class);
-        response = JSON.parseObject(JSON.toJSONString(resultHolder.getData()), TestPlanOperationResponse.class);
-        Assertions.assertEquals(response.getOperationCount(), 1);
-        funcList = testPlanTestService.selectTestPlanFunctionalCaseByTestPlanId(repeatCaseTestPlan.getId());
-        Assertions.assertEquals(funcList.get(0).getId(), request.getMoveId());
-        Assertions.assertEquals(funcList.get(1).getId(), request.getTargetId());
-        LOG_CHECK_LIST.add(
-                new CheckLogModel(request.getMoveId(), OperationLogType.UPDATE, URL_POST_RESOURCE_FUNCTIONAL_CASE_SORT)
-        );
-
-        //反例：测试集为空
-        request.setTestCollectionId(null);
-        this.requestPost(URL_POST_RESOURCE_FUNCTIONAL_CASE_SORT, request).andExpect(status().isBadRequest());
-        //反例：拖拽的节点不存在
-        request.setTestCollectionId(funcList.getFirst().getTestPlanCollectionId());
-        request.setMoveId(null);
-        this.requestPost(URL_POST_RESOURCE_FUNCTIONAL_CASE_SORT, request).andExpect(status().isBadRequest());
-        //反例：目标节点不存在
-        request.setMoveId(funcList.get(29).getId());
-        request.setTargetId(null);
-        this.requestPost(URL_POST_RESOURCE_FUNCTIONAL_CASE_SORT, request).andExpect(status().isBadRequest());
-        //反例： 节点重复
-        request.setTargetId(request.getMoveId());
-        this.requestPost(URL_POST_RESOURCE_FUNCTIONAL_CASE_SORT, request).andExpect(status().is5xxServerError());
-
-        //测试权限
-        request.setMoveMode(MoveTypeEnum.BEFORE.name());
-        this.requestPostPermissionTest(PermissionConstants.TEST_PLAN_READ_UPDATE, URL_POST_RESOURCE_FUNCTIONAL_CASE_SORT, request);
 
     }
 
@@ -1537,6 +1650,15 @@ public class TestPlanTests extends BaseTest {
         List<TestPlanResponse> copyChild = this.selectByGroupId(copyGroup.getId());
         childs = childs.stream().filter(item -> !StringUtils.equalsIgnoreCase(item.getStatus(), TestPlanConstants.TEST_PLAN_STATUS_ARCHIVED)).collect(Collectors.toList());
         Assertions.assertTrue(copyChild.size() == childs.size());
+
+
+        //赋值超过20个数据到测试计划组
+        request = new TestPlanBatchRequest();
+        request.setProjectId(project.getId());
+        request.setTargetId(groupTestPlanId7);
+        request.setMoveType("GROUP");
+        request.setSelectIds(Collections.singletonList(simpleTestPlan.getId()));
+        this.requestPost(URL_TEST_PLAN_BATCH_COPY, request).andExpect(status().is5xxServerError());
 
         //删除
         this.requestGet(String.format(URL_GET_TEST_PLAN_DELETE, copyGroup.getId())).andExpect(status().isOk());
@@ -1811,7 +1933,7 @@ public class TestPlanTests extends BaseTest {
         List<TestPlan> testPlanList = testPlanTestService.selectByProjectIdAndNames(project.getId(),
                 new String[]{"testPlan_61"});
 
-        this.requestGet(String.format(URL_GET_TEST_PLAN_DELETE, testPlanList.get(0).getId())).andExpect(status().isOk());
+        this.requestGet(String.format(URL_GET_TEST_PLAN_DELETE, testPlanList.getFirst().getId())).andExpect(status().isOk());
         allDataInDB--;
         testPlanTestService.checkDataCount(project.getId(), allDataInDB);
 
@@ -1837,7 +1959,7 @@ public class TestPlanTests extends BaseTest {
 
         //测试项目没有开启测试计划模块时能否使用
         testPlanTestService.removeProjectModule(project, PROJECT_MODULE, "testPlan");
-        this.requestGet(String.format(URL_GET_TEST_PLAN_DELETE, testPlanList.get(0).getId())).andExpect(status().is5xxServerError());
+        this.requestGet(String.format(URL_GET_TEST_PLAN_DELETE, testPlanList.getFirst().getId())).andExpect(status().is5xxServerError());
         this.requestPost(URL_POST_TEST_PLAN_BATCH_DELETE, request).andExpect(status().is5xxServerError());
         //恢复
         testPlanTestService.resetProjectModule(project, PROJECT_MODULE);
@@ -2166,40 +2288,32 @@ public class TestPlanTests extends BaseTest {
     public void testArchived() throws Exception {
         //计划 -- 首先状态不是已完成
         this.requestGet(String.format(URL_TEST_PLAN_ARCHIVED, "wx_test_plan_id_1")).andExpect(status().is5xxServerError());
-        //更改状态再归档
-        TestPlan testPlan = new TestPlan();
-        testPlan.setId("wx_test_plan_id_1");
-        testPlan.setStatus(TestPlanConstants.TEST_PLAN_STATUS_COMPLETED);
-        testPlanMapper.updateByPrimaryKeySelective(testPlan);
-        this.requestGetWithOk(String.format(URL_TEST_PLAN_ARCHIVED, "wx_test_plan_id_1"));
-
         //计划组没有可归档的测试计划：
         this.requestGet(String.format(URL_TEST_PLAN_ARCHIVED, "wx_test_plan_id_2")).andExpect(status().is5xxServerError());
-        this.requestGetWithOk(String.format(URL_TEST_PLAN_ARCHIVED, "wx_test_plan_id_5"));
-
     }
 
     @Test
     @Order(303)
     public void testCopy() throws Exception {
-        //1. 已归档的不能再归档计划  无用例
-        requestGet(String.format(URL_TEST_PLAN_COPY, "wx_test_plan_id_1")).andExpect(status().is5xxServerError());
+        // 1. 已归档的不能再归档计划  无用例
+        requestGet(String.format(URL_TEST_PLAN_COPY, groupTestPlanId35)).andExpect(status().is5xxServerError());
 
-
-        //2.计划 有用例
+        // 2.计划 有用例
         MvcResult mvcResult1 = this.requestGetWithOkAndReturn(String.format(URL_TEST_PLAN_COPY, "wx_test_plan_id_4"));
         String returnStr1 = mvcResult1.getResponse().getContentAsString();
         ResultHolder holder1 = JSON.parseObject(returnStr1, ResultHolder.class);
         String returnId1 = holder1.getData().toString();
         Assertions.assertNotNull(returnId1);
 
-        //3.计划组 无计划
+        // 3.计划组 无计划
         MvcResult mvcResult2 = this.requestGetWithOkAndReturn(String.format(URL_TEST_PLAN_COPY, "wx_test_plan_id_2"));
         String returnStr2 = mvcResult2.getResponse().getContentAsString();
         ResultHolder holder2 = JSON.parseObject(returnStr2, ResultHolder.class);
         String returnId2 = holder2.getData().toString();
         Assertions.assertNotNull(returnId2);
 
+        // 4.计划组 有子计划
+        this.requestGetWithOk(String.format(URL_TEST_PLAN_COPY, "oasis_test_plan_id_1"));
     }
 
     @Test
@@ -2256,20 +2370,6 @@ public class TestPlanTests extends BaseTest {
 
 
     @Test
-    @Order(305)
-    public void testAssociation() throws Exception {
-        TestPlanAssociationRequest request = new TestPlanAssociationRequest();
-        request.setTestPlanId("wx_test_plan_id_2");
-        this.requestPostWithOkAndReturn(URL_POST_RESOURCE_CASE_ASSOCIATION, request);
-        request.setFunctionalSelectIds(Arrays.asList("my_test_1", "my_test_2", "my_test_3"));
-        this.requestPostWithOkAndReturn(URL_POST_RESOURCE_CASE_ASSOCIATION, request);
-
-        //测试归档的关联会报错
-        request.setTestPlanId("wx_test_plan_id_1");
-        this.requestPost(URL_POST_RESOURCE_CASE_ASSOCIATION, request).andExpect(status().is5xxServerError());
-    }
-
-    @Test
     @Order(306)
     public void testStatistics() throws Exception {
         this.requestPostWithOk(URL_POST_TEST_PLAN_STATISTICS, List.of("wx_test_plan_id_7"));
@@ -2280,16 +2380,43 @@ public class TestPlanTests extends BaseTest {
     @Order(307)
     public void testBatchEditTestPlan() throws Exception {
         TestPlanBatchEditRequest request = new TestPlanBatchEditRequest();
-        request.setTags(Arrays.asList("tag1", "tag2"));
-        request.setAppend(true);
         request.setType("ALL");
         request.setProjectId("songtianyang-fix-wx");
         request.setSelectIds(Arrays.asList("wx_test_plan_id_1"));
-        this.requestPostWithOk(URL_TEST_PLAN_BATCH_EDIT, request);
         request.setAppend(false);
         request.setTags(Arrays.asList("tag3", "tag4"));
-        request.setSelectIds(Arrays.asList("wx_test_plan_id_1"));
         this.requestPostWithOk(URL_TEST_PLAN_BATCH_EDIT, request);
+        //检查标签是否覆盖
+        TestPlan testPlan = testPlanMapper.selectByPrimaryKey("wx_test_plan_id_1");
+        Assertions.assertEquals(2, CollectionUtils.size(testPlan.getTags()));
+        Assertions.assertTrue(testPlan.getTags().contains("tag3"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag4"));
+
+        request.setAppend(true);
+        request.setTags(Arrays.asList("tag1", "tag2"));
+        this.requestPostWithOk(URL_TEST_PLAN_BATCH_EDIT, request);
+        testPlan = testPlanMapper.selectByPrimaryKey("wx_test_plan_id_1");
+        Assertions.assertEquals(4, CollectionUtils.size(testPlan.getTags()));
+        Assertions.assertTrue(testPlan.getTags().contains("tag1"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag2"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag3"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag4"));
+
+        //超过10个
+        request.setTags(Arrays.asList("tag1", "tag2", "tag3", "tag4", "tag5", "tag6", "tag7", "tag8", "tag9", "tag0", "tag11"));
+        this.requestPostWithOk(URL_TEST_PLAN_BATCH_EDIT, request);
+        testPlan = testPlanMapper.selectByPrimaryKey("wx_test_plan_id_1");
+        Assertions.assertEquals(10, CollectionUtils.size(testPlan.getTags()));
+        Assertions.assertTrue(testPlan.getTags().contains("tag1"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag2"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag3"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag4"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag5"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag6"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag7"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag8"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag9"));
+        Assertions.assertTrue(testPlan.getTags().contains("tag0"));
     }
 
     @Test

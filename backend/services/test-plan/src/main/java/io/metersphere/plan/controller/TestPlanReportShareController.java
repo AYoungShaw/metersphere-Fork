@@ -10,10 +10,12 @@ import io.metersphere.api.service.definition.ApiReportService;
 import io.metersphere.api.service.scenario.ApiScenarioReportService;
 import io.metersphere.bug.dto.response.BugDTO;
 import io.metersphere.plan.constants.AssociateCaseType;
+import io.metersphere.plan.domain.TestPlanReportComponent;
 import io.metersphere.plan.dto.ReportDetailCasePageDTO;
 import io.metersphere.plan.dto.TestPlanShareInfo;
 import io.metersphere.plan.dto.request.TestPlanReportShareRequest;
 import io.metersphere.plan.dto.request.TestPlanShareReportDetailRequest;
+import io.metersphere.plan.dto.response.TestPlanCaseExecHistoryResponse;
 import io.metersphere.plan.dto.response.TestPlanReportDetailResponse;
 import io.metersphere.plan.dto.response.TestPlanShareResponse;
 import io.metersphere.plan.service.TestPlanReportService;
@@ -70,6 +72,14 @@ public class TestPlanReportShareController {
 
     // 分享报告详情开始
 
+    @GetMapping("/get-layout/{shareId}/{reportId}")
+    @Operation(summary = "测试计划-报告-组件布局")
+    public List<TestPlanReportComponent> getLayout(@PathVariable String shareId, @PathVariable String reportId) {
+        ShareInfo shareInfo = testPlanReportShareService.checkResource(shareId);
+        testPlanReportShareService.validateExpired(shareInfo);
+        return testPlanReportService.getLayout(reportId);
+    }
+
     @GetMapping("/get/detail/{shareId}/{reportId}")
     @Operation(summary = "测试计划-报告分享-详情查看")
     public TestPlanReportDetailResponse getDetail(@PathVariable String shareId, @PathVariable String reportId) {
@@ -94,7 +104,7 @@ public class TestPlanReportShareController {
         ShareInfo shareInfo = testPlanReportShareService.checkResource(request.getShareId());
         testPlanReportShareService.validateExpired(shareInfo);
         Page<Object> page = PageHelper.startPage(request.getCurrent(), request.getPageSize(),
-                StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tprfc.function_case_num, tprfc.id desc");
+                StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tprfc.pos desc");
         return PageUtils.setPageInfo(page, testPlanReportService.listReportDetailCases(request, AssociateCaseType.FUNCTIONAL));
     }
 
@@ -104,7 +114,7 @@ public class TestPlanReportShareController {
         ShareInfo shareInfo = testPlanReportShareService.checkResource(request.getShareId());
         testPlanReportShareService.validateExpired(shareInfo);
         Page<Object> page = PageHelper.startPage(request.getCurrent(), request.getPageSize(),
-                StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tprac.api_case_num, tprac.id desc");
+                StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tprac.pos desc");
         return PageUtils.setPageInfo(page, testPlanReportService.listReportDetailCases(request, AssociateCaseType.API_CASE));
     }
 
@@ -114,7 +124,7 @@ public class TestPlanReportShareController {
         ShareInfo shareInfo = testPlanReportShareService.checkResource(request.getShareId());
         testPlanReportShareService.validateExpired(shareInfo);
         Page<Object> page = PageHelper.startPage(request.getCurrent(), request.getPageSize(),
-                StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tpras.api_scenario_num, tpras.id desc");
+                StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tpras.pos desc");
         return PageUtils.setPageInfo(page, testPlanReportService.listReportDetailCases(request, AssociateCaseType.API_SCENARIO));
     }
 
@@ -162,5 +172,13 @@ public class TestPlanReportShareController {
         ShareInfo shareInfo = testPlanReportShareService.checkResource(shareId);
         testPlanReportShareService.validateExpired(shareInfo);
         return apiScenarioReportService.getDetail(reportId, stepId);
+    }
+
+    @GetMapping("/detail/functional/case/step/{shareId}/{reportId}")
+    @Operation(summary = "测试计划-报告-详情-功能用例-执行步骤结果")
+    public TestPlanCaseExecHistoryResponse getFunctionalExecuteResult(@PathVariable String shareId, @PathVariable String reportId) {
+        ShareInfo shareInfo = testPlanReportShareService.checkResource(shareId);
+        testPlanReportShareService.validateExpired(shareInfo);
+        return testPlanReportService.getFunctionalExecuteResult(reportId);
     }
 }

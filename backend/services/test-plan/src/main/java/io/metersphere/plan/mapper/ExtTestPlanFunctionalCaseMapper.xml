@@ -135,8 +135,15 @@
     <sql id="queryWhereCondition">
         <if test="request.moduleIds != null and request.moduleIds.size() > 0">
             and functional_case.module_id in
-            <foreach collection="request.moduleIds" item="moduleId" separator="," open="(" close=")">
-                #{moduleId}
+            <foreach collection="request.moduleIds" item="nodeId" separator="," open="(" close=")">
+                <choose>
+                    <when test="nodeId.contains('_root')">
+                        'root'
+                    </when>
+                    <otherwise>
+                        #{nodeId}
+                    </otherwise>
+                </choose>
             </foreach>
         </if>
         <if test="request.keyword != null and request.keyword != ''">
@@ -147,6 +154,9 @@
         </if>
         <if test="request.collectionId != null and request.collectionId != ''">
             and test_plan_functional_case.test_plan_collection_id = #{request.collectionId}
+        </if>
+        <if test="request.projectId != null and request.projectId!=''">
+            and functional_case.project_id = #{request.projectId}
         </if>
         <include refid="filters">
             <property name="filter" value="request.filter"/>
@@ -451,7 +461,7 @@
                  LEFT JOIN test_plan_functional_case tpfc ON tpfc.functional_case_id = fc.id
                  LEFT JOIN project p ON fc.project_id = p.id
         WHERE tpfc.test_plan_id = #{testPlanId}
-          AND fc.deleted = false AND fc.module_id = 'root'
+          AND fc.deleted = false
         ORDER BY fc.pos
     </select>
 
@@ -465,14 +475,15 @@
     </select>
 
     <select id="countModuleIdByRequest"  resultType="io.metersphere.functional.dto.FunctionalCaseModuleCountDTO">
-        SELECT functional_case.module_id AS moduleId, count(functional_case.id) AS dataCount, functional_case.project_id AS projectId, project.name AS projectName
+        SELECT CASE WHEN functional_case.module_id = 'root' THEN concat(functional_case.project_id, '_', functional_case.module_id) ElSE functional_case.module_id END AS moduleId,
+               count(functional_case.id) As dataCount, functional_case.project_id As projectId, project.name As projectName
         FROM test_plan_functional_case
         LEFT JOIN functional_case ON test_plan_functional_case.functional_case_id = functional_case.id
         LEFT JOIN project ON functional_case.project_id = project.id
         WHERE test_plan_functional_case.test_plan_id = #{request.testPlanId}
         AND functional_case.deleted = #{deleted}
         <include refid="queryWhereCondition"/>
-        GROUP BY module_id
+        GROUP BY moduleId
     </select>
 
     <select id="caseCount"
@@ -497,6 +508,18 @@
             </if>
         </where>
     </select>
+
+    <select id="getPlanCaseNotDeletedByCollectionIds" resultType="io.metersphere.plan.domain.TestPlanFunctionalCase">
+        SELECT t.*
+        from test_plan_functional_case t
+                 INNER JOIN functional_case f ON t.functional_case_id = f.id
+        WHERE t.test_plan_collection_id IN
+        <foreach collection="collectionIds" item="collectionId" separator="," open="(" close=")">
+            #{collectionId}
+        </foreach>
+          AND f.deleted = false
+    </select>
+
     <select id="selectCaseExecResultCount" resultType="io.metersphere.plan.dto.TestPlanCaseRunResultCount">
         select test_plan_functional_case.last_exec_result as result, count(test_plan_functional_case.id) as resultCount
         from test_plan_functional_case
@@ -554,5 +577,24 @@
         <include refid="queryWhereCondition"/>
         GROUP BY
             test_plan_functional_case.test_plan_collection_id
+    </select>
+    <select id="selectDistinctExecResult" resultType="io.metersphere.plan.dto.TestPlanResourceExecResultDTO">
+        select distinct resource.test_plan_id AS testPlanId,
+                        CASE
+                            WHEN resource.last_exec_result = 'BLOCKED'
+                                THEN 'COMPLETED'
+                            WHEN resource.last_exec_result = 'FAKE_ERROR'
+                                THEN 'COMPLETED'
+                            WHEN resource.last_exec_result = 'ERROR'
+                                THEN 'COMPLETED'
+                            WHEN resource.last_exec_result = 'SUCCESS'
+                                THEN 'COMPLETED'
+                            ELSE 'PENDING'
+                            END               AS execResult,
+                        test_plan.group_id    AS testPlanGroupId
+        from test_plan_functional_case resource
+                 INNER JOIN test_plan ON test_plan.id = resource.test_plan_id
+        where test_plan.project_id = #{projectId}
+          AND test_plan.status != 'ARCHIVED'
     </select>
 </mapper>

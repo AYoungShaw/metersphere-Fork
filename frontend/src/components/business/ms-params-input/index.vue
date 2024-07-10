@@ -363,7 +363,11 @@
   });
 
   const disabledPopover = computed(() => {
-    return !innerValue.value || innerValue.value.trim() === '' || isFocusAutoComplete.value;
+    return (
+      !innerValue.value ||
+      (typeof innerValue.value === 'string' && innerValue.value.trim() === '') ||
+      isFocusAutoComplete.value
+    );
   });
 
   const paramSettingVisible = ref(false);
@@ -654,15 +658,6 @@
 </script>
 
 <style lang="less">
-  .ms-params-input-popover {
-    .arco-trigger-popup-wrapper {
-      .arco-popover-popup-content {
-        padding: 4px 8px;
-      }
-    }
-
-    max-width: 400px;
-  }
   .ms-params-input-setting-trigger {
     @apply bg-white;
     .ms-params-input-setting-trigger-content {
@@ -701,13 +696,13 @@
   .ms-params-input:not(.arco-input-focus) {
     @apply bg-transparent;
 
-    border-color: transparent;
+    border-color: transparent !important;
     &:not(:hover) {
       .arco-input::placeholder {
         @apply invisible;
       }
 
-      border-color: transparent;
+      border-color: transparent !important;
     }
   }
   .ms-params-input,
@@ -756,27 +751,5 @@
         padding: 2px 8px !important;
       }
     }
-  }
-  .ms-params-popover-title {
-    @apply font-medium;
-
-    margin-bottom: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 16px;
-    color: var(--color-text-1);
-  }
-  .ms-params-popover-subtitle {
-    margin-bottom: 2px;
-    font-size: 12px;
-    line-height: 16px;
-    color: var(--color-text-1);
-  }
-  .ms-params-popover-value {
-    min-width: 100px;
-    max-width: 280px;
-    font-size: 12px;
-    line-height: 16px;
-    color: var(--color-text-1);
   }
 </style>

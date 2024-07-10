@@ -5,6 +5,7 @@ export default {
   'caseManagement.caseReview.searchPlaceholder': 'Search by ID or name',
   'caseManagement.caseReview.list.searchPlaceholder': 'Search by ID, name, or tag',
   'caseManagement.caseReview.archive': 'Archive',
+  'caseManagement.caseReview.cannotReviewTip': 'Tips: Non reviewers cannot review',
   'caseManagement.caseReview.tableNoData': 'No data yet, please',
   'caseManagement.caseReview.tableNoDataNoPermission': 'No data yet',
   'caseManagement.caseReview.name': 'Review name',
@@ -135,4 +136,6 @@ export default {
   'caseManagement.caseReview.updateCase': 'update case',
   'caseManagement.caseReview.reviewSuccess.widthAdmin':
     'Submitted successfully! You are not the designated reviewer for the current project. The system will only record your review and will not affect the final review result.',
+  'caseManagement.caseReview.reviewFormTip':
+    'Add the review results of the operator, and multiple reviewers must pass the review by all reviewers',
 };

@@ -42,6 +42,7 @@
             :module-type="ReportEnum.API_REPORT"
             :status="record.lastExecResult"
             :class="[!record.lastExecReportId ? '' : 'cursor-pointer']"
+            :script-identifier="record.scriptIdentifier"
             @click="showReport(record)"
           />
         </template>
@@ -57,7 +58,11 @@
           >
             {{ t('common.execute') }}
           </MsButton>
-          <a-divider v-permission="['PROJECT_TEST_PLAN:READ+ASSOCIATION']" direction="vertical" :margin="8"></a-divider>
+          <a-divider
+            v-if="hasAllPermission(['PROJECT_TEST_PLAN:READ+EXECUTE', 'PROJECT_TEST_PLAN:READ+ASSOCIATION'])"
+            direction="vertical"
+            :margin="8"
+          ></a-divider>
           <MsPopconfirm
             :title="t('testPlan.featureCase.disassociateTip', { name: characterLimit(record.name) })"
             :sub-title-tip="t('testPlan.featureCase.disassociateTipContent')"
@@ -129,9 +134,8 @@
   import useModal from '@/hooks/useModal';
   import useOpenNewPage from '@/hooks/useOpenNewPage';
   import useTableStore from '@/hooks/useTableStore';
-  import useAppStore from '@/store/modules/app';
   import { characterLimit } from '@/utils';
-  import { hasAnyPermission } from '@/utils/permission';
+  import { hasAllPermission, hasAnyPermission } from '@/utils/permission';
 
   import { DragSortParams, ModuleTreeNode } from '@/models/common';
   import type { PlanDetailApiScenarioItem, PlanDetailApiScenarioQueryParams } from '@/models/testPlan/testPlan';
@@ -145,6 +149,7 @@
   const props = defineProps<{
     modulesCount: Record<string, number>; // 模块数量统计对象
     moduleName: string;
+    moduleParentId: string;
     activeModule: string;
     offspringIds: string[];
     planId: string;
@@ -160,7 +165,6 @@
   }>();
 
   const { t } = useI18n();
-  const appStore = useAppStore();
   const tableStore = useTableStore();
   const { openModal } = useModal();
   const { openNewPage } = useOpenNewPage();
@@ -189,7 +193,7 @@
       columnSelectorDisabled: true,
     },
     {
-      title: 'case.caseName',
+      title: 'apiScenario.table.columns.name',
       dataIndex: 'name',
       sortable: {
         sortDirections: ['ascend', 'descend'],
@@ -207,7 +211,7 @@
       showDrag: true,
     },
     {
-      title: 'case.caseLevel',
+      title: 'apiScenario.table.columns.level',
       dataIndex: 'priority',
       slotName: 'caseLevel',
       filterConfig: {
@@ -225,7 +229,7 @@
         options: lastReportStatusListOptions.value,
         filterSlotName: FilterSlotNameEnum.API_TEST_CASE_API_LAST_EXECUTE_STATUS,
       },
-      width: 150,
+      width: 200,
       showDrag: true,
     },
     {
@@ -277,7 +281,7 @@
       slotName: 'operation',
       dataIndex: 'operation',
       fixed: 'right',
-      width: hasOperationPermission.value ? 200 : 50,
+      width: hasOperationPermission.value ? 150 : 50,
     },
   ]);
 
@@ -341,7 +345,6 @@
     const selectModules = await getModuleIds();
     const commonParams = {
       testPlanId: props.planId,
-      projectId: appStore.currentProjectId,
       ...(props.treeType === 'COLLECTION' ? { collectionId: collectionId.value } : { moduleIds: selectModules }),
     };
     if (isBatch) {
@@ -350,6 +353,7 @@
           keyword: keyword.value,
           filter: propsRes.value.filter,
         },
+        projectId: props.activeModule !== 'all' && props.treeType === 'MODULE' ? props.moduleParentId : '',
         ...commonParams,
       };
     }
@@ -377,7 +381,10 @@
 
   async function loadCaseList(refreshTreeCount = true) {
     const tableParams = await getTableParams(false);
-    setLoadListParams(tableParams);
+    setLoadListParams({
+      ...tableParams,
+      projectId: props.activeModule !== 'all' && props.treeType === 'MODULE' ? props.moduleParentId : '',
+    });
     loadList();
     if (refreshTreeCount) {
       emit('getModuleCount', {
@@ -496,7 +503,7 @@
         excludeIds: batchParams.value?.excludeIds || [],
         ...tableParams,
       });
-      Message.success(t('common.executionSuccess'));
+      Message.success(t('common.operationSuccess'));
       resetSelectorAndCaseList();
       emit('refresh');
     } catch (error) {

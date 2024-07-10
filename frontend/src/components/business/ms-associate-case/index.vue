@@ -136,7 +136,7 @@
           :filter-config-list="[]"
           :custom-fields-config-list="[]"
           :row-count="0"
-          :search-placeholder="t('ms.case.associate.searchPlaceholder')"
+          :search-placeholder="searchPlaceholder"
           @keyword-search="loadCaseList"
           @adv-search="loadCaseList"
           @refresh="loadCaseList"
@@ -369,6 +369,19 @@
     }
   });
 
+  const searchPlaceholder = computed(() => {
+    switch (associationType.value) {
+      case CaseLinkEnum.FUNCTIONAL:
+        return t('common.searchByIDNameTag');
+      case CaseLinkEnum.API:
+        return t('ms.case.associate.apiSearchPlaceholder');
+      case CaseLinkEnum.SCENARIO:
+        return t('common.searchByIDNameTag');
+      default:
+        return '';
+    }
+  });
+
   /**
    * 处理模块树节点选中事件
    */
@@ -471,8 +484,6 @@
     selectedProtocols.value = _protocols || [];
     if (props.associatedType === CaseLinkEnum.API) {
       loadCaseList();
-    } else {
-      activeFolder.value = 'all';
     }
   }
 
@@ -514,6 +525,7 @@
     (val) => {
       if (val) {
         associationType.value = props.associatedType;
+        activeFolder.value = 'all';
         initProjectList();
       }
       selectPopVisible.value = false;
@@ -528,13 +540,6 @@
       if (val) {
         selectedIds.value = [];
       }
-    }
-  );
-
-  watch(
-    () => innerProject.value,
-    (val) => {
-      innerProject.value = val;
     }
   );
 </script>

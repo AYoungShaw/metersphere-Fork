@@ -65,6 +65,7 @@
     PluginKey,
     RichTextEditor,
   } from '@halo-dev/richtext-editor';
+  import CharacterCount from '@tiptap/extension-character-count';
   import Mention from '@tiptap/extension-mention';
   import type { queueAsPromised } from 'fastq';
   import * as fastq from 'fastq';
@@ -91,6 +92,7 @@
       draggable?: boolean;
       previewUrl?: string;
       editable?: boolean;
+      limitLength?: number;
     }>(),
     {
       raw: '',
@@ -98,6 +100,7 @@
       placeholder: 'editor.placeholder',
       draggable: false,
       autoHeight: true,
+      editable: true,
     }
   );
 
@@ -135,6 +138,14 @@
       if (props.raw !== editor.value?.getHTML()) {
         editor.value?.commands.setContent(props.raw);
       }
+    }
+  );
+
+  watch(
+    () => props.editable,
+    (val) => {
+      // 更新富文本的可编辑配置
+      editor.value?.setOptions({ editable: val });
     },
     {
       immediate: true,
@@ -329,7 +340,6 @@
           HTMLAttributes: {
             class: 'mention',
           },
-          // TODO第一版本先按照初始化评论的人 不加userMap
           // @ts-ignore
           renderHTML({ options, node }) {
             return [
@@ -341,9 +351,12 @@
           },
           suggestion,
         }) as Extension<any, any>,
+        CharacterCount.configure({
+          limit: props.limitLength || null,
+        }),
       ],
       autofocus: false,
-      editable: !props.editable,
+      editable: props.editable,
       onUpdate: () => {
         debounceOnUpdate();
       },

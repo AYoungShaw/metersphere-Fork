@@ -2,7 +2,7 @@ import MSR from '@/api/http';
 import * as reportUrl from '@/api/requrls/test-plan/report';
 
 import type { GetShareId } from '@/models/apiTest/report';
-import { ReportDetail, ReportStepDetail } from "@/models/apiTest/report";
+import { ReportDetail, ReportStepDetail } from '@/models/apiTest/report';
 import { CommonList, TableQueryParams } from '@/models/common';
 import {
   ApiOrScenarioCaseItem,
@@ -10,7 +10,8 @@ import {
   ReportBugItem,
   UpdateReportDetailParams,
 } from '@/models/testPlan/report';
-import { PlanReportDetail } from '@/models/testPlan/testPlanReport';
+import type { ExecuteHistoryItem } from '@/models/testPlan/testPlan';
+import { manualReportGenParams, PlanReportDetail } from '@/models/testPlan/testPlanReport';
 
 // 报告列表
 export function reportList(data: TableQueryParams) {
@@ -148,6 +149,28 @@ export function reportCaseStepDetail(reportId: string, stepId: string, shareId?:
     });
   }
   return MSR.get<ReportStepDetail[]>({ url: `${reportUrl.ReportDetailApiUrl}/${reportId}/${stepId}` });
+}
+
+// 报告详情-用例明细-执行历史步骤
+export function getFunctionalExecuteStep(data: { reportId: string; shareId?: string }) {
+  if (data.shareId) {
+    return MSR.get<ExecuteHistoryItem>({
+      url: `${reportUrl.ReportShareFunctionalStepUrl}/${data.shareId}/${data.reportId}`,
+    });
+  }
+  return MSR.get<ExecuteHistoryItem>({ url: `${reportUrl.ReportFunctionalStepUrl}/${data.reportId}` });
+}
+// 手动生成报告
+export function manualReportGen(data: manualReportGenParams) {
+  return MSR.post({ url: reportUrl.ManualReportGenUrl, data });
+}
+
+// 获取报告布局
+export function getReportLayout(reportId: string, shareId?: string) {
+  if (shareId) {
+    return MSR.get({ url: `${reportUrl.getReportShareLayoutUrl}/${shareId}/${reportId}` });
+  }
+  return MSR.get({ url: `${reportUrl.getReportLayoutUrl}/${reportId}` });
 }
 
 export default {};

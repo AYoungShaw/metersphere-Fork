@@ -7,6 +7,7 @@ import io.metersphere.plan.mapper.TestPlanMapper;
 import io.metersphere.project.domain.Project;
 import io.metersphere.project.mapper.ProjectMapper;
 import io.metersphere.sdk.constants.HttpMethodConstants;
+import io.metersphere.sdk.constants.TestPlanConstants;
 import io.metersphere.sdk.util.JSON;
 import io.metersphere.sdk.util.Translator;
 import io.metersphere.system.dto.LogInsertModule;
@@ -30,7 +31,6 @@ import java.util.stream.Collectors;
 @Transactional(rollbackFor = Exception.class)
 public class TestPlanLogService {
 
-    private String logModule = OperationLogModule.TEST_PLAN_INDEX;
 
     @Resource
     private ProjectMapper projectMapper;
@@ -46,7 +46,7 @@ public class TestPlanLogService {
                 .projectId(project.getId())
                 .organizationId(project.getOrganizationId())
                 .type(OperationLogType.UPDATE.name())
-                .module(logModule)
+                .module(getLogModule(testPlan))
                 .sourceId(testPlan.getId())
                 .content(Translator.get("test_plan_schedule") + ":" + testPlan.getName())
                 .build().getLogDTO();
@@ -67,7 +67,7 @@ public class TestPlanLogService {
                 .projectId(module.getProjectId())
                 .organizationId(project.getOrganizationId())
                 .type(OperationLogType.ADD.name())
-                .module(logModule)
+                .module(getLogModule(module))
                 .method(requestMethod)
                 .path(requestUrl)
                 .sourceId(module.getId())
@@ -94,7 +94,7 @@ public class TestPlanLogService {
                 .projectId(projectId)
                 .organizationId(project.getOrganizationId())
                 .type(OperationLogType.UPDATE.name())
-                .module(logModule)
+                .module(getLogModule(newTestPlan))
                 .method(requestMethod)
                 .path(requestUrl)
                 .sourceId(newTestPlan.getId())
@@ -120,7 +120,7 @@ public class TestPlanLogService {
                 .projectId(deleteTestPlan.getProjectId())
                 .organizationId(project.getOrganizationId())
                 .type(OperationLogType.DELETE.name())
-                .module(logModule)
+                .module(getLogModule(deleteTestPlan))
                 .method(requestMethod)
                 .path(requestUrl)
                 .sourceId(deleteTestPlan.getId())
@@ -145,7 +145,7 @@ public class TestPlanLogService {
                 testPlan.getId(),
                 null,
                 OperationLogType.ARCHIVED.name(),
-                logModule,
+                getLogModule(testPlan),
                 testPlan.getName());
         dto.setPath("/test-plan/archived");
         dto.setMethod(HttpMethodConstants.GET.name());
@@ -164,8 +164,8 @@ public class TestPlanLogService {
                     project.getOrganizationId(),
                     testPlan.getId(),
                     operator,
-                    OperationLogType.COPY.name(),
-                    logModule,
+                    OperationLogType.ADD.name(),
+                    getLogModule(testPlan),
                     testPlan.getName());
             dto.setPath("/test-plan/copy");
             dto.setMethod(HttpMethodConstants.POST.name());
@@ -182,17 +182,19 @@ public class TestPlanLogService {
      * @param requestUrl    请求URL
      * @param requestMethod 请求方法
      * @param requestType   请求类型
-     * @param typeKey       类型Key
      */
-    public void saveBatchLog(List<TestPlan> plans, String operator, String requestUrl, String requestMethod, String requestType, String typeKey) {
-        Project project = projectMapper.selectByPrimaryKey(plans.get(0).getProjectId());
+    public void saveBatchLog(List<TestPlan> plans, String operator, String requestUrl, String requestMethod, String requestType) {
+        if (CollectionUtils.isEmpty(plans)) {
+            return;
+        }
+        Project project = projectMapper.selectByPrimaryKey(plans.getFirst().getProjectId());
         List<LogDTO> list = new ArrayList<>();
         for (TestPlan plan : plans) {
             LogDTO dto = LogDTOBuilder.builder()
                     .projectId(plan.getProjectId())
                     .organizationId(project.getOrganizationId())
                     .type(requestType)
-                    .module(logModule)
+                    .module(getLogModule(plan))
                     .method(requestMethod)
                     .path(requestUrl)
                     .sourceId(plan.getId())
@@ -228,7 +230,7 @@ public class TestPlanLogService {
                         testPlan.getId(),
                         null,
                         OperationLogType.UPDATE.name(),
-                        logModule,
+                        getLogModule(testPlan),
                         testPlan.getName());
                 dto.setPath("/test-plan/batch-edit");
                 dto.setMethod(HttpMethodConstants.POST.name());
@@ -246,7 +248,7 @@ public class TestPlanLogService {
                 .projectId(testPlan.getProjectId())
                 .organizationId(project.getOrganizationId())
                 .type(OperationLogType.UPDATE.name())
-                .module(logModule)
+                .module(getLogModule(testPlan))
                 .method(logInsertModule.getRequestMethod())
                 .path(logInsertModule.getRequestUrl())
                 .sourceId(moveId)
@@ -256,4 +258,11 @@ public class TestPlanLogService {
         operationLogService.add(dto);
     }
 
+    private String getLogModule(TestPlan testPlan) {
+        if (StringUtils.equalsIgnoreCase(testPlan.getType(), TestPlanConstants.TEST_PLAN_TYPE_PLAN)) {
+            return OperationLogModule.TEST_PLAN_TEST_PLAN;
+        } else {
+            return OperationLogModule.TEST_PLAN_TEST_PLAN_GROUP;
+        }
+    }
 }

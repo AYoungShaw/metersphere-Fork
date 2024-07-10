@@ -1,10 +1,7 @@
 package io.metersphere.functional.controller;
 
 import io.metersphere.functional.domain.*;
-import io.metersphere.functional.dto.CaseCustomFieldDTO;
-import io.metersphere.functional.dto.FunctionalCaseStepDTO;
-import io.metersphere.functional.dto.FunctionalMinderTreeDTO;
-import io.metersphere.functional.dto.MinderOptionDTO;
+import io.metersphere.functional.dto.*;
 import io.metersphere.functional.mapper.*;
 import io.metersphere.functional.request.*;
 import io.metersphere.sdk.util.JSON;
@@ -12,6 +9,7 @@ import io.metersphere.sdk.util.Translator;
 import io.metersphere.system.base.BaseTest;
 import io.metersphere.system.controller.handler.ResultHolder;
 import io.metersphere.system.dto.sdk.BaseTreeNode;
+import io.metersphere.system.utils.Pager;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -25,6 +23,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -64,17 +64,21 @@ public class FunctionalCaseMinderControllerTest extends BaseTest {
     public void testGetPageList() throws Exception {
         FunctionalCaseMindRequest request = new FunctionalCaseMindRequest();
         request.setProjectId("project-case-minder-test");
+        request.setCurrent(1);
         MvcResult mvcResultPage = this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_LIST_URL, request);
-        String contentAsString = mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        ResultHolder resultHolder = JSON.parseObject(contentAsString, ResultHolder.class);
-        Assertions.assertNotNull(resultHolder);
+        Pager<List<FunctionalMinderTreeDTO>> tableData = JSON.parseObject(JSON.toJSONString(
+                        JSON.parseObject(mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8), ResultHolder.class).getData()),
+                Pager.class);
+        Assertions.assertNotNull(tableData);
         request = new FunctionalCaseMindRequest();
         request.setProjectId("project-case-minder-test");
         request.setModuleId("TEST_MINDER_MODULE_ID_GYQ");
+        request.setCurrent(1);
         mvcResultPage = this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_LIST_URL, request);
-        contentAsString = mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        resultHolder = JSON.parseObject(contentAsString, ResultHolder.class);
-        Assertions.assertNotNull(resultHolder);
+        tableData = JSON.parseObject(JSON.toJSONString(
+                        JSON.parseObject(mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8), ResultHolder.class).getData()),
+                Pager.class);
+        Assertions.assertNotNull(tableData);
         FunctionalCaseBlob functionalCaseBlob = new FunctionalCaseBlob();
         functionalCaseBlob.setId("TEST_FUNCTIONAL_MINDER_CASE_ID_2");
         functionalCaseBlob.setSteps(JSON.toJSONString(new ArrayList<>()).getBytes(StandardCharsets.UTF_8));
@@ -92,9 +96,10 @@ public class FunctionalCaseMinderControllerTest extends BaseTest {
         functionalCaseBlob6.setDescription(StringUtils.EMPTY.getBytes(StandardCharsets.UTF_8));
         functionalCaseBlobMapper.updateByPrimaryKeyWithBLOBs(functionalCaseBlob6);
         mvcResultPage = this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_LIST_URL, request);
-        contentAsString = mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        resultHolder = JSON.parseObject(contentAsString, ResultHolder.class);
-        Assertions.assertNotNull(resultHolder);
+        tableData = JSON.parseObject(JSON.toJSONString(
+                        JSON.parseObject(mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8), ResultHolder.class).getData()),
+                Pager.class);
+        Assertions.assertNotNull(tableData);
         List<FunctionalCaseStepDTO> list = new ArrayList<>();
         FunctionalCaseStepDTO functionalCaseStepDTO = new FunctionalCaseStepDTO();
         functionalCaseStepDTO.setId("12455");
@@ -130,9 +135,11 @@ public class FunctionalCaseMinderControllerTest extends BaseTest {
         functionalCaseBlob6.setDescription(description.getBytes(StandardCharsets.UTF_8));
         functionalCaseBlobMapper.updateByPrimaryKeyWithBLOBs(functionalCaseBlob6);
         mvcResultPage = this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_LIST_URL, request);
-        contentAsString = mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        resultHolder = JSON.parseObject(contentAsString, ResultHolder.class);
-        Assertions.assertNotNull(resultHolder);
+
+        tableData = JSON.parseObject(JSON.toJSONString(
+                        JSON.parseObject(mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8), ResultHolder.class).getData()),
+                Pager.class);
+        Assertions.assertNotNull(tableData);
         expectedResult = "文本描述的结果";
         functionalCaseBlob = new FunctionalCaseBlob();
         functionalCaseBlob.setId("TEST_FUNCTIONAL_MINDER_CASE_ID_2");
@@ -145,11 +152,12 @@ public class FunctionalCaseMinderControllerTest extends BaseTest {
 
 
         mvcResultPage = this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_LIST_URL, request);
-        contentAsString = mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        resultHolder = JSON.parseObject(contentAsString, ResultHolder.class);
-        List<FunctionalMinderTreeDTO> baseTreeNodes = JSON.parseArray(JSON.toJSONString(resultHolder.getData()), FunctionalMinderTreeDTO.class);
-        Assertions.assertNotNull(baseTreeNodes);
-        Assertions.assertEquals(3, baseTreeNodes.size());
+        tableData = JSON.parseObject(JSON.toJSONString(
+                        JSON.parseObject(mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8), ResultHolder.class).getData()),
+                Pager.class);
+        Assertions.assertNotNull(tableData);
+        Assertions.assertNotNull(tableData.getList());
+        Assertions.assertEquals(2, tableData.getList().size());
     }
 
     @Test
@@ -175,6 +183,21 @@ public class FunctionalCaseMinderControllerTest extends BaseTest {
         customFieldDTO.setFieldId("custom_field_minder_gyq_id_4");
         customFieldDTO.setValue("a");
         customFields.add(customFieldDTO);
+        caseChangeRequest.setCustomFields(customFields);
+        caseChangeRequests.add(caseChangeRequest);
+
+        caseChangeRequest = new FunctionalCaseChangeRequest();
+        caseChangeRequest.setId("123dd44dd");
+        caseChangeRequest.setName("对很多司机凤凰师傅节点师傅叫可视电话国际快递符合国际快递发货根据客户个人空间规划人口结构和空间和光可鉴人规划股好方式打开房间好的师傅即可获得师傅叫好的师傅好sad个好师傅和师傅黑色粉丝互粉晚对很多司机凤凰师傅节点师傅叫可视电话国际快递符合国际快递发货根据客户个人空间规划人口结构和空间和光可鉴人规划股好方式打开房间好的师傅即可获得师傅叫好的师傅好sad个好师傅和师傅黑色粉丝互粉晚饭还未发觉饿而gui额外的红包v味道规划为v风格和v晚饭过后v微风个v的师傅v的师傅黄金时代v分饭还未发觉饿而gui额外的红包v味道规划为v风格和v晚饭过后v微风个v的师傅v的师傅黄金时代v分");
+        caseChangeRequest.setModuleId("TEST_MINDER_MODULE_ID_GYQ2");
+        caseChangeRequest.setMoveMode("AFTER");
+        caseChangeRequest.setPriority(3);
+        caseChangeRequest.setTargetId("TEST_FUNCTIONAL_MINDER_CASE_ID_3");
+        caseChangeRequest.setTemplateId("100001");
+        caseChangeRequest.setType("ADD");
+        caseChangeRequest.setPrerequisite("前置条件");
+        caseChangeRequest.setCaseEditType("TEXT");
+        customFields = new ArrayList<>();
         caseChangeRequest.setCustomFields(customFields);
         caseChangeRequests.add(caseChangeRequest);
 
@@ -268,7 +291,7 @@ public class FunctionalCaseMinderControllerTest extends BaseTest {
         FunctionalCaseCustomFieldExample customFieldExample = new FunctionalCaseCustomFieldExample();
         customFieldExample.createCriteria().andCaseIdEqualTo("TEST_FUNCTIONAL_MINDER_CASE_ID_1").andFieldIdEqualTo("custom_field_minder_gyq_id_3");
         List<FunctionalCaseCustomField> functionalCaseCustomFields = functionalCaseCustomFieldMapper.selectByExample(customFieldExample);
-        Assertions.assertTrue(StringUtils.equalsIgnoreCase(functionalCaseCustomFields.get(0).getValue(),"P0"));
+        Assertions.assertTrue(StringUtils.equalsIgnoreCase(functionalCaseCustomFields.getFirst().getValue(),"P0"));
 
         FunctionalCaseModule functionalCaseModule = functionalCaseModuleMapper.selectByPrimaryKey("TEST_MINDER_MODULE_ID_GYQ7");
         Assertions.assertTrue(StringUtils.equalsIgnoreCase(functionalCaseModule.getName(),"移动7"));
@@ -290,30 +313,51 @@ public class FunctionalCaseMinderControllerTest extends BaseTest {
         functionalCaseExample.createCriteria().andNameEqualTo("新增用例");
         functionalCases = functionalCaseMapper.selectByExample(functionalCaseExample);
         Assertions.assertTrue(CollectionUtils.isNotEmpty(functionalCases));
-        Assertions.assertTrue(functionalCases.get(0).getPos() > 0L);
+        Assertions.assertTrue(functionalCases.getFirst().getPos() > 0L);
 
         Assertions.assertTrue(CollectionUtils.isNotEmpty(functionalCases));
         customFieldExample = new FunctionalCaseCustomFieldExample();
-        customFieldExample.createCriteria().andCaseIdEqualTo(functionalCases.get(0).getId()).andFieldIdEqualTo("custom_field_minder_gyq_id_3");
+        customFieldExample.createCriteria().andCaseIdEqualTo(functionalCases.getFirst().getId()).andFieldIdEqualTo("custom_field_minder_gyq_id_3");
         functionalCaseCustomFields = functionalCaseCustomFieldMapper.selectByExample(customFieldExample);
-        Assertions.assertTrue(StringUtils.equalsIgnoreCase(functionalCaseCustomFields.get(0).getValue(),"P2"));
+        Assertions.assertTrue(StringUtils.equalsIgnoreCase(functionalCaseCustomFields.getFirst().getValue(),"P2"));
         FunctionalCaseModuleExample functionalCaseModuleExample = new FunctionalCaseModuleExample();
         functionalCaseModuleExample.createCriteria().andNameEqualTo("新增9");
         List<FunctionalCaseModule> functionalCaseModules = functionalCaseModuleMapper.selectByExample(functionalCaseModuleExample);
         Assertions.assertTrue(CollectionUtils.isNotEmpty(functionalCaseModules));
-        Assertions.assertTrue(functionalCaseModules.get(0).getPos() > 0L);
+        Assertions.assertTrue(functionalCaseModules.getFirst().getPos() > 0L);
         request = new FunctionalCaseMinderEditRequest();
         request.setProjectId("project-case-minder-test");
         request.setVersionId("ffff");
         this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_EDIT_URL, request);
         functionalCases = functionalCaseMapper.selectByExample(functionalCaseExample);
         Assertions.assertTrue(CollectionUtils.isNotEmpty(functionalCases));
+
+        mindAdditionalNodeRequest = new MindAdditionalNodeRequest();
+        mindAdditionalNodeRequest.setId("sss2");
+        mindAdditionalNodeRequest.setType("ADD");
+        mindAdditionalNodeRequest.setName("");
+        mindAdditionalNodeRequest.setParentId("TEST_MINDER_MODULE_ID_GYQ");
+        additionalNodeList.add(mindAdditionalNodeRequest);
+        request.setAdditionalNodeList(additionalNodeList);
+
+        this.requestPost(FUNCTIONAL_CASE_EDIT_URL, request).andExpect(status().is5xxServerError());
+        request.getAdditionalNodeList().remove(additionalNodeList.size()-1);
+        mindAdditionalNodeRequest = new MindAdditionalNodeRequest();
+        mindAdditionalNodeRequest.setId("additional2");
+        mindAdditionalNodeRequest.setType("UPDATE");
+        mindAdditionalNodeRequest.setName("");
+        mindAdditionalNodeRequest.setParentId("TEST_MINDER_MODULE_ID_GYQ");
+        additionalNodeList.add(mindAdditionalNodeRequest);
+        request.setAdditionalNodeList(additionalNodeList);
+
+        this.requestPost(FUNCTIONAL_CASE_EDIT_URL, request).andExpect(status().is5xxServerError());
+
     }
 
     @Test
     @Order(3)
     public void testGetCaseModuleNodeList() throws Exception {
-        FunctionalCaseMindRequest request = new FunctionalCaseMindRequest();
+        FunctionalCaseMindTreeRequest request = new FunctionalCaseMindTreeRequest();
         request.setProjectId("project-case-minder-test");
         MvcResult mvcResultPage = this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_NODE_MODULE_URL, request);
         String contentAsString = mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8);
@@ -335,24 +379,27 @@ public class FunctionalCaseMinderControllerTest extends BaseTest {
         request.setProjectId("project-case-minder-test");
         request.setModuleId("TEST_MINDER_MODULE_ID_GYQ4");
         request.setReviewId("TEST_MINDER_REVIEW_ID_GYQ");
+        request.setCurrent(1);
         MvcResult mvcResultPage = this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_REVIEW_LIST_URL, request);
-        String contentAsString = mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        ResultHolder resultHolder = JSON.parseObject(contentAsString, ResultHolder.class);
-        List<FunctionalMinderTreeDTO> baseTreeNodes = JSON.parseArray(JSON.toJSONString(resultHolder.getData()), FunctionalMinderTreeDTO.class);
-        Assertions.assertNotNull(baseTreeNodes);
-        Assertions.assertEquals(1, baseTreeNodes.size());
+        Pager<List<FunctionalMinderTreeDTO>> tableData = JSON.parseObject(JSON.toJSONString(
+                        JSON.parseObject(mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8), ResultHolder.class).getData()),
+                Pager.class);
+
+        Assertions.assertNotNull(tableData.getList());
+        Assertions.assertEquals(1, tableData.getList().size());
         request = new FunctionalCaseReviewMindRequest();
         request.setProjectId("project-case-minder-test");
         request.setModuleId("TEST_MINDER_MODULE_ID_GYQ4");
         request.setReviewId("TEST_MINDER_REVIEW_ID_GYQ2");
         request.setViewFlag(true);
         request.setViewStatusFlag(true);
+        request.setCurrent(1);
         mvcResultPage = this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_REVIEW_LIST_URL, request);
-        contentAsString = mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        resultHolder = JSON.parseObject(contentAsString, ResultHolder.class);
-        baseTreeNodes = JSON.parseArray(JSON.toJSONString(resultHolder.getData()), FunctionalMinderTreeDTO.class);
-        Assertions.assertNotNull(baseTreeNodes);
-        Assertions.assertEquals(1, baseTreeNodes.size());
+        tableData = JSON.parseObject(JSON.toJSONString(
+                        JSON.parseObject(mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8), ResultHolder.class).getData()),
+                Pager.class);
+        Assertions.assertNotNull(tableData.getList());
+        Assertions.assertEquals(1, tableData.getList().size());
     }
 
     @Test
@@ -362,13 +409,13 @@ public class FunctionalCaseMinderControllerTest extends BaseTest {
         request.setProjectId("project-case-minder-test");
         request.setModuleId("TEST_MINDER_MODULE_ID_GYQ4");
         request.setPlanId("TEST_MINDER_PLAN_ID_1");
+        request.setCurrent(1);
         MvcResult mvcResultPage = this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_PLAN_LIST_URL, request);
-        String contentAsString = mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        ResultHolder resultHolder = JSON.parseObject(contentAsString, ResultHolder.class);
-        List<FunctionalMinderTreeDTO> baseTreeNodes = JSON.parseArray(JSON.toJSONString(resultHolder.getData()), FunctionalMinderTreeDTO.class);
-        Assertions.assertNotNull(baseTreeNodes);
-        Assertions.assertEquals(2, baseTreeNodes.size());
-        System.out.println(baseTreeNodes);
+        Pager<List<FunctionalMinderTreeDTO>> tableData = JSON.parseObject(JSON.toJSONString(
+                        JSON.parseObject(mvcResultPage.getResponse().getContentAsString(StandardCharsets.UTF_8), ResultHolder.class).getData()),
+                Pager.class);
+        Assertions.assertNotNull(tableData.getList());
+        Assertions.assertEquals(2, tableData.getList().size());
     }
 
 }

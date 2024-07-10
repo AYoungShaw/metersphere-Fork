@@ -68,6 +68,24 @@ public class TestPlanReportLogService {
         return dto;
     }
 
+    public LogDTO renameLog(String id, Object name) {
+        TestPlanReport report = testPlanReportMapper.selectByPrimaryKey(id);
+        Project project = projectMapper.selectByPrimaryKey(report.getProjectId());
+        LogDTO dto = new LogDTO(
+                report.getProjectId(),
+                project.getOrganizationId(),
+                report.getId(),
+                null,
+                OperationLogType.UPDATE.name(),
+                OperationLogModule.TEST_PLAN_REPORT,
+                name.toString());
+
+        dto.setPath(OperationLogAspect.getPath());
+        dto.setMethod(HttpMethodConstants.GET.name());
+        dto.setOriginalValue(JSON.toJSONBytes(report));
+        return dto;
+    }
+
     public LogDTO updateDetailLog(TestPlanReportDetailEditRequest request) {
         return updateLog(request.getId());
     }
@@ -99,9 +117,8 @@ public class TestPlanReportLogService {
      * @param report 报告
      * @param userId 用户ID
      * @param projectId 项目ID
-     * @param path 路径
      */
-    public void addLog(TestPlanReport report, String userId, String projectId, String path) {
+    public void addLog(TestPlanReport report, String userId, String projectId) {
         Project project = projectMapper.selectByPrimaryKey(projectId);
         LogDTO log = new LogDTO(
                 projectId,
@@ -111,7 +128,6 @@ public class TestPlanReportLogService {
                 OperationLogType.ADD.name(),
                 report.getIntegrated() ? OperationLogModule.TEST_PLAN_GROUP_REPORT : OperationLogModule.TEST_PLAN_REPORT,
                 report.getName());
-        log.setPath(path);
         log.setMethod(HttpMethodConstants.POST.name());
         log.setOriginalValue(JSON.toJSONBytes(report));
         operationLogService.add(log);

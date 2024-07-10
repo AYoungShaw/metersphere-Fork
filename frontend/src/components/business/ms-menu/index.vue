@@ -2,7 +2,7 @@
   import { computed, defineComponent, h, ref } from 'vue';
   import { RouteRecordRaw, useRoute, useRouter } from 'vue-router';
   import { Message } from '@arco-design/web-vue';
-  import { cloneDeep } from 'lodash-es';
+  import { cloneDeep, debounce } from 'lodash-es';
 
   import MsAvatar from '@/components/pure/ms-avatar/index.vue';
   import MsIcon from '@/components/pure/ms-icon-font/index.vue';
@@ -23,7 +23,6 @@
   import { SettingRouteEnum } from '@/enums/routeEnum';
 
   import useMenuTree from './use-menu-tree';
-  import type { RouteMeta } from 'vue-router';
 
   export default defineComponent({
     emit: ['collapse'],
@@ -50,37 +49,43 @@
       const openKeys = ref<string[]>([]);
       const selectedKey = ref<string[]>([]);
 
-      const goto = (item: RouteRecordRaw | null) => {
-        if (item) {
-          // 如果菜单是外链
-          if (regexUrl.test(item.path)) {
-            openWindow(item.path);
-            selectedKey.value = [item.name as string];
-            return;
-          }
-          // 已激活的菜单重复点击不处理
-          const { hideInMenu, activeMenu } = item.meta as RouteMeta;
-          if (route.name === item.name && !hideInMenu && !activeMenu) {
-            selectedKey.value = [item.name as string];
-            return;
-          }
-          if (item.meta?.hideChildrenInMenu) {
-            // 顶级菜单路由跳转到该菜单下有权限的第一个顶部子菜单
-            const childName = getFirstRouterNameByCurrentRoute(item.name as string);
-            router.push({
-              name: childName,
-            });
+      const goto = debounce(
+        (item: RouteRecordRaw | null) => {
+          if (item) {
+            // 如果菜单是外链
+            if (regexUrl.test(item.path)) {
+              openWindow(item.path);
+              selectedKey.value = [item.name as string];
+              return;
+            }
+            // 已激活的菜单重复点击不处理
+            if (
+              route.name === item.name ||
+              ((route.name as string).includes(item.name as string) && route.meta?.hideChildrenInMenu)
+            ) {
+              selectedKey.value = [item.name as string];
+              return;
+            }
+            if (item.meta?.hideChildrenInMenu) {
+              // 顶级菜单路由跳转到该菜单下有权限的第一个顶部子菜单
+              const childName = getFirstRouterNameByCurrentRoute(item.name as string);
+              router.push({
+                name: childName,
+              });
+            } else {
+              router.push({
+                name: item.name,
+              });
+            }
           } else {
             router.push({
-              name: item.name,
+              name: 'notFound',
             });
           }
-        } else {
-          router.push({
-            name: 'notFound',
-          });
-        }
-      };
+        },
+        500,
+        { leading: true, trailing: false, maxWait: 500 }
+      );
       /**
        * 查找激活的菜单项
        * @param target 目标菜单名
@@ -175,7 +180,7 @@
           label: t('personal.switchOrg'),
           icon: () => (
             <MsIcon
-              type="icon-icon_switch_outlined1"
+              type="icon-icon_switch_outlined"
               class={isActiveSwitchOrg.value ? 'text-[rgb(var(--primary-5))]' : 'text-[var(--color-text-4)]'}
             />
           ),
@@ -191,7 +196,7 @@
         {
           label: t('personal.exit'),
           icon: <MsIcon type="icon-icon_into-item_outlined" class="text-[var(--color-text-4)]" />,
-          event: () => logout(),
+          event: () => logout(undefined, true),
         },
       ]);
 
@@ -429,7 +434,7 @@
                         clearTimeout(mouseEnterTimer);
                       }}
                     >
-                      <MsIcon type="icon-icon_switch_outlined1" class="text-[var(--color-text-4)]" />
+                      <MsIcon type="icon-icon_switch_outlined" class="text-[var(--color-text-4)]" />
                     </div>
                   ))
                 : ''}

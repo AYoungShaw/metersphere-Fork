@@ -144,6 +144,8 @@ public class ApiScenarioService extends MoveNodeService {
     @Resource
     private ScheduleMapper scheduleMapper;
     @Resource
+    private ApiScenarioReportService apiScenarioReportService;
+    @Resource
     private ProjectMapper projectMapper;
     @Resource
     private ExtApiDefinitionMapper extApiDefinitionMapper;
@@ -157,8 +159,6 @@ public class ApiScenarioService extends MoveNodeService {
     private OperationHistoryService operationHistoryService;
     @Resource
     private ApiCommonService apiCommonService;
-    @Resource
-    private ApiScenarioReportMapper apiScenarioReportMapper;
     @Resource
     private ApiScenarioNoticeService apiScenarioNoticeService;
     @Resource
@@ -211,9 +211,7 @@ public class ApiScenarioService extends MoveNodeService {
         Map<String, Schedule> scheduleMap = schedules.stream().collect(Collectors.toMap(Schedule::getResourceId, t -> t));
         //获取所有的lastResultId
         List<String> lastResultIds = scenarioLists.stream().map(ApiScenarioDTO::getLastReportId).toList();
-        ApiScenarioReportExample reportExample = new ApiScenarioReportExample();
-        reportExample.createCriteria().andIdIn(lastResultIds);
-        List<ApiScenarioReport> reports = apiScenarioReportMapper.selectByExample(reportExample);
+        List<ApiScenarioReport> reports = apiScenarioReportService.getApiScenarioReportByIds(lastResultIds);
         // 生成map key是id value是ScriptIdentifier  但是getScriptIdentifier为空的不放入
         Map<String, String> reportMap = reports.stream().filter(report -> StringUtils.isNotBlank(report.getScriptIdentifier())).collect(Collectors.toMap(ApiScenarioReport::getId, ApiScenarioReport::getScriptIdentifier));
         scenarioLists.forEach(item -> {
@@ -316,7 +314,6 @@ public class ApiScenarioService extends MoveNodeService {
         if (CollectionUtils.isEmpty(request.getTags())) {
             throw new MSException(Translator.get("tags_is_null"));
         }
-        apiTestCaseService.checkTagLength(request.getTags());
         if (request.isAppend()) {
             Map<String, ApiScenario> scenarioMap = extApiScenarioMapper.getTagsByIds(ids, false)
                     .stream()
@@ -326,8 +323,7 @@ public class ApiScenarioService extends MoveNodeService {
                     if (CollectionUtils.isNotEmpty(v.getTags())) {
                         List<String> orgTags = v.getTags();
                         orgTags.addAll(request.getTags());
-                        apiTestCaseService.checkTagLength(orgTags.stream().distinct().toList());
-                        v.setTags(orgTags.stream().distinct().toList());
+                        v.setTags(ServiceUtils.parseTags(orgTags.stream().distinct().toList()));
                     } else {
                         v.setTags(request.getTags());
                     }
@@ -337,7 +333,7 @@ public class ApiScenarioService extends MoveNodeService {
                 });
             }
         } else {
-            updateScenario.setTags(request.getTags());
+            updateScenario.setTags(ServiceUtils.parseTags(request.getTags().stream().distinct().toList()));
             mapper.updateByExampleSelective(updateScenario, example);
         }
     }
@@ -388,7 +384,7 @@ public class ApiScenarioService extends MoveNodeService {
 
     public ApiScenario add(ApiScenarioAddRequest request, String creator) {
         checkAddExist(request);
-        apiTestCaseService.checkTagLength(request.getTags());
+        request.setTags(ServiceUtils.parseTags(request.getTags()));
         ApiScenario scenario = getAddApiScenario(request, creator);
         scenario.setStepTotal(request.getSteps().size());
         apiScenarioMapper.insert(scenario);
@@ -710,7 +706,7 @@ public class ApiScenarioService extends MoveNodeService {
     public ApiScenario update(ApiScenarioUpdateRequest request, String updater) {
         checkResourceExist(request.getId());
         checkUpdateExist(request);
-        apiTestCaseService.checkTagLength(request.getTags());
+        request.setTags(ServiceUtils.parseTags(request.getTags()));
         // 更新基础信息
         ApiScenario scenario = BeanUtils.copyBean(new ApiScenario(), request);
         scenario.setUpdateUser(updater);
@@ -2030,7 +2026,7 @@ public class ApiScenarioService extends MoveNodeService {
                 scenarioIds,
                 sublist -> operationGC(sublist, isDeleteOperation, deleteTime, logInsertModule.getOperator()));
         apiScenarioLogService.saveBatchOperationLog(response, request.getProjectId(),
-                isDeleteOperation ? OperationLogType.DELETE.name() : OperationLogType.RECOVER.name(), logInsertModule, OperationLogModule.API_TEST_SCENARIO_RECYCLE, false);
+                isDeleteOperation ? OperationLogType.DELETE.name() : OperationLogType.RECOVER.name(), logInsertModule, OperationLogModule.API_SCENARIO_MANAGEMENT_SCENARIO, false);
         apiScenarioNoticeService.batchSendNotice(scenarioIds, logInsertModule.getOperator(), request.getProjectId(), NoticeConstants.Event.DELETE);
         return response;
     }

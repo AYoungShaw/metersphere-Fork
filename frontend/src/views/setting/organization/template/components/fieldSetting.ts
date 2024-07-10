@@ -294,7 +294,7 @@ export const getTotalFieldOptionList = (totalData: DefinedFieldItem[]) => {
         },
       ],
       fApi: null,
-      required: false,
+      required: item.internal && item.internalFieldKey === 'functional_priority',
     };
   });
 };

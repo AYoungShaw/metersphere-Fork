@@ -6,8 +6,10 @@ import io.metersphere.bug.dto.response.BugDTO;
 import io.metersphere.bug.service.BugAttachmentService;
 import io.metersphere.plan.constants.AssociateCaseType;
 import io.metersphere.plan.constants.TestPlanResourceConfig;
+import io.metersphere.plan.domain.TestPlanReportComponent;
 import io.metersphere.plan.dto.ReportDetailCasePageDTO;
 import io.metersphere.plan.dto.request.*;
+import io.metersphere.plan.dto.response.TestPlanCaseExecHistoryResponse;
 import io.metersphere.plan.dto.response.TestPlanReportDetailResponse;
 import io.metersphere.plan.dto.response.TestPlanReportPageResponse;
 import io.metersphere.plan.service.*;
@@ -26,6 +28,7 @@ import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.Logical;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -62,7 +65,7 @@ public class TestPlanReportController {
     @Operation(summary = "测试计划-报告-重命名")
     @RequiresPermissions(PermissionConstants.TEST_PLAN_REPORT_READ_UPDATE)
     @CheckOwner(resourceId = "#id", resourceType = "test_plan_report")
-    @Log(type = OperationLogType.UPDATE, expression = "#msClass.updateLog(#id)", msClass = TestPlanReportLogService.class)
+    @Log(type = OperationLogType.UPDATE, expression = "#msClass.renameLog(#id, #name)", msClass = TestPlanReportLogService.class)
     public void rename(@PathVariable String id, @RequestBody Object name) {
         testPlanReportService.rename(id, name.toString());
     }
@@ -85,13 +88,22 @@ public class TestPlanReportController {
         testPlanReportService.batchSetReportDelete(request, SessionUtils.getUserId());
     }
 
-    @PostMapping("/gen")
-    @Operation(summary = "测试计划-详情-生成报告")
+    @PostMapping("/manual-gen")
+    @Operation(summary = "测试计划-详情-手动生成报告")
     @RequiresPermissions(PermissionConstants.TEST_PLAN_READ_EXECUTE)
     @CheckOwner(resourceId = "#request.getTestPlanId()", resourceType = "test_plan")
-    public void genReportByManual(@Validated @RequestBody TestPlanReportGenRequest request) {
+    public String genReportByManual(@Validated @RequestBody TestPlanReportManualRequest request) {
         testPlanService.checkTestPlanNotArchived(request.getTestPlanId());
-        testPlanReportService.genReportByManual(request, SessionUtils.getUserId());
+        return testPlanReportService.genReportByManual(request, SessionUtils.getUserId());
+    }
+
+    @PostMapping("/auto-gen")
+    @Operation(summary = "测试计划-详情-自动生成报告")
+    @RequiresPermissions(PermissionConstants.TEST_PLAN_READ_EXECUTE)
+    @CheckOwner(resourceId = "#request.getTestPlanId()", resourceType = "test_plan")
+    public String genReportByAuto(@Validated @RequestBody TestPlanReportGenRequest request) {
+        testPlanService.checkTestPlanNotArchived(request.getTestPlanId());
+        return testPlanReportService.genReportByAuto(request, SessionUtils.getUserId());
     }
 
     // 报告详情开始
@@ -104,6 +116,14 @@ public class TestPlanReportController {
         return testPlanReportService.getReport(reportId);
     }
 
+    @GetMapping("/get-layout/{reportId}")
+    @Operation(summary = "测试计划-报告-组件布局")
+    @RequiresPermissions(value = {PermissionConstants.TEST_PLAN_REPORT_READ, PermissionConstants.TEST_PLAN_READ_EXECUTE}, logical = Logical.OR)
+    @CheckOwner(resourceId = "#reportId", resourceType = "test_plan_report")
+    public List<TestPlanReportComponent> getLayout(@PathVariable String reportId) {
+        return testPlanReportService.getLayout(reportId);
+    }
+
     @PostMapping("/upload/md/file")
     @Operation(summary = "测试计划-报告-详情-上传富文本(图片)")
     @RequiresPermissions(PermissionConstants.TEST_PLAN_REPORT_READ_UPDATE)
@@ -112,7 +132,7 @@ public class TestPlanReportController {
     }
 
     @PostMapping("/detail/edit")
-    @Operation(summary = "测试计划-报告-详情-报告内容更新")
+    @Operation(summary = "测试计划-报告-详情-富文本组件内容更新")
     @RequiresPermissions(PermissionConstants.TEST_PLAN_REPORT_READ_UPDATE)
     @CheckOwner(resourceId = "#request.getId()", resourceType = "test_plan_report")
     @Log(type = OperationLogType.UPDATE, expression = "#msClass.updateDetailLog(#request)", msClass = TestPlanReportLogService.class)
@@ -136,8 +156,16 @@ public class TestPlanReportController {
     @CheckOwner(resourceId = "#request.getReportId()", resourceType = "test_plan_report")
     public Pager<List<ReportDetailCasePageDTO>> pageFunctionalCase(@Validated @RequestBody TestPlanReportDetailPageRequest request) {
         Page<Object> page = PageHelper.startPage(request.getCurrent(), request.getPageSize(),
-                StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tprfc.function_case_num, tprfc.id desc");
+                StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tprfc.pos desc");
         return PageUtils.setPageInfo(page, testPlanReportService.listReportDetailCases(request, AssociateCaseType.FUNCTIONAL));
+    }
+
+    @GetMapping("/detail/functional/case/step/{reportId}")
+    @Operation(summary = "测试计划-报告-详情-功能用例-执行步骤结果")
+    @RequiresPermissions(value = {PermissionConstants.TEST_PLAN_REPORT_READ, PermissionConstants.TEST_PLAN_READ_EXECUTE}, logical = Logical.OR)
+    @CheckOwner(resourceId = "#reportId", resourceType = "test_plan_case_execute_history")
+    public TestPlanCaseExecHistoryResponse getFunctionalExecuteResult(@PathVariable String reportId) {
+        return testPlanReportService.getFunctionalExecuteResult(reportId);
     }
 
     @PostMapping("/detail/api/case/page")
@@ -146,7 +174,7 @@ public class TestPlanReportController {
     @CheckOwner(resourceId = "#request.getReportId()", resourceType = "test_plan_report")
     public Pager<List<ReportDetailCasePageDTO>> pageApiCase(@Validated @RequestBody TestPlanReportDetailPageRequest request) {
         Page<Object> page = PageHelper.startPage(request.getCurrent(), request.getPageSize(),
-                StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tprac.api_case_num, tprac.id desc");
+                StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tprac.pos desc");
         return PageUtils.setPageInfo(page, testPlanReportService.listReportDetailCases(request, AssociateCaseType.API_CASE));
     }
 
@@ -156,7 +184,7 @@ public class TestPlanReportController {
     @CheckOwner(resourceId = "#request.getReportId()", resourceType = "test_plan_report")
     public Pager<List<ReportDetailCasePageDTO>> pageScenarioCase(@Validated @RequestBody TestPlanReportDetailPageRequest request) {
         Page<Object> page = PageHelper.startPage(request.getCurrent(), request.getPageSize(),
-                StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tpras.api_scenario_num, tpras.id desc");
+                StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tpras.pos desc");
         return PageUtils.setPageInfo(page, testPlanReportService.listReportDetailCases(request, AssociateCaseType.API_SCENARIO));
     }
 
@@ -168,5 +196,11 @@ public class TestPlanReportController {
         Page<Object> page = PageHelper.startPage(request.getCurrent(), request.getPageSize(),
                 StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "tpr.create_time desc");
         return PageUtils.setPageInfo(page, testPlanReportService.planReportList(request));
+    }
+
+    @GetMapping(value = "/preview/md/{projectId}/{fileId}/{compressed}")
+    @Operation(summary = "缺陷管理-富文本缩略图-预览")
+    public ResponseEntity<byte[]> previewMd(@PathVariable String projectId, @PathVariable String fileId, @PathVariable("compressed") boolean compressed) {
+        return testPlanReportService.previewMd(projectId, fileId, compressed);
     }
 }

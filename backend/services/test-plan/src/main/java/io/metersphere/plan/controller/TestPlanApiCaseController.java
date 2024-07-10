@@ -45,10 +45,6 @@ public class TestPlanApiCaseController {
     @Resource
     private TestPlanApiCaseBatchRunService testPlanApiCaseBatchRunService;
     @Resource
-    private TestPlanManagementService testPlanManagementService;
-    @Resource
-    private TestPlanService testPlanService;
-    @Resource
     private ApiReportService apiReportService;
 
     @PostMapping(value = "/sort")
@@ -65,7 +61,7 @@ public class TestPlanApiCaseController {
     @CheckOwner(resourceId = "#request.getTestPlanId()", resourceType = "test_plan")
     public Pager<List<TestPlanApiCasePageResponse>> page(@Validated @RequestBody TestPlanApiCaseRequest request) {
         Page<Object> page = PageHelper.startPage(request.getCurrent(), request.getPageSize(),
-                StringUtils.isNotBlank(request.getSortString("id")) ? request.getSortString("id") : "t.pos asc");
+                StringUtils.isNotBlank(request.getSortString("id")) ? request.getSortString("id") : "t.pos desc");
         return PageUtils.setPageInfo(page, testPlanApiCaseService.hasRelateApiCaseList(request, false));
     }
 
@@ -95,7 +91,6 @@ public class TestPlanApiCaseController {
         batchRequest.setTestPlanId(request.getTestPlanId());
         batchRequest.setSelectIds(List.of(request.getId()));
         TestPlanAssociationResponse response = testPlanApiCaseService.disassociate(batchRequest, new LogInsertModule(SessionUtils.getUserId(), "/test-plan/api/case/disassociate", HttpMethodConstants.POST.name()));
-        testPlanService.refreshTestPlanStatus(request.getTestPlanId());
         return response;
     }
 
@@ -109,7 +104,6 @@ public class TestPlanApiCaseController {
             return new TestPlanAssociationResponse();
         }
         TestPlanAssociationResponse response = testPlanApiCaseService.disassociate(request, new LogInsertModule(SessionUtils.getUserId(), "/test-plan/api/case/batch/disassociate", HttpMethodConstants.POST.name()));
-        testPlanService.refreshTestPlanStatus(request.getTestPlanId());
         return response;
     }
 
@@ -126,7 +120,7 @@ public class TestPlanApiCaseController {
     @GetMapping("/run/{id}")
     @Operation(summary = "用例执行")
     @RequiresPermissions(PermissionConstants.TEST_PLAN_READ_EXECUTE)
-//    @CheckOwner(resourceId = "#id", resourceType = "test_plan_api_case") todo
+    @CheckOwner(resourceId = "#id", resourceType = "test_plan", relationType = "test_plan_api_case")
     public TaskRequestDTO run(@PathVariable String id,
                               @Schema(description = "报告ID，传了可以实时获取结果，不传则不支持实时获取")
                               @RequestParam(required = false) String reportId) {
@@ -137,7 +131,7 @@ public class TestPlanApiCaseController {
     @PostMapping("/batch/run")
     @Operation(summary = "批量执行")
     @RequiresPermissions(PermissionConstants.TEST_PLAN_READ_EXECUTE)
-//    @CheckOwner(resourceId = "#request.getId()", resourceType = "test_plan_api_case") todo
+    @CheckOwner(resourceId = "#request.getSelectIds()", resourceType = "test_plan", relationType = "test_plan_api_case")
     public void batchRun(@Validated @RequestBody TestPlanApiCaseBatchRunRequest request) {
         testPlanApiCaseBatchRunService.asyncBatchRun(request, SessionUtils.getUserId());
     }

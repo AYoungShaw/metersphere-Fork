@@ -38,7 +38,7 @@
         <template #tree-slot-title="node">
           <a-tooltip :content="`${node.name}`" position="tl">
             <div class="inline-flex w-full">
-              <div class="one-line-text w-[240px] text-[var(--color-text-1)]">
+              <div class="one-line-text w-[240px]">
                 {{ node.name }}
               </div>
             </div>
@@ -115,11 +115,12 @@
   import { RequestParam } from '@/views/api-test/components/requestComposition/index.vue';
 
   import { useI18n } from '@/hooks/useI18n';
+  import { filterTreeNode } from '@/utils';
 
   import { ModuleTreeNode } from '@/models/common';
   import { RequestDefinitionStatus } from '@/enums/apiEnum';
 
-  import type { FormInstance, TreeNodeData } from '@arco-design/web-vue';
+  import type { FormInstance } from '@arco-design/web-vue';
 
   const props = defineProps<{
     selectTree?: ModuleTreeNode[];
@@ -134,10 +135,6 @@
     if (requestVModel.value) {
       requestVModel.value.unSaved = true;
     }
-  }
-
-  function filterTreeNode(searchValue: string, nodeData: TreeNodeData) {
-    return (nodeData as ModuleTreeNode).name.toLowerCase().indexOf(searchValue.toLowerCase()) > -1;
   }
 
   defineExpose({

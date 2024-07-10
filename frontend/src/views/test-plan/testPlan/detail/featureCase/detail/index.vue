@@ -105,7 +105,7 @@
             <!-- 开始执行 -->
             <div
               v-if="canEdit && hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])"
-              class="px-[16px] py-[8px] shadow-[0_-1px_4px_rgba(2,2,2,0.1)]"
+              class="z-[101] px-[16px] py-[8px] shadow-[0_-1px_4px_rgba(2,2,2,0.1)]"
             >
               <div class="mb-[12px] flex items-center justify-between">
                 <div class="font-medium text-[var(--color-text-1)]">
@@ -193,8 +193,8 @@
           />
           <ExecutionHistory
             v-if="activeTab === 'executionHistory'"
-            :case-id="activeCaseId"
-            :test-plan-case-id="activeId"
+            :execute-list="executeHistoryList"
+            :loading="executeLoading"
           />
         </div>
       </a-spin>
@@ -245,6 +245,7 @@
   import { getBugList } from '@/api/modules/bug-management';
   import {
     associateBugToPlan,
+    executeHistory,
     getCaseDetail,
     getPlanDetailFeatureCaseList,
     getTestPlanDetail,
@@ -256,7 +257,7 @@
   import { hasAnyPermission } from '@/utils/permission';
 
   import type { TableQueryParams } from '@/models/common';
-  import type { PlanDetailFeatureCaseItem, TestPlanDetail } from '@/models/testPlan/testPlan';
+  import type { ExecuteHistoryItem, PlanDetailFeatureCaseItem, TestPlanDetail } from '@/models/testPlan/testPlan';
   import { LastExecuteResults } from '@/enums/caseEnum';
   import { CaseManagementRouteEnum } from '@/enums/routeEnum';
 
@@ -572,11 +573,37 @@
     initBugList();
     await loadCase();
   });
+
+  const executeLoading = ref<boolean>(false);
+  const executeHistoryList = ref<ExecuteHistoryItem[]>([]);
+  async function initExecuteHistory() {
+    executeLoading.value = true;
+    try {
+      executeHistoryList.value = await executeHistory({
+        caseId: activeCaseId.value,
+        id: activeId.value,
+        testPlanId: route.query.id as string,
+      });
+    } catch (error) {
+      console.log(error);
+    } finally {
+      executeLoading.value = false;
+    }
+  }
   watch(
     () => activeId.value,
     () => {
       loadCaseDetail();
       initBugList();
+    }
+  );
+
+  watch(
+    () => activeTab.value,
+    (val) => {
+      if (val === 'executionHistory') {
+        initExecuteHistory();
+      }
     }
   );
 </script>

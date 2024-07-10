@@ -1,7 +1,7 @@
 <template>
   <a-form ref="formRef" :model="form" layout="vertical">
     <div
-      class="mb-[16px] overflow-y-auto rounded-[4px] bg-[var(--color-fill-1)] p-[12px]"
+      class="mb-[16px] overflow-y-auto rounded-[4px] border border-[var(--color-text-n8)] p-[12px]"
       :style="{ width: props.formWidth || '100%' }"
     >
       <a-scrollbar class="overflow-y-auto" :style="{ 'max-height': props.maxHeight }">
@@ -16,23 +16,23 @@
         >
           <div
             v-for="(element, index) in form.list"
-            :key="`${element.filed}${index}`"
+            :key="`${element.field}${index}`"
             class="draggableElement gap-[8px] py-[6px] pr-[8px]"
             :class="[props.isShowDrag ? 'cursor-move' : '']"
           >
             <div v-if="props.isShowDrag" class="dragIcon ml-[8px] mr-[8px] pt-[8px]">
-              <MsIcon type="icon-icon_drag" class="block text-[16px] text-[var(--color-text-4)]"
-            /></div>
+              <MsIcon type="icon-icon_drag" class="block text-[16px] text-[var(--color-text-4)]" />
+            </div>
             <a-form-item
               v-for="model of props.models"
-              :key="`${model.filed}${index}`"
-              :field="`list[${index}].${model.filed}`"
+              :key="`${model.field}${index}`"
+              :field="`list[${index}].${model.field}`"
               :class="index > 0 ? 'hidden-item' : 'mb-0 flex-1'"
               :rules="
                 model.rules?.map((e) => {
                   if (e.notRepeat === true) {
                     return {
-                      validator: (val, callback) => fieldNotRepeat(val, callback, index, model.filed, e.message),
+                      validator: (val, callback) => fieldNotRepeat(val, callback, index, model.field, e.message),
                     };
                   }
                   return e;
@@ -59,17 +59,30 @@
               </template>
               <a-input
                 v-if="model.type === 'input'"
-                v-model:model-value="element[model.filed]"
+                v-model:model-value="element[model.field]"
                 class="flex-1"
                 :placeholder="t(model.placeholder || '')"
                 :max-length="model.maxLength || 255"
                 allow-clear
                 @change="emit('change')"
               />
+              <MsQuickInput
+                v-else-if="model.type === 'textarea'"
+                v-model:model-value="element[model.field]"
+                class="flex-1"
+                type="textarea"
+                @change="
+                  () => {
+                    formRef?.validateField(`list[${index}].${model.field}`);
+                    emit('change');
+                  }
+                "
+              >
+              </MsQuickInput>
               <a-tooltip v-else-if="model.type === 'inputNumber'" position="tl" mini :disabled="!model.tooltip">
                 <a-input-number
                   v-if="model.type === 'inputNumber'"
-                  v-model:model-value="element[model.filed]"
+                  v-model:model-value="element[model.field]"
                   class="flex-1"
                   :placeholder="t(model.placeholder || '')"
                   :min="model.min"
@@ -89,7 +102,7 @@
               </a-tooltip>
               <MsTagsInput
                 v-else-if="model.type === 'tagInput'"
-                v-model:model-value="element[model.filed]"
+                v-model:model-value="element[model.field]"
                 class="flex-1"
                 :placeholder="t(model.placeholder || 'common.tagPlaceholder')"
                 allow-clear
@@ -100,7 +113,7 @@
               />
               <a-select
                 v-else-if="model.type === 'select'"
-                v-model="element[model.filed]"
+                v-model="element[model.field]"
                 class="flex-1"
                 :placeholder="t(model.placeholder || '')"
                 :options="model.options"
@@ -110,8 +123,8 @@
               <div v-else-if="model.type === 'multiple'" class="flex flex-row gap-[4px]">
                 <a-form-item
                   v-for="(child, childIndex) in model.children"
-                  :key="`${child.filed}${childIndex}${index}`"
-                  :field="`list[${index}].${child.filed}`"
+                  :key="`${child.field}${childIndex}${index}`"
+                  :field="`list[${index}].${child.field}`"
                   :label="child.label ? t(child.label) : ''"
                   asterisk-position="end"
                   :hide-asterisk="child.hideAsterisk"
@@ -121,7 +134,7 @@
                 >
                   <a-input
                     v-if="child.type === 'input'"
-                    v-model="element[child.filed]"
+                    v-model="element[child.field]"
                     :class="child.className"
                     :placeholder="t(child.placeholder || '')"
                     :max-length="child.maxLength || 255"
@@ -130,12 +143,28 @@
                   />
                   <a-select
                     v-else-if="child.type === 'select'"
-                    v-model="element[child.filed]"
+                    v-model="element[child.field]"
                     :class="child.className"
                     :placeholder="t(child.placeholder || '')"
                     :options="child.options"
                     :field-names="child.filedNames"
                     @change="emit('change')"
+                  />
+                  <MsQuickInput
+                    v-else-if="child.type === 'textarea'"
+                    v-model="element[child.field]"
+                    type="textarea"
+                    :class="child.className"
+                    :placeholder="t(child.placeholder || '')"
+                    :max-length="child.maxLength || 255"
+                    :title="child.title"
+                    allow-clear
+                    @change="
+                      () => {
+                        formRef?.validateField(`list[${index}].${child.field}`);
+                        emit('change');
+                      }
+                    "
                   />
                 </a-form-item>
               </div>
@@ -195,10 +224,10 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, unref, watchEffect } from 'vue';
   import { VueDraggable } from 'vue-draggable-plus';
 
   import MsTagsInput from '@/components/pure/ms-tags-input/index.vue';
+  import MsQuickInput from '@/components/business/ms-quick-input/index.vue';
 
   import { useI18n } from '@/hooks/useI18n';
   import { scrollIntoView } from '@/utils/dom';
@@ -206,8 +235,6 @@
   import type { FormItemModel, FormMode } from './types';
   import type { FormInstance, ValidatedError } from '@arco-design/web-vue';
   import { FieldData } from '@arco-design/web-vue/es/form/interface';
-
-  const { t } = useI18n();
 
   const props = withDefaults(
     defineProps<{
@@ -229,6 +256,8 @@
     }
   );
   const emit = defineEmits(['change']);
+
+  const { t } = useI18n();
 
   const defaultForm = {
     list: [] as Record<string, any>[],
@@ -253,19 +282,19 @@
       } else {
         value = e.defaultValue;
       }
-      formItem[e.filed] = value;
+      formItem[e.field] = value;
       if (props.showEnable) {
         // 如果有开启关闭状态，将默认禁用
         formItem.enable = false;
       }
       // 默认填充表单项的子项
       e.children?.forEach((child) => {
-        formItem[child.filed] = child.type === 'inputNumber' ? null : child.defaultValue;
+        formItem[child.field] = child.type === 'inputNumber' ? null : child.defaultValue;
       });
     });
     form.value.list = [{ ...formItem }];
     if (props.defaultVals?.length) {
-      // 取出defaultVals的表单 filed
+      // 取出defaultVals的表单 field
       form.value.list = props.defaultVals.map((e) => e);
     }
   });

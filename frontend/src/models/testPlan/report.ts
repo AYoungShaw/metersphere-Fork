@@ -16,12 +16,14 @@ export interface FeatureCaseItem {
   executeResult: string;
   executeUserName: string;
   bugCount: number;
+  reportId: string;
 }
 
 export interface UpdateReportDetailParams {
   id: string;
-  summary: string;
-  richTextTmpFileIds: string[];
+  componentId: string;
+  componentValue?: string;
+  richTextTmpFileIds?: string[];
 }
 
 export interface ApiOrScenarioCaseItem {
@@ -34,4 +36,5 @@ export interface ApiOrScenarioCaseItem {
   executeUser: string;
   bugCount: number;
   reportId: string;
+  projectId: string;
 }

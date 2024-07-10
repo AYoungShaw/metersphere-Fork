@@ -270,12 +270,12 @@
             :rules="[{ required: true, message: t('system.config.auth.clientSecretRequired') }]"
             required
           >
-            <a-input
+            <a-input-password
               v-model:model-value="activeAuthForm.configuration.secret"
               :max-length="255"
               :placeholder="t('system.config.auth.clientSecretPlaceholder')"
               allow-clear
-            ></a-input>
+            ></a-input-password>
           </a-form-item>
           <a-form-item
             :label="t('system.config.auth.logoutSessionUrl')"
@@ -305,7 +305,7 @@
             <MsFormItemSub :text="t('system.config.auth.loginUrlTip')" :show-fill-icon="false" />
           </a-form-item>
         </template>
-        <template v-else-if="activeAuthForm.type === 'OAuth2'">
+        <template v-else-if="activeAuthForm.type === 'OAUTH2'">
           <a-form-item
             :label="t('system.config.auth.authUrl')"
             field="configuration.authUrl"
@@ -399,12 +399,12 @@
             :rules="[{ required: true, message: t('system.config.auth.clientSecretRequired') }]"
             required
           >
-            <a-input
+            <a-input-password
               v-model:model-value="activeAuthForm.configuration.secret"
               :max-length="255"
               :placeholder="t('system.config.auth.clientSecretPlaceholder')"
               allow-clear
-            ></a-input>
+            ></a-input-password>
           </a-form-item>
           <a-form-item
             :label="t('system.config.auth.propertyMap')"
@@ -899,7 +899,7 @@
             },
           ]);
           break;
-        case 'OAuth2':
+        case 'OAUTH2':
           description = description.concat([
             {
               label: t('system.config.auth.authUrl'),
@@ -984,8 +984,7 @@
   const showDrawer = ref(false);
   const drawerLoading = ref(false);
   const authFormRef = ref<FormInstance>();
-  // const authTypeList = ['CAS', 'OIDC', 'OAuth2', 'LDAP'];
-  const authTypeList = ['LDAP'];
+  const authTypeList = ['CAS', 'OIDC', 'OAUTH2', 'LDAP'];
   const defaultAuth = {
     id: '',
     enable: true,
@@ -1151,7 +1150,7 @@
             loginUrl: configuration.loginUrl,
           };
           break;
-        case 'OAuth2':
+        case 'OAUTH2':
           _configuration = {
             authUrl: configuration.authUrl,
             tokenUrl: configuration.tokenUrl,

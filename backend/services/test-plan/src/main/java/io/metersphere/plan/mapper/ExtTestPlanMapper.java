@@ -2,6 +2,7 @@ package io.metersphere.plan.mapper;
 
 import io.metersphere.plan.domain.TestPlan;
 import io.metersphere.plan.dto.TestPlanExecuteHisDTO;
+import io.metersphere.plan.dto.TestPlanGroupCountDTO;
 import io.metersphere.plan.dto.TestPlanQueryConditions;
 import io.metersphere.plan.dto.request.TestPlanBatchProcessRequest;
 import io.metersphere.plan.dto.request.TestPlanExecuteHisPageRequest;
@@ -57,9 +58,17 @@ public interface ExtTestPlanMapper {
 
     long selectMaxPosByGroupId(String groupId);
 
+    long selectMaxPosByProjectIdAndGroupId(@Param("projectId") String projectId, @Param("groupId") String groupId);
+
     List<TestPlanResponse> selectByGroupIds(@Param("groupIds") List<String> groupIds);
 
     List<String> selectRightfulIdsForExecute(@Param("ids") List<String> ids);
 
     List<TestPlanExecuteHisDTO> listHis(@Param("request")TestPlanExecuteHisPageRequest request);
+
+    List<String> selectGroupIdByKeyword(@Param("projectId") String projectId, @Param("keyword") String keyword);
+
+    List<TestPlanGroupCountDTO> countByGroupPlan(String projectId);
+
+    List<String> selectIdByProjectIdAndWithoutList(@Param("projectId") String projectId, @Param("withoutList") List<String> withoutList);
 }

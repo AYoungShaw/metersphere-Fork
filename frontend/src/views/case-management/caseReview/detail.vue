@@ -89,7 +89,12 @@
             </span>
           </div>
         </div>
-        <passRateLine :review-detail="reviewDetail" height="8px" radius="var(--border-radius-mini)" />
+        <passRateLine
+          ref="passRateLineRef"
+          :review-detail="reviewDetail"
+          height="8px"
+          radius="var(--border-radius-mini)"
+        />
       </div>
     </template>
     <!-- <div class="px-[24px]">
@@ -109,7 +114,6 @@
             :modules-count="modulesCount"
             :selected-keys="selectedKeys"
             @folder-node-select="handleFolderNodeSelect"
-            @init="initModuleTree"
           />
         </div>
       </template>
@@ -120,10 +124,11 @@
           :only-mine="onlyMine"
           :review-pass-rule="reviewDetail.reviewPassRule"
           :offspring-ids="offspringIds"
-          :module-tree="moduleTree"
-          @init="initModulesCount"
-          @refresh="handleRefresh"
+          :modules-count="modulesCount"
+          :review-progress="reviewProgress"
+          @refresh="initDetail()"
           @link="associateDrawerVisible = true"
+          @select-parent-node="selectParentNode"
         ></CaseTable>
       </template>
     </MsSplitBox>
@@ -158,23 +163,14 @@
   import deleteReviewModal from './components/index/deleteReviewModal.vue';
   import passRateLine from './components/passRateLine.vue';
 
-  import {
-    associateReviewCase,
-    followReview,
-    getReviewDetail,
-    getReviewDetailModuleCount,
-  } from '@/api/modules/case-management/caseReview';
+  import { associateReviewCase, followReview, getReviewDetail } from '@/api/modules/case-management/caseReview';
   import { reviewDefaultDetail } from '@/config/caseManagement';
   import { useI18n } from '@/hooks/useI18n';
   import useAppStore from '@/store/modules/app';
+  import useCaseReviewStore from '@/store/modules/case/caseReview';
   import useUserStore from '@/store/modules/user';
 
-  import type {
-    BaseAssociateCaseRequest,
-    ReviewDetailCaseListQueryParams,
-    ReviewItem,
-    ReviewStatus,
-  } from '@/models/caseManagement/caseReview';
+  import type { BaseAssociateCaseRequest, ReviewItem, ReviewStatus } from '@/models/caseManagement/caseReview';
   import { ModuleTreeNode } from '@/models/common';
   import { CaseManagementRouteEnum } from '@/enums/routeEnum';
 
@@ -183,12 +179,15 @@
   const userStore = useUserStore();
   const appStore = useAppStore();
   const { t } = useI18n();
+  const caseReviewStore = useCaseReviewStore();
 
   const loading = ref(false);
   const reviewDetail = ref<ReviewItem>({
     ...reviewDefaultDetail,
   });
   const reviewId = ref(route.query.id as string);
+  const passRateLineRef = ref<InstanceType<typeof passRateLine>>();
+  const reviewProgress = computed(() => passRateLineRef.value?.progress ?? '');
 
   async function initDetail() {
     try {
@@ -212,20 +211,7 @@
   //   },
   // ]);
 
-  const modulesCount = ref<Record<string, any>>({});
-
-  async function getModuleCount(params: ReviewDetailCaseListQueryParams) {
-    try {
-      modulesCount.value = await getReviewDetailModuleCount({
-        ...params,
-        viewFlag: onlyMine.value,
-        reviewId: reviewId.value,
-      });
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.log(error);
-    }
-  }
+  const modulesCount = computed(() => caseReviewStore.modulesCount);
 
   const folderTreeRef = ref<InstanceType<typeof CaseTree>>();
   const activeFolderId = ref<string>('all');
@@ -236,14 +222,14 @@
   });
   const caseTableRef = ref<InstanceType<typeof CaseTable>>();
 
+  function selectParentNode(folderTree: ModuleTreeNode[]) {
+    folderTreeRef.value?.selectParentNode(folderTree);
+  }
+
   function handleFolderNodeSelect(ids: string[], _offspringIds: string[]) {
     [activeFolderId.value] = ids;
     offspringIds.value = [..._offspringIds];
     caseTableRef.value?.resetSelector();
-  }
-
-  function initModulesCount(params: ReviewDetailCaseListQueryParams) {
-    getModuleCount(params);
   }
 
   const associateDrawerVisible = ref(false);
@@ -262,7 +248,7 @@
       Message.success(t('caseManagement.caseReview.associateSuccess'));
       await initDetail();
       folderTreeRef.value?.initModules();
-      caseTableRef.value?.searchCase();
+      caseTableRef.value?.refresh();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
@@ -385,17 +371,6 @@
         copyId: reviewId.value,
       },
     });
-  }
-
-  function handleRefresh(params: ReviewDetailCaseListQueryParams) {
-    initModulesCount(params);
-    initDetail();
-    folderTreeRef.value?.initModules();
-  }
-
-  const moduleTree = ref<ModuleTreeNode[]>([]);
-  function initModuleTree(tree: ModuleTreeNode[]) {
-    moduleTree.value = unref(tree);
   }
 
   onMounted(() => {

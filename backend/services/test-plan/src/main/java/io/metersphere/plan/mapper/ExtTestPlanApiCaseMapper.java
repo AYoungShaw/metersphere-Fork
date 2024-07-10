@@ -1,6 +1,5 @@
 package io.metersphere.plan.mapper;
 
-import io.metersphere.api.domain.ApiTestCase;
 import io.metersphere.api.dto.definition.ApiDefinitionDTO;
 import io.metersphere.functional.dto.FunctionalCaseModuleCountDTO;
 import io.metersphere.functional.dto.ProjectOptionDTO;
@@ -8,6 +7,7 @@ import io.metersphere.plan.domain.TestPlanApiCase;
 import io.metersphere.plan.dto.ApiCaseModuleDTO;
 import io.metersphere.plan.dto.ResourceSelectParam;
 import io.metersphere.plan.dto.TestPlanCaseRunResultCount;
+import io.metersphere.plan.dto.TestPlanResourceExecResultDTO;
 import io.metersphere.plan.dto.request.TestPlanApiCaseBatchRequest;
 import io.metersphere.plan.dto.request.TestPlanApiCaseModuleRequest;
 import io.metersphere.plan.dto.request.TestPlanApiCaseRequest;
@@ -60,17 +60,20 @@ public interface ExtTestPlanApiCaseMapper {
 
     Long getMaxPosByCollectionId(String collectionId);
 
-	/**
-	 * 获取计划下的功能用例集合
-	 *
-	 * @param planIds 测试计划ID集合
-	 * @return 计划功能用例集合
-	 */
-	List<TestPlanApiCase> getPlanApiCaseByIds(@Param("planIds") List<String> planIds);
+    /**
+     * 获取计划下的功能用例集合
+     *
+     * @param planIds 测试计划ID集合
+     * @return 计划功能用例集合
+     */
+    List<TestPlanApiCase> getPlanApiCaseByIds(@Param("planIds") List<String> planIds);
 
     List<TestPlanApiCase> getApiCaseExecuteInfoByIds(@Param("ids") List<String> ids);
 
-    List<ApiTestCase> selectApiCaseByDefinitionIds(@Param("ids") List<String> ids, @Param("isRepeat") boolean isRepeat, @Param("testPlanId") String testPlanId);
 
     List<TestPlanApiCase> getSelectIdAndCollectionId(@Param("request") TestPlanApiCaseBatchRequest request);
+
+    List<TestPlanApiCase> getPlanApiCaseNotDeletedByCollectionIds(@Param("collectionIds") List<String> collectionIds);
+
+    List<TestPlanResourceExecResultDTO> selectDistinctExecResult(String projectId);
 }

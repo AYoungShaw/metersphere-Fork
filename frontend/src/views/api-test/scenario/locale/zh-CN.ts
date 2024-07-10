@@ -29,7 +29,8 @@ export default {
   'apiScenario.params.csvScoped': '作用域',
   'apiScenario.params.file': '文件',
   'apiScenario.params.csvScopedTip1': '场景级：执行场景前加载CSV，当前场景任意步骤均可从CSV中读取到数据',
-  'apiScenario.params.csvScopedTip2': '步骤级：需在场景步骤中添加该CSV，执行该步骤时加载CSV，作用域为步骤内的请求',
+  'apiScenario.params.csvScopedTip2':
+    '步骤级：需在循环步骤中添加该CSV，执行该循环步骤时加载CSV，作用域为循环步骤内的请求',
   'apiScenario.params.config': '配置',
   'apiScenario.params.csvConfig': 'CSV 配置',
   'apiScenario.params.csvParamName': '参数名称',
@@ -41,7 +42,7 @@ export default {
   'apiScenario.params.csvQuoteAllow': '允许带引号',
   'apiScenario.params.csvRecycle': '遇到文件结束符再次循环',
   'apiScenario.params.csvStop': '遇到文件结束符停止线程',
-  'apiScenario.params.searchPlaceholder': '通过名称或标签搜索',
+  'apiScenario.params.searchPlaceholder': '通过名称/标签搜索',
   'apiScenario.params.priority':
     '变量优先级：临时参数>场景参数 >环境参数>全局参数；注: 避免使用同名变量，同名变量时场景级 CSV 优先级最高',
   'apiScenario.params.name': '变量名称',

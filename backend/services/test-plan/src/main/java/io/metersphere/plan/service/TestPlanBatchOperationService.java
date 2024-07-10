@@ -2,17 +2,23 @@ package io.metersphere.plan.service;
 
 import io.metersphere.plan.domain.*;
 import io.metersphere.plan.dto.response.TestPlanResponse;
+import io.metersphere.plan.job.TestPlanScheduleJob;
 import io.metersphere.plan.mapper.ExtTestPlanMapper;
 import io.metersphere.plan.mapper.TestPlanCollectionMapper;
 import io.metersphere.plan.mapper.TestPlanConfigMapper;
 import io.metersphere.plan.mapper.TestPlanMapper;
 import io.metersphere.project.utils.NodeSortUtils;
 import io.metersphere.sdk.constants.ApplicationNumScope;
+import io.metersphere.sdk.constants.ModuleConstants;
 import io.metersphere.sdk.constants.TestPlanConstants;
 import io.metersphere.sdk.exception.MSException;
 import io.metersphere.sdk.util.BeanUtils;
 import io.metersphere.sdk.util.CommonBeanFactory;
+import io.metersphere.sdk.util.JSON;
 import io.metersphere.sdk.util.Translator;
+import io.metersphere.system.domain.Schedule;
+import io.metersphere.system.dto.request.schedule.BaseScheduleConfigRequest;
+import io.metersphere.system.schedule.ScheduleService;
 import io.metersphere.system.uid.IDGenerator;
 import io.metersphere.system.uid.NumGenerator;
 import jakarta.annotation.Resource;
@@ -33,7 +39,10 @@ public class TestPlanBatchOperationService extends TestPlanBaseUtilsService {
     private ExtTestPlanMapper extTestPlanMapper;
     @Resource
     private TestPlanMapper testPlanMapper;
-
+    @Resource
+    private ScheduleService scheduleService;
+    @Resource
+    private TestPlanScheduleService testPlanScheduleService;
     @Resource
     private TestPlanGroupService testPlanGroupService;
     @Resource
@@ -48,7 +57,7 @@ public class TestPlanBatchOperationService extends TestPlanBaseUtilsService {
         for (TestPlan testPlan : testPlanList) {
             // 已归档的测试计划无法操作
             if (StringUtils.equalsIgnoreCase(testPlan.getStatus(), TestPlanConstants.TEST_PLAN_STATUS_ARCHIVED)) {
-                continue;
+                throw new MSException(Translator.get("test_plan.is.archived"));
             }
             if (!StringUtils.equalsIgnoreCase(testPlan.getGroupId(), TestPlanConstants.TEST_PLAN_DEFAULT_GROUP_ID)) {
                 // 测试计划组下的测试计划不单独处理， 如果勾选了他的测试计划组，会在下面进行逻辑补足。
@@ -77,10 +86,13 @@ public class TestPlanBatchOperationService extends TestPlanBaseUtilsService {
 
         List<String> movePlanIds = new ArrayList<>();
         for (TestPlan testPlan : testPlanList) {
+            // 已归档的测试计划无法操作
+            if (StringUtils.equalsIgnoreCase(testPlan.getStatus(), TestPlanConstants.TEST_PLAN_STATUS_ARCHIVED)) {
+                throw new MSException(Translator.get("test_plan.is.archived"));
+            }
             // 已归档的测试计划无法操作 测试计划组无法操作
-            if (StringUtils.equalsIgnoreCase(testPlan.getStatus(), TestPlanConstants.TEST_PLAN_STATUS_ARCHIVED)
-                    || StringUtils.equalsIgnoreCase(testPlan.getType(), TestPlanConstants.TEST_PLAN_TYPE_GROUP)) {
-                continue;
+            if (StringUtils.equalsIgnoreCase(testPlan.getType(), TestPlanConstants.TEST_PLAN_TYPE_GROUP)) {
+                throw new MSException(Translator.get("test_plan.group.error"));
             }
             movePlanIds.add(testPlan.getId());
         }
@@ -113,23 +125,26 @@ public class TestPlanBatchOperationService extends TestPlanBaseUtilsService {
     }
 
 
-    public long batchCopy(List<TestPlan> copyPlanList, String targetId, String targetType, String userId) {
-        long copyCount = 0;
+    public List<TestPlan> batchCopy(List<TestPlan> originalPlanList, String targetId, String targetType, String userId) {
+        List<TestPlan> copyPlanResult = new ArrayList<>();
         long operatorTime = System.currentTimeMillis();
+        //如果目标ID是测试计划组， 需要进行容量校验
+        if (!StringUtils.equalsIgnoreCase(targetType, ModuleConstants.NODE_TYPE_DEFAULT)) {
+            testPlanGroupService.validateGroupCapacity(targetId, originalPlanList.size());
+        }
         /*
-            此处不选择批量操作，原因有两点：
+            此处不进行批量处理，原因有两点：
             1） 测试计划内（或者测试计划组内）数据量不可控，选择批量操作时更容易出现数据太多不走索引、数据太多内存溢出等问题。不批量操作可以减少这些问题出现的概率，代价是速度会变慢。
             2） 作为数据量不可控的操作，如果数据量少，不采用批量处理也不会消耗太多时间。如果数据量多，就会容易出现1的问题。并且本人不建议针对不可控数据量的数据支持批量操作。
          */
-        for (TestPlan copyPlan : copyPlanList) {
+        for (TestPlan copyPlan : originalPlanList) {
             if (StringUtils.equalsIgnoreCase(copyPlan.getType(), TestPlanConstants.TEST_PLAN_TYPE_GROUP)) {
-                this.copyPlanGroup(copyPlan, targetId, targetType, operatorTime, userId);
+                copyPlanResult.add(this.copyPlanGroup(copyPlan, targetId, targetType, operatorTime, userId));
             } else {
-                this.copyPlan(copyPlan, targetId, targetType, operatorTime, userId);
+                copyPlanResult.add(this.copyPlan(copyPlan, targetId, targetType, operatorTime, userId));
             }
-            copyCount++;
         }
-        return copyCount;
+        return copyPlanResult;
     }
 
 
@@ -152,17 +167,13 @@ public class TestPlanBatchOperationService extends TestPlanBaseUtilsService {
         String groupId = originalTestPlan.getGroupId();
         long pos = originalTestPlan.getPos();
         if (StringUtils.equals(targetType, TestPlanConstants.TEST_PLAN_TYPE_GROUP)) {
-            if (StringUtils.equalsIgnoreCase(targetId, TestPlanConstants.TEST_PLAN_DEFAULT_GROUP_ID)) {
-                pos = 0L;
-            } else {
+            if (!StringUtils.equalsIgnoreCase(targetId, TestPlanConstants.TEST_PLAN_DEFAULT_GROUP_ID)) {
                 TestPlan group = testPlanMapper.selectByPrimaryKey(targetId);
-                //已归档的无法操作
-                if (group == null || StringUtils.equalsIgnoreCase(group.getStatus(), TestPlanConstants.TEST_PLAN_STATUS_ARCHIVED)
-                        || !StringUtils.equalsIgnoreCase(group.getType(), TestPlanConstants.TEST_PLAN_TYPE_GROUP)) {
-                    throw new MSException(Translator.get("test_plan.group.error"));
+                //如果目标ID是测试计划组， 需要进行容量校验
+                if (!StringUtils.equalsIgnoreCase(targetType, ModuleConstants.NODE_TYPE_DEFAULT)) {
+                    testPlanGroupService.validateGroupCapacity(targetId, 1);
                 }
-                pos = testPlanGroupService.getNextOrder(targetId);
-                moduleId = group.getId();
+                moduleId = group.getModuleId();
             }
             groupId = targetId;
         } else {
@@ -181,8 +192,10 @@ public class TestPlanBatchOperationService extends TestPlanBaseUtilsService {
         testPlan.setUpdateTime(operatorTime);
         testPlan.setModuleId(moduleId);
         testPlan.setGroupId(groupId);
-        testPlan.setPos(pos);
-        testPlan.setStatus(TestPlanConstants.TEST_PLAN_STATUS_PREPARED);
+        testPlan.setPos(testPlanGroupService.getNextOrder(targetId));
+        testPlan.setActualEndTime(null);
+        testPlan.setActualStartTime(null);
+        testPlan.setStatus(TestPlanConstants.TEST_PLAN_STATUS_NOT_ARCHIVED);
         testPlanMapper.insert(testPlan);
 
         //测试配置信息
@@ -237,6 +250,10 @@ public class TestPlanBatchOperationService extends TestPlanBaseUtilsService {
         beansOfType.forEach((k, v) -> {
             v.copyResource(originalTestPlan.getId(), testPlan.getId(), oldCollectionIdToNewCollectionId, operator, operatorTime);
         });
+
+        // 复制计划-定时任务信息
+        copySchedule(originalTestPlan.getId(), testPlan.getId(), operator);
+
         return testPlan;
     }
 
@@ -265,7 +282,10 @@ public class TestPlanBatchOperationService extends TestPlanBaseUtilsService {
         testPlanGroup.setUpdateUser(operator);
         testPlanGroup.setUpdateTime(operatorTime);
         testPlanGroup.setModuleId(moduleId);
-        testPlanGroup.setStatus(TestPlanConstants.TEST_PLAN_STATUS_PREPARED);
+        testPlanGroup.setPos(testPlanGroupService.getNextOrder(originalGroup.getGroupId()));
+        testPlanGroup.setActualEndTime(null);
+        testPlanGroup.setActualStartTime(null);
+        testPlanGroup.setStatus(TestPlanConstants.TEST_PLAN_STATUS_NOT_ARCHIVED);
         testPlanMapper.insert(testPlanGroup);
 
         //测试配置信息
@@ -280,7 +300,30 @@ public class TestPlanBatchOperationService extends TestPlanBaseUtilsService {
         for (TestPlan child : childList) {
             copyPlan(child, testPlanGroup.getId(), TestPlanConstants.TEST_PLAN_TYPE_GROUP, operatorTime, operator);
         }
+
+        // 复制计划组-定时任务信息
+        copySchedule(originalGroup.getId(), testPlanGroup.getId(), operator);
         return testPlanGroup;
+    }
+
+    /**
+     * 复制 计划/计划组 定时任务
+     * @param resourceId 来源ID
+     * @param targetId 目标ID
+     * @param operator 操作人
+     */
+    private void copySchedule(String resourceId, String targetId, String operator) {
+        Schedule originalSchedule = scheduleService.getScheduleByResource(resourceId, TestPlanScheduleJob.class.getName());
+        if (originalSchedule != null) {
+            // 来源的 "计划/计划组" 存在定时任务即复制, 无论开启或关闭
+            BaseScheduleConfigRequest scheduleRequest = new BaseScheduleConfigRequest();
+            scheduleRequest.setEnable(originalSchedule.getEnable());
+            scheduleRequest.setCron(originalSchedule.getValue());
+            // noinspection unchecked
+            scheduleRequest.setRunConfig(JSON.parseMap(originalSchedule.getConfig()));
+            scheduleRequest.setResourceId(targetId);
+            testPlanScheduleService.scheduleConfig(scheduleRequest, operator);
+        }
     }
 
     private String getCopyName(String name, long oldNum, long newNum) {

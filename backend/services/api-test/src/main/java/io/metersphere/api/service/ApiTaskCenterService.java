@@ -89,9 +89,6 @@ public class ApiTaskCenterService {
     @Resource
     private KafkaTemplate<String, String> kafkaTemplate;
     private static final String DEFAULT_SORT = "start_time desc";
-    private final static String PROJECT_STOP = "/task/center/api/project/stop";
-    private final static String ORG_STOP = "/task/center/api/org/stop";
-    private final static String SYSTEM_STOP = "/task/center/api/system/stop";
 
     /**
      * 任务中心实时任务列表-项目级
@@ -256,7 +253,17 @@ public class ApiTaskCenterService {
             TestResourcePoolReturnDTO testResourcePoolDTO = testResourcePoolService.getTestResourcePoolDetail(poolId);
             List<TestResourceNodeDTO> nodesList = testResourcePoolDTO.getTestResourceReturnDTO().getNodesList();
             if (CollectionUtils.isNotEmpty(nodesList)) {
-                stopTask(request, reportList, nodesList, userId, module, reports);
+                stopTask(request, reportList, nodesList, reports);
+            }
+        });
+        // 保存日志 获取所有的reportId
+        List<String> reportIds = reports.stream().map(ReportDTO::getId).toList();
+        SubListUtils.dealForSubList(reportIds, 100, (subList) -> {
+            if (request.getModuleType().equals(TaskCenterResourceType.API_CASE.toString())) {
+                //记录日志
+                saveLog(subList, userId, StringUtils.join(module, "_REAL_TIME_API_CASE"), TaskCenterResourceType.API_CASE.toString());
+            } else if (request.getModuleType().equals(TaskCenterResourceType.API_SCENARIO.toString())) {
+                saveLog(subList, userId, StringUtils.join(module, "_REAL_TIME_API_SCENARIO"), TaskCenterResourceType.API_SCENARIO.toString());
             }
         });
     }
@@ -264,8 +271,6 @@ public class ApiTaskCenterService {
     public void stopTask(TaskCenterBatchRequest request,
                          List<String> reportList,
                          List<TestResourceNodeDTO> nodesList,
-                         String userId,
-                         String module,
                          List<ReportDTO> reports) {
         // 根据报告id分组 key是报告id value是 是否集成
         Map<String, Boolean> integrationMap = reports.stream()
@@ -320,13 +325,6 @@ public class ApiTaskCenterService {
                             kafkaTemplate.send(KafkaTopicConstants.API_REPORT_TOPIC, JSON.toJSONString(result));
                         }
                     });
-
-                    if (request.getModuleType().equals(TaskCenterResourceType.API_CASE.toString())) {
-                        //记录日志
-                        saveLog(subList, userId, StringUtils.join(module, "_REAL_TIME_API_CASE"), TaskCenterResourceType.API_CASE.toString());
-                    } else if (request.getModuleType().equals(TaskCenterResourceType.API_SCENARIO.toString())) {
-                        saveLog(subList, userId, StringUtils.join(module, "_REAL_TIME_API_SCENARIO"), TaskCenterResourceType.API_SCENARIO.toString());
-                    }
                 }
             });
         });
@@ -350,12 +348,12 @@ public class ApiTaskCenterService {
             LogDTO dto = LogDTOBuilder.builder()
                     .projectId(reportDTO.getProjectId())
                     .organizationId(orgMap.get(reportDTO.getProjectId()))
-                    .type(OperationLogType.UPDATE.name())
+                    .type(OperationLogType.STOP.name())
                     .module(module)
                     .method(OperationLogAspect.getMethod())
                     .path(OperationLogAspect.getPath())
                     .sourceId(reportDTO.getId())
-                    .content(String.format("停止任务：%s", reportDTO.getName()))
+                    .content(reportDTO.getName())
                     .createUser(userId)
                     .build().getLogDTO();
             logs.add(dto);

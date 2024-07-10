@@ -115,7 +115,8 @@
         functional_case.last_execute_result,
         functional_case.delete_user,
         functional_case.delete_time,
-        functional_case.tags
+        functional_case.tags,
+        functional_case.project_id
         FROM
             functional_case
         LEFT JOIN project_version ON  functional_case.version_id = project_version.id
@@ -792,7 +793,7 @@
 
     <select id="getMinderCaseList" resultType="io.metersphere.functional.dto.FunctionalCaseMindDTO">
         SELECT
-            fc.id, fc.name, fc.project_id, fc.module_id, fc.template_id, fc.review_status, fc.pos, fc.case_edit_type,
+            fc.id, fc.id as caseId, fc.name, fc.project_id, fc.module_id, fc.template_id, fc.review_status, fc.pos, fc.case_edit_type,
             fcb.steps, fcb.text_description, fcb.expected_result, fcb.prerequisite, fcb.description
         FROM
         functional_case fc
@@ -836,21 +837,21 @@
     <select id="getMinderCaseReviewList" resultType="io.metersphere.functional.dto.FunctionalCaseMindDTO">
         SELECT
         crfc.id as id,
-        history.`status` as status,
+        IFNULL(history.`status`, fc.review_status) as reviewStatus,
         fc.module_id as moduleId,
         fc.name as name,
-        fcb.steps, fcb.expected_result, fcb.prerequisite, fcb.description, fccf.value as priority
+        fc.id as caseId,
+        fc.project_id,  fc.template_id, fc.pos, fc.case_edit_type,
+        fcb.steps, fcb.text_description, fcb.expected_result, fcb.prerequisite, fcb.description
         FROM
         case_review_functional_case crfc
         LEFT JOIN functional_case fc ON crfc.case_id = fc.id
         LEFT JOIN functional_case_blob fcb ON fcb.id = fc.id
-        LEFT JOIN functional_case_custom_field fccf ON fccf.case_id = fc.id
-        LEFT JOIN custom_field cf ON cf.id = fccf.field_id
-        LEFT JOIN ( SELECT crh.case_id, crh.`status`, crh.`create_user` from case_review_history crh where crh.review_id = #{request.reviewId}
+        LEFT JOIN (select  * from (SELECT  crh.case_id, crh.`status`, ROW_NUMBER() OVER (PARTITION BY crh.case_id ORDER BY crh.create_time DESC) as rn from case_review_history crh where crh.review_id = #{request.reviewId}
         <if test="viewStatusUserId != null and viewStatusUserId != ''">
             AND crh.create_user = #{viewStatusUserId}
         </if>
-        order by crh.create_time desc limit 1 ) as history  ON history.case_id = crfc.case_id
+        order by crh.create_time desc ) as history_filter WHERE rn = 1 ) as history  ON history.case_id = crfc.case_id
         WHERE
         crfc.review_id = #{request.reviewId}
         AND fc.deleted = #{deleted}
@@ -861,10 +862,6 @@
         fc.project_Id = #{request.projectId}
         AND
         fc.module_id = #{request.moduleId}
-        AND
-        cf.name = 'functional_priority'
-        AND cf.scene = 'FUNCTIONAL'
-        AND cf.internal= true
     </select>
 
     <select id="getMinderTestPlanList" resultType="io.metersphere.functional.dto.FunctionalCaseMindDTO">
@@ -873,13 +870,13 @@
         history.`status` as status,
         fc.module_id as moduleId,
         fc.name as name,
-        fcb.steps, fcb.expected_result, fcb.prerequisite, fcb.description, fccf.value as priority
+        fc.id as caseId,
+        fc.project_id,  fc.template_id, fc.review_status, fc.pos, fc.case_edit_type,
+        fcb.steps, fcb.text_description, fcb.expected_result, fcb.prerequisite, fcb.description
         FROM
         test_plan_functional_case tpfc
         LEFT JOIN functional_case fc ON tpfc.functional_case_id = fc.id
         LEFT JOIN functional_case_blob fcb ON fcb.id = fc.id
-        LEFT JOIN functional_case_custom_field fccf ON fccf.case_id = fc.id
-        LEFT JOIN custom_field cf ON cf.id = fccf.field_id
         LEFT JOIN ( SELECT GROUP_CONCAT(DISTINCT tpceh.test_plan_case_id) AS test_plan_case_id, tpceh.`status` from test_plan_case_execute_history tpceh where tpceh.test_plan_id = #{request.planId}
                     GROUP BY test_plan_case_id order by tpceh.create_time desc ) as history  ON history.test_plan_case_id = tpfc.id
         WHERE
@@ -889,10 +886,6 @@
         fc.project_Id = #{request.projectId}
         AND
         fc.module_id = #{request.moduleId}
-        AND
-        cf.name = 'functional_priority'
-        AND cf.scene = 'FUNCTIONAL'
-        AND cf.internal= true
     </select>
 
     <select id="selectBaseMindNodeByProjectId" resultType="io.metersphere.system.dto.sdk.BaseTreeNode">
@@ -902,4 +895,51 @@
         ORDER BY pos
     </select>
 
+    <select id="selectAllFunctionalCase" resultType="io.metersphere.functional.domain.FunctionalCase">
+        select
+        functional_case.id,
+        functional_case.create_user
+        from functional_case
+        where functional_case.deleted = false
+        and functional_case.project_id = #{projectId}
+        <if test="!isRepeat">
+            AND functional_case.id not in (
+            select test_plan_functional_case.functional_case_id from test_plan_functional_case where test_plan_functional_case.test_plan_id = #{testPlanId}
+            )
+        </if>
+        order by functional_case.pos asc
+    </select>
+
+    <select id="selectCaseByModules" resultType="io.metersphere.functional.domain.FunctionalCase">
+        select
+        functional_case.id,
+        functional_case.create_user
+        from functional_case
+        where functional_case.deleted = false
+        and functional_case.project_id = #{projectId}
+        <if test="!isRepeat">
+            AND functional_case.id not in (
+            select test_plan_functional_case.functional_case_id from test_plan_functional_case where test_plan_functional_case.test_plan_id = #{testPlanId}
+            )
+        </if>
+        <if test="dto.moduleIds != null and dto.moduleIds.size() > 0">
+            and functional_case.module_id in
+            <foreach collection="dto.moduleIds" item="moduleId" open="(" separator="," close=")">
+                #{moduleId}
+            </foreach>
+        </if>
+        <if test="dto.excludeIds != null and dto.excludeIds.size() > 0">
+            AND functional_case.id not in
+            <foreach collection="dto.excludeIds" item="excludeId" separator="," open="(" close=")">
+                #{excludeId}
+            </foreach>
+        </if>
+        <if test="dto.selectIds != null and dto.selectIds.size() > 0">
+            or functional_case.id in
+            <foreach collection="dto.selectIds" item="selectId" separator="," open="(" close=")">
+                #{selectId}
+            </foreach>
+        </if>
+        order by functional_case.pos asc
+    </select>
 </mapper>

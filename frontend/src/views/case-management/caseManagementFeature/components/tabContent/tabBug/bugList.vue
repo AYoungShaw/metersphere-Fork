@@ -14,6 +14,11 @@
         <div class="one-line-text max-w-[200px]">{{ characterLimit(record.handleUserName) || '-' }}</div>
       </a-tooltip>
     </template>
+    <template #createUserName="{ record }">
+      <a-tooltip :content="record.handleUserName">
+        <div class="one-line-text">{{ record.createUserName || '-' }}</div>
+      </a-tooltip>
+    </template>
 
     <template #operation="{ record }">
       <MsButton v-permission="['FUNCTIONAL_CASE:READ+UPDATE']" @click="cancelLink(record.id)">{{
@@ -94,7 +99,6 @@
     columns: props.bugColumns,
     scroll: { x: '100%' },
     heightUsed: 340,
-    enableDrag: false,
   });
 
   const innerKeyword = useVModel(props, 'keyword', emit);

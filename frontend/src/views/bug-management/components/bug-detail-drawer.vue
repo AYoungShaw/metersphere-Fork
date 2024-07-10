@@ -71,18 +71,31 @@
           />
           {{ t('caseManagement.featureCase.follow') }}
         </MsButton>
-        <MsButton type="icon" status="secondary" class="mr-2 !rounded-[var(--border-radius-small)]">
+        <MsButton
+          v-permission="['PROJECT_BUG:READ+ADD', 'PROJECT_BUG:READ+DELETE']"
+          type="icon"
+          status="secondary"
+          class="mr-2 !rounded-[var(--border-radius-small)]"
+        >
           <a-dropdown position="br" :hide-on-select="false">
             <div>
               <icon-more class="mr-1" />
               <span> {{ t('caseManagement.featureCase.more') }}</span>
             </div>
             <template #content>
-              <a-doption :disabled="props.currentPlatform !== detailInfo.platform" @click="handleCopy">
+              <a-doption
+                v-permission="['PROJECT_BUG:READ+ADD']"
+                :disabled="props.currentPlatform !== detailInfo.platform"
+                @click="handleCopy"
+              >
                 <MsIcon type="icon-icon_copy_filled" class="font-[16px]" />
                 {{ t('common.copy') }}
               </a-doption>
-              <a-doption class="error-6 text-[rgb(var(--danger-6))]" @click="deleteHandler">
+              <a-doption
+                v-permission="['PROJECT_BUG:READ+DELETE']"
+                class="error-6 text-[rgb(var(--danger-6))]"
+                @click="deleteHandler"
+              >
                 <MsIcon type="icon-icon_delete-trash_outlined" class="font-[16px] text-[rgb(var(--danger-6))]" />
                 {{ t('common.delete') }}
               </a-doption>
@@ -91,7 +104,7 @@
         </MsButton>
       </div>
     </template>
-    <template #default="{ detail }">
+    <template #default>
       <div
         ref="wrapperRef"
         :class="[
@@ -130,7 +143,7 @@
                 v-if="activeTab === 'basicInfo'"
                 v-model:tags="tags"
                 :form-rule="formRules"
-                :detail="detail"
+                :detail="detailInfo"
                 :current-platform="props.currentPlatform"
                 :is-platform-default-template="isPlatformDefaultTemplate"
                 :loading="rightLoading"
@@ -168,7 +181,6 @@
 </template>
 
 <script setup lang="ts">
-  import { defineModel, ref } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
   import { useClipboard } from '@vueuse/core';
   import { Message } from '@arco-design/web-vue';
@@ -391,7 +403,13 @@
 
   const editLoading = ref<boolean>(false);
 
+  async function getDetail() {
+    const res = await getBugDetail(props.detailId);
+    loadedBug(res);
+  }
+
   function updateSuccess() {
+    getDetail();
     emit('submit');
   }
 
@@ -540,11 +558,6 @@
       fileList: [file],
     });
     return data;
-  }
-
-  async function getDetail() {
-    const res = await getBugDetail(props.detailId);
-    loadedBug(res);
   }
 
   watch(

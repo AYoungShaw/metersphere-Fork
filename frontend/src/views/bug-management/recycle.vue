@@ -33,11 +33,13 @@
         </template>
         <template #operation="{ record }">
           <div class="flex flex-row flex-nowrap">
-            <MsButton class="!mr-0" @click="handleRecover(record)">{{ t('bugManagement.recycle.recover') }}</MsButton>
+            <MsButton v-permission="['PROJECT_BUG:READ+DELETE']" class="!mr-0" @click="handleRecover(record)">
+              {{ t('bugManagement.recycle.recover') }}
+            </MsButton>
             <a-divider direction="vertical" />
-            <MsButton class="!mr-0" @click="handleDelete(record)">{{
-              t('bugManagement.recycle.permanentlyDelete')
-            }}</MsButton>
+            <MsButton v-permission="['PROJECT_BUG:READ+DELETE']" class="!mr-0" @click="handleDelete(record)">
+              {{ t('bugManagement.recycle.permanentlyDelete') }}
+            </MsButton>
           </div>
         </template>
 
@@ -283,31 +285,32 @@
     return customFieldToColumns(res);
   };
 
-  const { propsRes, propsEvent, loadList, setKeyword, setLoadListParams, setProps } = useTable(
-    getRecycleList,
-    {
-      tableKey: TableKeyEnum.BUG_MANAGEMENT_RECYCLE,
-      selectable: true,
-      noDisable: true,
-      showSetting: true,
-      scroll: { x: '1900px' },
-      heightUsed: 256,
-    },
-    (record: TableData) => ({
-      ...record,
-      handleUser: record.handleUserName,
-      createUser: record.createUserName,
-      updateUser: record.updateUserName,
-      ...customFieldDataToTableData(record.customFields, customFields.value),
-    })
-  );
+  const { propsRes, propsEvent, loadList, setKeyword, setLoadListParams, setProps, resetSelector, resetFilterParams } =
+    useTable(
+      getRecycleList,
+      {
+        tableKey: TableKeyEnum.BUG_MANAGEMENT_RECYCLE,
+        selectable: true,
+        noDisable: true,
+        showSetting: true,
+        scroll: { x: '1900px' },
+        heightUsed: 256,
+      },
+      (record: TableData) => ({
+        ...record,
+        handleUser: record.handleUserName,
+        createUser: record.createUserName,
+        updateUser: record.updateUserName,
+        ...customFieldDataToTableData(record.customFields, customFields.value),
+      })
+    );
 
   const tableAction = {
     baseAction: [
       {
         eventTag: 'recover',
         label: t('bugManagement.recycle.recover'),
-        permission: ['PROJECT_BUG:READ+UPDATE'],
+        permission: ['PROJECT_BUG:READ+DELETE'],
       },
       {
         eventTag: 'delete',
@@ -352,6 +355,8 @@
     try {
       await recoverSingleByRecycle(record.id);
       Message.success(t('bugManagement.recycle.recoverSuccess'));
+      resetSelector();
+      resetFilterParams();
       fetchData();
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -368,6 +373,8 @@
       appStore.hideLoading();
       Message.success(t('bugManagement.recycle.recoverSuccess'));
       keyword.value = '';
+      resetSelector();
+      resetFilterParams();
       fetchData();
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -384,6 +391,8 @@
         try {
           await deleteSingleByRecycle(record.id);
           Message.success(t('common.deleteSuccess'));
+          resetSelector();
+          resetFilterParams();
           fetchData();
         } catch (error) {
           // eslint-disable-next-line no-console
@@ -403,6 +412,8 @@
           await deleteBatchByRecycle(tmpObj);
           Message.success(t('common.deleteSuccess'));
           keyword.value = '';
+          resetSelector();
+          resetFilterParams();
           fetchData();
         } catch (error) {
           // eslint-disable-next-line no-console

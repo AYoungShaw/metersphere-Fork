@@ -10,6 +10,7 @@ import io.metersphere.sdk.constants.PermissionConstants;
 import io.metersphere.system.log.annotation.Log;
 import io.metersphere.system.log.constants.OperationLogType;
 import io.metersphere.system.security.CheckOwner;
+import io.metersphere.system.uid.IDGenerator;
 import io.metersphere.system.utils.SessionUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,17 +42,23 @@ public class TestPlanExecuteController {
     @Log(type = OperationLogType.EXECUTE, expression = "#msClass.executeLog(#request)", msClass = TestPlanLogService.class)
     public String startExecute(@Validated @RequestBody TestPlanExecuteRequest request) {
         testPlanManagementService.checkModuleIsOpen(request.getExecuteId(), TestPlanResourceConfig.CONFIG_TEST_PLAN, Collections.singletonList(TestPlanResourceConfig.CONFIG_TEST_PLAN));
-        return testPlanExecuteService.singleExecuteTestPlan(request, SessionUtils.getUserId());
+        String reportId = IDGenerator.nextStr();
+        Thread.startVirtualThread(() ->
+                testPlanExecuteService.singleExecuteTestPlan(request, reportId, SessionUtils.getUserId())
+        );
+        return reportId;
     }
 
     @PostMapping("/batch")
-    @Operation(summary = "测试计划-开始自行")
+    @Operation(summary = "测试计划-批量执行")
     @RequiresPermissions(PermissionConstants.TEST_PLAN_READ_EXECUTE)
-    @CheckOwner(resourceId = "#request.getProjectId()", resourceType = "project")
+    @CheckOwner(resourceId = "#request.getExecuteIds()", resourceType = "test_plan")
     @Log(type = OperationLogType.EXECUTE, expression = "#msClass.batchExecuteLog(#request)", msClass = TestPlanLogService.class)
     public void startExecute(@Validated @RequestBody TestPlanBatchExecuteRequest request) {
         testPlanManagementService.checkModuleIsOpen(request.getProjectId(), TestPlanResourceConfig.CHECK_TYPE_PROJECT, Collections.singletonList(TestPlanResourceConfig.CONFIG_TEST_PLAN));
-        testPlanExecuteService.batchExecuteTestPlan(request, SessionUtils.getUserId());
+        Thread.startVirtualThread(() ->
+                testPlanExecuteService.batchExecuteTestPlan(request, SessionUtils.getUserId())
+        );
     }
 
 }

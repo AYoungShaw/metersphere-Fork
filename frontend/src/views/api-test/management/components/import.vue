@@ -48,10 +48,11 @@
               :draggable="false"
               allow-search
               allow-clear
+              :filter-tree-node="filterTreeNode"
             >
               <template #tree-slot-title="node">
                 <a-tooltip :content="`${node.name}`" position="tl">
-                  <div class="one-line-text w-[300px] text-[var(--color-text-1)]">{{ node.name }}</div>
+                  <div class="one-line-text w-[300px]">{{ node.name }}</div>
                 </a-tooltip>
               </template>
             </a-tree-select>
@@ -252,10 +253,11 @@
               class="w-[500px]"
               :field-names="{ title: 'name', key: 'id', children: 'children' }"
               allow-search
+              :filter-tree-node="filterTreeNode"
             >
               <template #tree-slot-title="node">
                 <a-tooltip :content="`${node.name}`" position="tl">
-                  <div class="one-line-text w-[300px] text-[var(--color-text-1)]">{{ node.name }}</div>
+                  <div class="one-line-text w-[300px]">{{ node.name }}</div>
                 </a-tooltip>
               </template>
             </a-tree-select>
@@ -288,26 +290,7 @@
             </a-select>
           </a-form-item>
           <a-form-item :label="t('apiTestManagement.syncFrequency')">
-            <a-select v-model:model-value="cronValue" class="w-[240px]">
-              <template #label="{ data }">
-                <div class="flex items-center">
-                  {{ data.value }}
-                  <div class="ml-[4px] text-[var(--color-text-4)]">{{ data.label.split('?')[1] }}</div>
-                </div>
-              </template>
-              <a-option v-for="item of syncFrequencyOptions" :key="item.value" :value="item.value" class="block">
-                <div class="flex w-full items-center justify-between">
-                  {{ item.value }}
-                  <div class="ml-[4px] text-[var(--color-text-4)]">{{ item.label }}</div>
-                </div>
-              </a-option>
-              <!-- TODO:第一版不做自定义 -->
-              <!-- <template #footer>
-              <div class="flex items-center p-[4px_8px]">
-                <MsButton type="text">{{ t('apiTestManagement.customFrequency') }}</MsButton>
-              </div>
-            </template> -->
-            </a-select>
+            <MsCronSelect v-model:model-value="cronValue" class="min-w-[240px]" />
           </a-form-item>
         </template>
       </a-form>
@@ -344,6 +327,7 @@
   import dayjs from 'dayjs';
 
   import MsButton from '@/components/pure/ms-button/index.vue';
+  import MsCronSelect from '@/components/pure/ms-cron-select/index.vue';
   import MsDrawer from '@/components/pure/ms-drawer/index.vue';
   import MsIcon from '@/components/pure/ms-icon-font/index.vue';
   import MsBaseTable from '@/components/pure/ms-table/base-table.vue';
@@ -361,7 +345,7 @@
   import { useI18n } from '@/hooks/useI18n';
   import useAppStore from '@/store/modules/app';
   import useUserStore from '@/store/modules/user';
-  import { filterTree, TreeNode } from '@/utils';
+  import { filterTree, filterTreeNode, TreeNode } from '@/utils';
 
   import type { ImportApiDefinitionParams, ImportApiDefinitionRequest } from '@/models/apiTest/management';
   import type { ModuleTreeNode } from '@/models/common';
@@ -435,12 +419,7 @@
     }
     return !importForm.value.name || !importForm.value.swaggerUrl;
   });
-  const syncFrequencyOptions = [
-    { label: t('apiTestManagement.timeTaskHour'), value: '0 0 0/1 * * ?' },
-    { label: t('apiTestManagement.timeTaskSixHour'), value: '0 0 0/6 * * ?' },
-    { label: t('apiTestManagement.timeTaskTwelveHour'), value: '0 0 0/12 * * ?' },
-    { label: t('apiTestManagement.timeTaskDay'), value: '0 0 0 * * ?' },
-  ];
+
   const cronValue = ref('0 0 0/1 * * ?');
   const importLoading = ref(false);
   const taskDrawerVisible = ref(false);
@@ -624,7 +603,7 @@
     (item) => ({
       ...item,
       operationTime: dayjs(item.operationTime).format('YYYY-MM-DD HH:mm:ss'),
-      nextTime: dayjs(item.nextTime).format('YYYY-MM-DD HH:mm:ss'),
+      nextTime: item.nextTime ? dayjs(item.nextTime).format('YYYY-MM-DD HH:mm:ss') : '-',
     })
   );
   function loadTaskList() {

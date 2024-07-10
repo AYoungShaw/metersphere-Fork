@@ -74,6 +74,7 @@
               @plan-tree-node-select="planNodeSelect"
               @init="setRootModules"
               @drag-update="dragUpdate"
+              @delete-node="deleteNode"
             ></TestPlanTree>
           </div>
         </div>
@@ -116,7 +117,6 @@
 
 <script setup lang="ts">
   import { computed, ref } from 'vue';
-  import { useRouter } from 'vue-router';
 
   import MsButton from '@/components/pure/ms-button/index.vue';
   import MsCard from '@/components/pure/ms-card/index.vue';
@@ -138,8 +138,6 @@
   import { testPlanTypeEnum } from '@/enums/testPlanEnum';
 
   import Message from '@arco-design/web-vue/es/message';
-
-  const router = useRouter();
 
   const appStore = useAppStore();
   const { t } = useI18n();
@@ -217,6 +215,7 @@
     try {
       modulesCount.value = await getPlanModulesCount(params);
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.log(error);
     }
   }
@@ -227,12 +226,9 @@
    */
   const rootModulesName = ref<string[]>([]);
   const folderTree = ref<ModuleTreeNode[]>([]);
-  function setRootModules(treeNode: ModuleTreeNode[], isSetDefaultKey: boolean) {
+  function setRootModules(treeNode: ModuleTreeNode[]) {
     folderTree.value = treeNode;
     rootModulesName.value = treeNode.map((e) => e.name);
-    if (isSetDefaultKey) {
-      activeFolder.value = 'all';
-    }
   }
 
   const showPlanDrawer = ref<boolean>(false);
@@ -270,6 +266,16 @@
   }
   function dragUpdate() {
     planTableRef.value?.emitTableParams();
+  }
+
+  function deleteNode() {
+    nextTick(() => {
+      if (activeFolder.value !== 'all') {
+        setActiveFolder('all');
+      } else {
+        planTableRef.value?.fetchData();
+      }
+    });
   }
 
   function createTestPlan(type: string) {

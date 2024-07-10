@@ -1,117 +1,150 @@
 <template>
-  <div class="px-[24px] py-[16px]">
-    <div class="mb-[16px] flex flex-wrap items-center justify-end">
+  <div class="h-full px-[24px] py-[16px]">
+    <div class="mb-[16px]">
       <MsAdvanceFilter
         v-model:keyword="keyword"
         :filter-config-list="filterConfigList"
         :row-count="filterRowCount"
+        :count="modulesCount[props.activeFolder] || 0"
+        :name="moduleNamePath"
+        :not-show-input-search="showType !== 'list'"
         :search-placeholder="t('caseManagement.caseReview.searchPlaceholder')"
         @keyword-search="(val, filter) => searchCase(filter)"
         @adv-search="searchCase"
-        @refresh="searchCase"
+        @refresh="refresh()"
       >
-        <!-- <template #right>
-          <div class="flex items-center">
-            <a-radio-group v-model:model-value="showType" type="button" class="case-show-type">
-              <a-radio value="list" class="show-type-icon p-[2px]">
-                <MsIcon type="icon-icon_view-list_outlined" />
-              </a-radio>
-              <a-radio value="mind" class="show-type-icon p-[2px]">
-                <MsIcon type="icon-icon_mindnote_outlined" />
-              </a-radio>
-            </a-radio-group>
+        <template v-if="showType !== 'list'" #nameRight>
+          <div v-if="reviewPassRule === 'MULTIPLE'" class="ml-[16px]">
+            <a-switch v-model:model-value="onlyMineStatus" size="small" class="mr-[4px]" type="line" />
+            {{ t('caseManagement.caseReview.myReviewStatus') }}
           </div>
-        </template> -->
+          <span class="ml-[16px] !text-[rgb(var(--warning-6))]">
+            {{ t('caseManagement.caseReview.cannotReviewTip') }}
+          </span>
+        </template>
+        <template #right>
+          <a-radio-group
+            v-model:model-value="showType"
+            type="button"
+            size="small"
+            class="list-show-type"
+            @change="handleShowTypeChange"
+          >
+            <a-radio value="list" class="show-type-icon !m-[2px]">
+              <MsIcon :size="14" type="icon-icon_view-list_outlined" />
+            </a-radio>
+            <a-radio value="minder" class="show-type-icon !m-[2px]">
+              <MsIcon :size="14" type="icon-icon_mindnote_outlined" />
+            </a-radio>
+          </a-radio-group>
+        </template>
       </MsAdvanceFilter>
     </div>
-    <ms-base-table
-      v-bind="propsRes"
-      :action-config="batchActions"
-      no-disable
-      filter-icon-align-left
-      v-on="propsEvent"
-      @batch-action="handleTableBatch"
-    >
-      <template #[FilterSlotNameEnum.CASE_MANAGEMENT_REVIEW_RESULT]="{ filterContent }">
-        <a-tag :color="reviewResultMap[filterContent.value as ReviewResult].color" class="px-[4px]" size="small">
-          {{ t(reviewResultMap[filterContent.value as ReviewResult].label) }}
-        </a-tag>
-      </template>
-      <template #[FilterSlotNameEnum.CASE_MANAGEMENT_CASE_LEVEL]="{ filterContent }">
-        <caseLevel :case-level="filterContent.text" />
-      </template>
-      <template #num="{ record }">
-        <a-tooltip :content="record.num">
-          <a-button type="text" class="px-0 !text-[14px] !leading-[22px]" @click="review(record)">
-            <div class="one-line-text max-w-[168px]">{{ record.num }}</div>
-          </a-button>
-        </a-tooltip>
-      </template>
-      <template #caseLevel="{ record }">
-        <span class="text-[var(--color-text-2)]"> <caseLevel :case-level="record.caseLevel" /></span>
-      </template>
-      <template #reviewNames="{ record }">
-        <MsTagGroup
-          v-if="record.showModuleTree"
-          :tag-list="record.reviewNames"
-          is-string-tag
-          :show-num="1"
-          theme="outline"
-          @click="record.showModuleTree = false"
-        />
-        <MsSelect
-          v-else
-          v-model:model-value="record.reviewers"
-          v-model:loading="dialogLoading"
-          :max-tag-count="1"
-          class="w-full"
-          :options="reviewersOptions"
-          :search-keys="['label']"
-          allow-search
-          :multiple="true"
-          :placeholder="t('project.messageManagement.receiverPlaceholder')"
-          @change="() => changeReviewer(record)"
-        >
-        </MsSelect>
-      </template>
-      <template #status="{ record }">
-        <div class="flex items-center gap-[4px]">
-          <MsIcon
-            :type="reviewResultMap[record.status as ReviewResult].icon"
-            :style="{
+    <!-- 表格 -->
+    <template v-if="showType === 'list'">
+      <ms-base-table
+        v-bind="propsRes"
+        :action-config="batchActions"
+        no-disable
+        filter-icon-align-left
+        v-on="propsEvent"
+        @batch-action="handleTableBatch"
+      >
+        <template #[FilterSlotNameEnum.CASE_MANAGEMENT_REVIEW_RESULT]="{ filterContent }">
+          <a-tag :color="reviewResultMap[filterContent.value as ReviewResult].color" class="px-[4px]" size="small">
+            {{ t(reviewResultMap[filterContent.value as ReviewResult].label) }}
+          </a-tag>
+        </template>
+        <template #[FilterSlotNameEnum.CASE_MANAGEMENT_CASE_LEVEL]="{ filterContent }">
+          <caseLevel :case-level="filterContent.text" />
+        </template>
+        <template #num="{ record }">
+          <a-tooltip :content="record.num">
+            <a-button type="text" class="px-0 !text-[14px] !leading-[22px]" @click="review(record)">
+              <div class="one-line-text max-w-[168px]">{{ record.num }}</div>
+            </a-button>
+          </a-tooltip>
+        </template>
+        <template #caseLevel="{ record }">
+          <span class="text-[var(--color-text-2)]"> <caseLevel :case-level="record.caseLevel" /></span>
+        </template>
+        <template #reviewNames="{ record }">
+          <MsTagGroup
+            v-if="record.showModuleTree"
+            :tag-list="record.reviewNames"
+            is-string-tag
+            :show-num="1"
+            theme="outline"
+            @click="record.showModuleTree = false"
+          />
+          <MsSelect
+            v-else
+            v-model:model-value="record.reviewers"
+            v-model:loading="dialogLoading"
+            :max-tag-count="1"
+            class="w-full"
+            :options="reviewersOptions"
+            :search-keys="['label']"
+            allow-search
+            :multiple="true"
+            :placeholder="t('project.messageManagement.receiverPlaceholder')"
+            @change="() => changeReviewer(record)"
+          >
+          </MsSelect>
+        </template>
+        <template #status="{ record }">
+          <div class="flex items-center gap-[4px]">
+            <MsIcon
+              :type="reviewResultMap[record.status as ReviewResult].icon"
+              :style="{
               color: reviewResultMap[record.status as ReviewResult].color
             }"
-          />
-          {{ t(reviewResultMap[record.status as ReviewResult].label) }}
-        </div>
-      </template>
-      <template #action="{ record }">
-        <MsButton v-permission="['CASE_REVIEW:READ+REVIEW']" type="text" class="!mr-0" @click="review(record)">
-          {{ t('caseManagement.caseReview.review') }}
-        </MsButton>
-        <a-divider direction="vertical" :margin="8"></a-divider>
-        <MsPopconfirm
-          :title="t('caseManagement.caseReview.disassociateTip')"
-          :sub-title-tip="t('caseManagement.caseReview.disassociateTipContent')"
-          :ok-text="t('common.confirm')"
-          :loading="disassociateLoading"
-          type="error"
-          @confirm="(val, done) => handleDisassociateReviewCase(record, done)"
-        >
-          <MsButton v-permission="['CASE_REVIEW:READ+RELEVANCE']" type="text" class="!mr-0">
-            {{ t('caseManagement.caseReview.disassociate') }}
+            />
+            {{ t(reviewResultMap[record.status as ReviewResult].label) }}
+          </div>
+        </template>
+        <template #action="{ record }">
+          <MsButton v-permission="['CASE_REVIEW:READ+REVIEW']" type="text" class="!mr-0" @click="review(record)">
+            {{ t('caseManagement.caseReview.review') }}
           </MsButton>
-        </MsPopconfirm>
-      </template>
-      <template v-if="keyword.trim() === ''" #empty>
-        <div class="flex w-full items-center justify-center p-[8px] text-[var(--color-text-4)]">
-          {{ t('caseManagement.caseReview.tableNoData') }}
-          <MsButton v-permission="['FUNCTIONAL_CASE:READ+ADD']" class="ml-[8px]" @click="emit('link')">
-            {{ t('caseManagement.featureCase.linkCase') }}
-          </MsButton>
-        </div>
-      </template>
-    </ms-base-table>
+          <a-divider direction="vertical" :margin="8"></a-divider>
+          <MsPopconfirm
+            :title="t('caseManagement.caseReview.disassociateTip')"
+            :sub-title-tip="t('caseManagement.caseReview.disassociateTipContent')"
+            :ok-text="t('common.confirm')"
+            :loading="disassociateLoading"
+            type="error"
+            @confirm="(val, done) => handleDisassociateReviewCase(record, done)"
+          >
+            <MsButton v-permission="['CASE_REVIEW:READ+RELEVANCE']" type="text" class="!mr-0">
+              {{ t('caseManagement.caseReview.disassociate') }}
+            </MsButton>
+          </MsPopconfirm>
+        </template>
+        <template v-if="keyword.trim() === ''" #empty>
+          <div class="flex w-full items-center justify-center p-[8px] text-[var(--color-text-4)]">
+            {{ t('caseManagement.caseReview.tableNoData') }}
+            <MsButton v-permission="['FUNCTIONAL_CASE:READ+ADD']" class="ml-[8px]" @click="emit('link')">
+              {{ t('caseManagement.featureCase.linkCase') }}
+            </MsButton>
+          </div>
+        </template>
+      </ms-base-table>
+    </template>
+    <!-- 脑图 -->
+    <div v-else class="h-[calc(100%-48px)] border-t border-[var(--color-text-n8)]">
+      <MsCaseReviewMinder
+        ref="msCaseReviewMinderRef"
+        :module-id="props.activeFolder"
+        :view-flag="props.onlyMine"
+        :view-status-flag="onlyMineStatus"
+        :module-tree="moduleTree"
+        :review-progress="props.reviewProgress"
+        :review-pass-rule="props.reviewPassRule"
+        @operation="handleMinderOperation"
+        @handle-review-done="handleReviewDone"
+      />
+    </div>
     <a-modal
       v-model:visible="dialogVisible"
       class="p-[4px]"
@@ -136,7 +169,7 @@
               size="16"
             />
           </a-tooltip>
-          <div class="ml-[8px] font-normal text-[var(--color-text-4)]">
+          <div v-show="showType === 'list'" class="ml-[8px] font-normal text-[var(--color-text-4)]">
             ({{ t('caseManagement.caseReview.selectedCase', { count: batchParams.currentSelectCount }) }})
           </div>
         </div>
@@ -269,6 +302,7 @@
   import { FilterFormItem, FilterResult, FilterType } from '@/components/pure/ms-advance-filter/type';
   import MsButton from '@/components/pure/ms-button/index.vue';
   import MsIcon from '@/components/pure/ms-icon-font/index.vue';
+  import type { MinderJsonNode, MinderJsonNodeData } from '@/components/pure/ms-minder-editor/props';
   import MsPopconfirm from '@/components/pure/ms-popconfirm/index.vue';
   import MsRichText from '@/components/pure/ms-rich-text/MsRichText.vue';
   import MsBaseTable from '@/components/pure/ms-table/base-table.vue';
@@ -277,6 +311,8 @@
   import MsTagGroup from '@/components/pure/ms-tag/ms-tag-group.vue';
   import { MsFileItem } from '@/components/pure/ms-upload/types';
   import caseLevel from '@/components/business/ms-case-associate/caseLevel.vue';
+  import MsCaseReviewMinder from '@/components/business/ms-minders/caseReviewMinder/index.vue';
+  import { getMinderOperationParams } from '@/components/business/ms-minders/caseReviewMinder/utils';
   import MsSelect from '@/components/business/ms-select';
 
   import {
@@ -295,11 +331,13 @@
   import useModal from '@/hooks/useModal';
   import useTableStore from '@/hooks/useTableStore';
   import useAppStore from '@/store/modules/app';
+  import useCaseReviewStore from '@/store/modules/case/caseReview';
   import useUserStore from '@/store/modules/user';
+  import { characterLimit, findNodeByKey } from '@/utils';
   import { hasAnyPermission } from '@/utils/permission';
 
   import { ReviewCaseItem, ReviewItem, ReviewPassRule, ReviewResult } from '@/models/caseManagement/caseReview';
-  import { BatchApiParams, ModuleTreeNode } from '@/models/common';
+  import { BatchApiParams, TableQueryParams } from '@/models/common';
   import { CaseManagementRouteEnum } from '@/enums/routeEnum';
   import { TableKeyEnum } from '@/enums/tableEnum';
   import { FilterSlotNameEnum } from '@/enums/tableFilterEnum';
@@ -312,13 +350,13 @@
   });
 
   const props = defineProps<{
-    activeFolder: string | number;
+    activeFolder: string;
     onlyMine: boolean;
     reviewPassRule: ReviewPassRule; // 评审规则
     offspringIds: string[]; // 当前选中节点的所有子节点id
-    moduleTree: ModuleTreeNode[];
+    reviewProgress: string; // 评审进度
   }>();
-  const emit = defineEmits(['init', 'refresh', 'link']);
+  const emit = defineEmits(['refresh', 'link', 'selectParentNode']);
 
   const router = useRouter();
   const route = useRoute();
@@ -327,11 +365,27 @@
   const userStore = useUserStore();
   const { t } = useI18n();
   const { openModal } = useModal();
+  const caseReviewStore = useCaseReviewStore();
+
+  const minderSelectData = ref<MinderJsonNodeData>(); // 当前脑图选中的数据
+  const minderParams = ref();
   const keyword = ref('');
-  // const showType = ref<'list' | 'mind'>('list');
   const filterRowCount = ref(0);
   const filterConfigList = ref<FilterFormItem[]>([]);
   const tableParams = ref<Record<string, any>>({});
+  const onlyMineStatus = ref(false);
+  const showType = ref<'list' | 'minder'>('list');
+  const msCaseReviewMinderRef = ref<InstanceType<typeof MsCaseReviewMinder>>();
+
+  const moduleTree = computed(() => unref(caseReviewStore.moduleTree));
+  async function initModules() {
+    await caseReviewStore.initModules(route.query.id as string);
+  }
+  const moduleNamePath = computed(() => {
+    return props.activeFolder === 'all'
+      ? t('caseManagement.featureCase.allCase')
+      : findNodeByKey<Record<string, any>>(moduleTree.value, props.activeFolder, 'id')?.name;
+  });
 
   const hasOperationPermission = computed(() =>
     hasAnyPermission(['CASE_REVIEW:READ+REVIEW', 'CASE_REVIEW:READ+RELEVANCE'])
@@ -463,6 +517,27 @@
     ],
   };
 
+  const modulesCount = computed(() => caseReviewStore.modulesCount);
+  async function getModuleCount() {
+    let params: TableQueryParams;
+    if (showType.value === 'list') {
+      params = {
+        ...tableParams.value,
+        current: propsRes.value.msPagination?.current,
+        pageSize: propsRes.value.msPagination?.pageSize,
+        total: propsRes.value.msPagination?.total,
+      };
+    } else {
+      params = { projectId: appStore.currentProjectId, pageSize: 10, current: 1 };
+    }
+    await caseReviewStore.getModuleCount({
+      ...params,
+      moduleIds: [],
+      viewFlag: props.onlyMine,
+      reviewId: route.query.id as string,
+    });
+  }
+
   function searchCase(filter?: FilterResult) {
     tableParams.value = {
       projectId: appStore.currentProjectId,
@@ -477,33 +552,60 @@
         : {},
     };
     setLoadListParams(tableParams.value);
+    resetSelector();
     loadList();
-    emit('init', {
-      ...tableParams.value,
-      current: propsRes.value.msPagination?.current,
-      pageSize: propsRes.value.msPagination?.pageSize,
-      total: propsRes.value.msPagination?.total,
-      moduleIds: [],
-    });
+    getModuleCount();
   }
 
   onBeforeMount(() => {
     searchCase();
   });
 
+  /**
+   * 更新数据
+   * @param getCount 获取模块树数量
+   */
+  async function refresh(getCount = true) {
+    if (showType.value === 'list') {
+      if (getCount) {
+        searchCase();
+      } else {
+        resetSelector();
+        loadList();
+      }
+    } else {
+      if (getCount) {
+        await getModuleCount();
+      }
+      msCaseReviewMinderRef.value?.initCaseTree();
+    }
+  }
+
   watch(
     () => props.onlyMine,
     () => {
-      searchCase();
+      refresh();
     }
   );
 
   watch(
     () => props.activeFolder,
     () => {
-      searchCase();
+      if (showType.value === 'list') {
+        searchCase();
+      }
     }
   );
+
+  function handleShowTypeChange(val: string | number | boolean) {
+    if (val === 'minder') {
+      keyword.value = '';
+      // 切换到脑图刷新模块统计
+      getModuleCount();
+    } else {
+      searchCase();
+    }
+  }
 
   const batchParams = ref<BatchApiParams>({
     selectIds: [],
@@ -555,18 +657,14 @@
     try {
       disassociateLoading.value = true;
       await disassociateReviewCase(route.query.id as string, record.caseId);
-      emit('refresh', {
-        ...tableParams.value,
-        current: propsRes.value.msPagination?.current,
-        pageSize: propsRes.value.msPagination?.pageSize,
-        total: propsRes.value.msPagination?.total,
-        moduleIds: [],
-      });
+      initModules();
+      emit('refresh');
       if (done) {
         done();
       }
       Message.success(t('caseManagement.caseReview.disassociateSuccess'));
       loadList();
+      getModuleCount();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
@@ -603,9 +701,13 @@
 
   // 批量解除关联用例拦截
   function batchDisassociate() {
+    const batchDisassociateTitle =
+      showType.value === 'list'
+        ? t('caseManagement.caseReview.disassociateConfirmTitle', { count: batchParams.value.currentSelectCount })
+        : t('testPlan.featureCase.disassociateTip', { name: characterLimit(minderSelectData.value?.text) });
     openModal({
       type: 'warning',
-      title: t('caseManagement.caseReview.disassociateConfirmTitle', { count: batchParams.value.currentSelectCount }),
+      title: batchDisassociateTitle,
       content: t('caseManagement.caseReview.disassociateTipContent'),
       okText: t('caseManagement.caseReview.disassociate'),
       cancelText: t('common.cancel'),
@@ -615,21 +717,26 @@
           await batchDisassociateReviewCase({
             reviewId: route.query.id as string,
             userId: props.onlyMine ? userStore.id || '' : '',
-            moduleIds: props.activeFolder === 'all' ? [] : [props.activeFolder, ...props.offspringIds],
-            ...batchParams.value,
-            ...tableParams.value,
+            ...(showType.value === 'list'
+              ? {
+                  moduleIds: props.activeFolder === 'all' ? [] : [props.activeFolder, ...props.offspringIds],
+                  ...batchParams.value,
+                  ...tableParams.value,
+                }
+              : minderParams.value),
           });
           Message.success(t('common.updateSuccess'));
           dialogLoading.value = false;
-          resetSelector();
-          loadList();
-          emit('refresh', {
-            ...tableParams.value,
-            current: propsRes.value.msPagination?.current,
-            pageSize: propsRes.value.msPagination?.pageSize,
-            total: propsRes.value.msPagination?.total,
-            moduleIds: [],
-          });
+          const folderTree = cloneDeep(moduleTree.value);
+          emit('refresh');
+          await initModules();
+          await getModuleCount();
+          if (!Object.keys(modulesCount.value).includes(props.activeFolder)) {
+            // 模块树选中返回上一级
+            emit('selectParentNode', folderTree);
+          } else {
+            refresh(false);
+          }
         } catch (error) {
           // eslint-disable-next-line no-console
           console.log(error);
@@ -675,21 +782,18 @@
         status: 'RE_REVIEWED',
         content: dialogForm.value.reason,
         notifier: dialogForm.value.commentIds.join(';'),
-        moduleIds: props.activeFolder === 'all' ? [] : [props.activeFolder, ...props.offspringIds],
-        ...batchParams.value,
-        ...tableParams.value,
+        ...(showType.value === 'list'
+          ? {
+              moduleIds: props.activeFolder === 'all' ? [] : [props.activeFolder, ...props.offspringIds],
+              ...batchParams.value,
+              ...tableParams.value,
+            }
+          : minderParams.value),
       });
       Message.success(t('common.updateSuccess'));
       dialogVisible.value = false;
-      resetSelector();
-      emit('refresh', {
-        ...tableParams.value,
-        current: propsRes.value.msPagination?.current,
-        pageSize: propsRes.value.msPagination?.pageSize,
-        total: propsRes.value.msPagination?.total,
-        moduleIds: [],
-      });
-      loadList();
+      refresh(false);
+      emit('refresh');
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
@@ -709,15 +813,19 @@
             userId: props.onlyMine ? userStore.id || '' : '',
             reviewerId: dialogForm.value.reviewer.length > 0 ? dialogForm.value.reviewer : record.reviewers,
             append: dialogForm.value.isAppend, // 是否追加
-            moduleIds: props.activeFolder === 'all' ? [] : [props.activeFolder, ...props.offspringIds],
-            ...batchParams.value,
-            ...tableParams.value,
-            selectIds: batchParams.value.selectIds.length > 0 ? batchParams.value.selectIds : [record.id],
+            ...(showType.value === 'list'
+              ? {
+                  moduleIds: props.activeFolder === 'all' ? [] : [props.activeFolder, ...props.offspringIds],
+                  ...batchParams.value,
+                  ...tableParams.value,
+                  selectIds: batchParams.value.selectIds.length > 0 ? batchParams.value.selectIds : [record.id],
+                }
+              : minderParams.value),
           });
           Message.success(t('common.updateSuccess'));
           dialogVisible.value = false;
-          resetSelector();
-          loadList();
+          emit('refresh');
+          refresh();
         } catch (error) {
           // eslint-disable-next-line no-console
           console.log(error);
@@ -749,13 +857,7 @@
           Message.success(t('caseManagement.caseReview.reviewSuccess'));
           dialogVisible.value = false;
           resetSelector();
-          emit('refresh', {
-            ...tableParams.value,
-            current: propsRes.value.msPagination?.current,
-            pageSize: propsRes.value.msPagination?.pageSize,
-            total: propsRes.value.msPagination?.total,
-            moduleIds: [],
-          });
+          emit('refresh');
           loadList();
         } catch (error) {
           // eslint-disable-next-line no-console
@@ -796,13 +898,8 @@
     }
   }
 
-  /**
-   * 处理表格选中后批量操作
-   * @param event 批量操作事件对象
-   */
-  function handleTableBatch(event: BatchActionParams, params: BatchActionQueryParams) {
-    batchParams.value = { ...params, selectIds: params?.selectedIds || [], condition: {} };
-    switch (event.eventTag) {
+  function handleOperation(type?: string) {
+    switch (type) {
       case 'review':
         dialogVisible.value = true;
         dialogShowType.value = 'review';
@@ -822,6 +919,27 @@
       default:
         break;
     }
+  }
+
+  // 脑图操作
+  function handleMinderOperation(type: string, node: MinderJsonNode) {
+    minderSelectData.value = node.data;
+    minderParams.value = getMinderOperationParams(node);
+    handleOperation(type);
+  }
+
+  function handleReviewDone() {
+    refresh(false);
+    emit('refresh');
+  }
+
+  /**
+   * 处理表格选中后批量操作
+   * @param event 批量操作事件对象
+   */
+  function handleTableBatch(event: BatchActionParams, params: BatchActionQueryParams) {
+    batchParams.value = { ...params, selectIds: params?.selectedIds || [], condition: {} };
+    handleOperation(event.eventTag);
   }
 
   // 去用例评审页面
@@ -889,7 +1007,7 @@
   });
 
   defineExpose({
-    searchCase,
+    refresh,
     resetSelector,
   });
   await getCaseLevelFields();
@@ -926,6 +1044,12 @@
       .arco-input-suffix {
         @apply invisible;
       }
+    }
+  }
+  .list-show-type {
+    padding: 0;
+    :deep(.arco-radio-button-content) {
+      padding: 4px 6px;
     }
   }
 </style>

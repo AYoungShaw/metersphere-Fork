@@ -6,7 +6,9 @@ import io.metersphere.sdk.constants.ApiBatchRunMode;
 import io.metersphere.sdk.constants.ApiExecuteRunMode;
 import io.metersphere.sdk.util.CommonBeanFactory;
 import io.metersphere.sdk.util.JSON;
+import io.metersphere.sdk.util.LogUtils;
 import io.metersphere.system.schedule.BaseScheduleJob;
+import io.metersphere.system.uid.IDGenerator;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobKey;
 import org.quartz.TriggerKey;
@@ -21,13 +23,14 @@ public class TestPlanScheduleJob extends BaseScheduleJob {
         assert testPlanExecuteService != null;
         Map<String, String> runConfig = JSON.parseObject(context.getJobDetail().getJobDataMap().get("config").toString(), Map.class);
         String runMode = runConfig.containsKey("runMode") ? runConfig.get("runMode") : ApiBatchRunMode.SERIAL.name();
-        Thread.startVirtualThread(() -> {
+        LogUtils.info("开始执行测试计划的定时任务. ID：" + resourceId);
+        Thread.startVirtualThread(() ->
             testPlanExecuteService.singleExecuteTestPlan(new TestPlanExecuteRequest() {{
                 this.setExecuteId(resourceId);
                 this.setRunMode(runMode);
                 this.setExecutionSource(ApiExecuteRunMode.SCHEDULE.name());
-            }}, userId);
-        });
+            }}, IDGenerator.nextStr(), userId)
+        );
     }
 
 

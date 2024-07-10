@@ -3,7 +3,7 @@
     ref="fullRef"
     :class="`${
       !isAdaptive ? 'h-full' : ''
-    } flex flex-col rounded-[var(--border-radius-small)] bg-[var(--color-fill-1)] p-[12px]`"
+    } flex flex-col rounded-[var(--border-radius-small)] border border-[var(--color-text-n8)] p-[12px]`"
   >
     <div v-if="showTitleLine" class="mb-[8px] flex items-center justify-between">
       <div class="flex flex-wrap gap-[4px]">
@@ -303,7 +303,12 @@
           ...props,
           language: props.language.toLowerCase(),
           theme: currentTheme.value,
+          lineNumbersMinChars: 3,
+          lineDecorationsWidth: 0,
+          tabSize: 2,
         });
+
+        editor.getModel()?.setEOL(monaco.editor.EndOfLineSequence.LF); // 设置换行符
 
         // 监听值的变化
         editor.onDidChangeModelContent(() => {

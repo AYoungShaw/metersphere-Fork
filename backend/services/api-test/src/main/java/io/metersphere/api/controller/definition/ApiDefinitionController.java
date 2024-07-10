@@ -1,21 +1,18 @@
 package io.metersphere.api.controller.definition;
 
-import com.fasterxml.jackson.databind.node.TextNode;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import io.metersphere.api.domain.ApiDefinition;
 import io.metersphere.api.dto.ReferenceDTO;
 import io.metersphere.api.dto.ReferenceRequest;
 import io.metersphere.api.dto.definition.*;
+import io.metersphere.api.dto.export.ApiExportResponse;
 import io.metersphere.api.dto.request.ApiEditPosRequest;
 import io.metersphere.api.dto.request.ApiTransferRequest;
 import io.metersphere.api.dto.request.ImportRequest;
+import io.metersphere.api.dto.schema.JsonSchemaItem;
 import io.metersphere.api.service.ApiFileResourceService;
-import io.metersphere.api.service.definition.ApiDefinitionImportUtilService;
-import io.metersphere.api.service.definition.ApiDefinitionLogService;
-import io.metersphere.api.service.definition.ApiDefinitionNoticeService;
-import io.metersphere.api.service.definition.ApiDefinitionService;
-import io.metersphere.api.utils.JsonSchemaBuilder;
+import io.metersphere.api.service.definition.*;
 import io.metersphere.project.service.FileModuleService;
 import io.metersphere.sdk.constants.DefaultRepositoryDir;
 import io.metersphere.sdk.constants.PermissionConstants;
@@ -60,7 +57,9 @@ public class ApiDefinitionController {
     @Resource
     private ApiFileResourceService apiFileResourceService;
     @Resource
-    private ApiDefinitionImportUtilService apiDefinitionImportUtilService;
+    private ApiDefinitionImportService apiDefinitionImportService;
+    @Resource
+    private ApiDefinitionExportService apiDefinitionExportService;
 
     @PostMapping(value = "/add")
     @Operation(summary = "接口测试-接口管理-添加接口定义")
@@ -224,7 +223,7 @@ public class ApiDefinitionController {
     @Operation(summary = "接口测试-接口管理-导入接口定义")
     public void testCaseImport(@RequestPart(value = "file", required = false) MultipartFile file, @RequestPart("request") ImportRequest request) {
         request.setUserId(SessionUtils.getUserId());
-        apiDefinitionImportUtilService.apiTestImport(file, request, SessionUtils.getCurrentProjectId());
+        apiDefinitionImportService.apiTestImport(file, request, SessionUtils.getCurrentProjectId());
     }
 
     @PostMapping("/operation-history")
@@ -282,8 +281,8 @@ public class ApiDefinitionController {
     @PostMapping("/preview")
     @Operation(summary = "接口测试-接口管理-接口-json-schema-预览")
     @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_READ)
-    public String preview(@RequestBody TextNode jsonSchema) {
-        return JsonSchemaBuilder.preview(jsonSchema.asText());
+    public String preview(@RequestBody JsonSchemaItem jsonSchemaItem) {
+        return apiDefinitionService.preview(jsonSchemaItem);
     }
 
     @PostMapping("/debug")
@@ -301,5 +300,11 @@ public class ApiDefinitionController {
         Page<Object> page = PageHelper.startPage(request.getCurrent(), request.getPageSize(),
                 StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "id desc");
         return PageUtils.setPageInfo(page, apiDefinitionService.getReference(request));
+    }
+
+    @PostMapping(value = "/export/{type}")
+    @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_EXPORT)
+    public ApiExportResponse export(@RequestBody ApiDefinitionBatchRequest request, @PathVariable String type) {
+        return apiDefinitionExportService.export(request, type, SessionUtils.getUserId());
     }
 }

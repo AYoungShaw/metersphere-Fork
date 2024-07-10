@@ -14,13 +14,7 @@
         <MsIcon type="icon-icon_full_screen_one" class="text-[var(--color-text-4)]" />
       </MsButton>
     </a-tooltip>
-    <a-button
-      type="outline"
-      :disabled="props.disabled"
-      class="px-[8px] py-[2px] text-[12px]"
-      size="small"
-      @click="save"
-    >
+    <a-button v-if="!props.disabled" type="outline" class="px-[8px] py-[2px] text-[12px]" size="small" @click="save">
       {{ t('minder.main.main.save') }}
     </a-button>
   </div>

@@ -4,7 +4,7 @@ SET SESSION innodb_lock_wait_timeout = 7200;
 -- 初始化组织
 INSERT INTO organization (id, num, name, description, create_user, update_user, create_time, update_time) VALUES ('100001', 100001, '默认组织', '系统默认创建的组织', 'admin', 'admin', unix_timestamp() * 1000, unix_timestamp() * 1000);
 -- 初始化项目
-INSERT INTO project (id, num, organization_id, name, description, create_user, update_user, create_time, update_time, module_setting) VALUES ('100001100001', 100001, (SELECT id FROM organization WHERE name LIKE '默认组织'), '默认项目', '系统默认创建的项目', 'admin', 'admin', unix_timestamp() * 1000, unix_timestamp() * 1000,'["bugManagement","caseManagement","apiTest","testPlan"]');
+INSERT INTO project (id, num, organization_id, name, description, create_user, update_user, create_time, update_time, module_setting) VALUES ('100001100001', 100001, (SELECT id FROM organization WHERE name LIKE '默认组织'), '示例项目', '系统默认创建的项目', 'admin', 'admin', unix_timestamp() * 1000, unix_timestamp() * 1000,'["bugManagement","caseManagement","apiTest","testPlan"]');
 
 -- 初始化用户
 insert into user(id, name, email, password, create_time, update_time, language, last_organization_id, phone, source, last_project_id, create_user, update_user,deleted)
@@ -280,10 +280,10 @@ INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((s
 
 -- 初始化组织缺陷严重程度
 INSERT INTO custom_field(id, name, scene, `type`, remark, internal, scope_type, create_time, update_time, create_user, scope_id) VALUES(UUID_SHORT(), 'bug_degree', 'BUG', 'SELECT', '', 1, 'ORGANIZATION', UNIX_TIMESTAMP() * 1000, UNIX_TIMESTAMP() * 1000, 'admin', '100001');
-INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree'), UUID_SHORT(), '提示', 1, 1);
-INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree'), UUID_SHORT(), '一般', 1, 2);
-INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree'), UUID_SHORT(), '严重', 1, 3);
-INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree'), UUID_SHORT(), '致命', 1, 4);
+INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree'), 'suggestive', '提示', 1, 1);
+INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree'), 'general', '一般', 1, 2);
+INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree'), 'severity', '严重', 1, 3);
+INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree'), 'deadly', '致命', 1, 4);
 
 -- 初始化组织功能用例默认模板, 缺陷默认模板
 INSERT INTO template (id,name,remark,internal,update_time,create_time,create_user,scope_type,scope_id,enable_third_part, scene) VALUES (UUID_SHORT(), 'functional_default', '', 1, UNIX_TIMESTAMP() * 1000, UNIX_TIMESTAMP() * 1000, 'admin', 'ORGANIZATION', '100001', 0, 'FUNCTIONAL');
@@ -294,7 +294,7 @@ INSERT INTO template_custom_field(id, field_id, template_id, required, pos, syst
 
 
 -- 初始化默认项目版本
-INSERT INTO project_version (id, project_id, name, description, status, latest, publish_time, start_time, end_time, create_time, create_user) VALUES (UUID_SHORT(), '100001100001', 'v1.0', NULL, 'open', 1, UNIX_TIMESTAMP() * 1000, UNIX_TIMESTAMP() * 1000, UNIX_TIMESTAMP() * 1000, UNIX_TIMESTAMP() * 1000, 'admin');
+INSERT INTO project_version (id, project_id, name, description, status, latest, publish_time, start_time, end_time, create_time, create_user) VALUES ('100000000000001', '100001100001', 'v1.0', NULL, 'open', 1, UNIX_TIMESTAMP() * 1000, UNIX_TIMESTAMP() * 1000, UNIX_TIMESTAMP() * 1000, UNIX_TIMESTAMP() * 1000, 'admin');
 
 -- 初始化项目功能用例字段
 INSERT INTO custom_field(id, name, scene, `type`, remark, internal, scope_type, create_time, update_time, create_user, scope_id, ref_id) VALUES(UUID_SHORT(), 'functional_priority', 'FUNCTIONAL', 'SELECT', '', 1, 'PROJECT', UNIX_TIMESTAMP() * 1000, UNIX_TIMESTAMP() * 1000, 'admin', '100001100001', (SELECT id FROM (SELECT * FROM custom_field) t where name = 'functional_priority'));
@@ -305,10 +305,10 @@ INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((s
 
 -- 初始化项目缺陷严重程度
 INSERT INTO custom_field(id, name, scene, `type`, remark, internal, scope_type, create_time, update_time, create_user, scope_id, ref_id) VALUES(UUID_SHORT(), 'bug_degree', 'BUG', 'SELECT', '', 1, 'PROJECT', UNIX_TIMESTAMP() * 1000, UNIX_TIMESTAMP() * 1000, 'admin', '100001100001', (SELECT id FROM (SELECT * FROM custom_field) t where name = 'bug_degree'));
-INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree' and scope_id = '100001100001'), UUID_SHORT(), '提示', 1, 1);
-INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree' and scope_id = '100001100001'), UUID_SHORT(), '一般', 1, 2);
-INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree' and scope_id = '100001100001'), UUID_SHORT(), '严重', 1, 3);
-INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree' and scope_id = '100001100001'), UUID_SHORT(), '致命', 1, 4);
+INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree' and scope_id = '100001100001'), 'suggestive', '提示', 1, 1);
+INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree' and scope_id = '100001100001'), 'general', '一般', 1, 2);
+INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree' and scope_id = '100001100001'), 'severity', '严重', 1, 3);
+INSERT INTO custom_field_option (field_id,value,`text`,internal, pos) VALUES ((select id from custom_field where name = 'bug_degree' and scope_id = '100001100001'), 'deadly', '致命', 1, 4);
 
 -- 初始化项目功能用例默认模板, 缺陷默认模板
 INSERT INTO template (id,name,remark,internal,update_time,create_time,create_user,scope_type,scope_id,enable_third_part, scene, ref_id) VALUES (UUID_SHORT(), 'functional_default', '', 1, UNIX_TIMESTAMP() * 1000, UNIX_TIMESTAMP() * 1000, 'admin', 'PROJECT', '100001100001', 0, 'FUNCTIONAL', (SELECT id FROM (SELECT * FROM template) t where name = 'functional_default'));
@@ -543,44 +543,6 @@ INSERT INTO message_task_blob(id, template) VALUES (@api_scenario_execute_failed
 SET @api_scenario_report_id = UUID_SHORT();
 Insert into message_task(id, event, receivers, project_robot_id, task_type, test_id, project_id, enable, create_user, create_time, update_user, update_time, use_default_template, use_default_subject, subject) VALUES (@api_scenario_report_id, 'DELETE', '["CREATE_USER"]', @robot_in_site_id, 'API_REPORT_TASK', 'NONE', '100001100001', true, 'admin', unix_timestamp() * 1000, 'admin',  unix_timestamp() * 1000, true, true, 'message.title.api_report_task_delete');
 INSERT INTO message_task_blob(id, template) VALUES (@api_scenario_report_id, 'message.api_report_task_delete');
-
--- 初始化UI消息数据
-SET @ui_update_id = UUID_SHORT();
-Insert into message_task(id, event, receivers, project_robot_id, task_type, test_id, project_id, enable, create_user, create_time, update_user, update_time, use_default_template, use_default_subject, subject) VALUES (@ui_update_id, 'UPDATE', '["CREATE_USER"]', @robot_in_site_id, 'UI_SCENARIO_TASK', 'NONE', '100001100001', true, 'admin', unix_timestamp() * 1000, 'admin',  unix_timestamp() * 1000, true, true, 'message.title.ui_scenario_task_update');
-INSERT INTO message_task_blob(id, template) VALUES (@ui_update_id, 'message.ui_scenario_task_update');
-
-SET @ui_delete_id = UUID_SHORT();
-Insert into message_task(id, event, receivers, project_robot_id, task_type, test_id, project_id, enable, create_user, create_time, update_user, update_time, use_default_template, use_default_subject, subject) VALUES (@ui_delete_id, 'DELETE', '["CREATE_USER"]', @robot_in_site_id, 'UI_SCENARIO_TASK', 'NONE', '100001100001', true, 'admin', unix_timestamp() * 1000, 'admin',  unix_timestamp() * 1000, true, true, 'message.title.ui_scenario_task_delete');
-INSERT INTO message_task_blob(id, template) VALUES (@ui_delete_id, 'message.ui_scenario_task_delete');
-
-SET @ui_execute_successful_id = UUID_SHORT();
-Insert into message_task(id, event, receivers, project_robot_id, task_type, test_id, project_id, enable, create_user, create_time, update_user, update_time, use_default_template, use_default_subject, subject) VALUES (@ui_execute_successful_id, 'EXECUTE_SUCCESSFUL', '["CREATE_USER"]', @robot_in_site_id, 'UI_SCENARIO_TASK', 'NONE', '100001100001', true, 'admin', unix_timestamp() * 1000, 'admin',  unix_timestamp() * 1000, true, true, 'message.title.ui_scenario_task_execute_successful');
-INSERT INTO message_task_blob(id, template) VALUES (@ui_execute_successful_id, 'message.ui_scenario_task_execute');
-
-SET @ui_execute_failed_id = UUID_SHORT();
-Insert into message_task(id, event, receivers, project_robot_id, task_type, test_id, project_id, enable, create_user, create_time, update_user, update_time, use_default_template, use_default_subject, subject) VALUES (@ui_execute_failed_id, 'EXECUTE_FAILED', '["CREATE_USER"]', @robot_in_site_id, 'UI_SCENARIO_TASK', 'NONE', '100001100001', true, 'admin', unix_timestamp() * 1000, 'admin',  unix_timestamp() * 1000, true, true, 'message.title.ui_scenario_task_execute_failed');
-INSERT INTO message_task_blob(id, template) VALUES (@ui_execute_failed_id, 'message.ui_scenario_task_execute');
-
-SET @ui_report_id = UUID_SHORT();
-Insert into message_task(id, event, receivers, project_robot_id, task_type, test_id, project_id, enable, create_user, create_time, update_user, update_time, use_default_template, use_default_subject, subject) VALUES (@ui_report_id, 'DELETE', '["CREATE_USER"]', @robot_in_site_id, 'UI_REPORT_TASK', 'NONE', '100001100001', true, 'admin', unix_timestamp() * 1000, 'admin',  unix_timestamp() * 1000, true, true, 'message.title.ui_report_task_delete');
-INSERT INTO message_task_blob(id, template) VALUES (@ui_report_id, 'message.ui_report_task_delete');
-
--- 初始化性能测试消息数据
-SET @load_create_id = UUID_SHORT();
-Insert into message_task(id, event, receivers, project_robot_id, task_type, test_id, project_id, enable, create_user, create_time, update_user, update_time, use_default_template, use_default_subject, subject) VALUES (@load_create_id, 'UPDATE', '["CREATE_USER"]', @robot_in_site_id, 'LOAD_TEST_TASK', 'NONE', '100001100001', true, 'admin', unix_timestamp() * 1000, 'admin',  unix_timestamp() * 1000, true, true, 'message.title.load_test_task_update');
-INSERT INTO message_task_blob(id, template) VALUES (@load_create_id, 'message.load_test_task_update');
-
-SET @load_delete_id = UUID_SHORT();
-Insert into message_task(id, event, receivers, project_robot_id, task_type, test_id, project_id, enable, create_user, create_time, update_user, update_time, use_default_template, use_default_subject, subject) VALUES (@load_delete_id, 'DELETE', '["CREATE_USER"]', @robot_in_site_id, 'LOAD_TEST_TASK', 'NONE', '100001100001', true, 'admin', unix_timestamp() * 1000, 'admin',  unix_timestamp() * 1000, true, true, 'message.title.load_test_task_delete');
-INSERT INTO message_task_blob(id, template) VALUES (@load_delete_id, 'message.load_test_task_delete');
-
-SET @load_execute_id = UUID_SHORT();
-Insert into message_task(id, event, receivers, project_robot_id, task_type, test_id, project_id, enable, create_user, create_time, update_user, update_time, use_default_template, use_default_subject, subject) VALUES (@load_execute_id, 'EXECUTE_COMPLETED', '["OPERATOR"]', @robot_in_site_id, 'LOAD_TEST_TASK', 'NONE', '100001100001', true, 'admin', unix_timestamp() * 1000, 'admin',  unix_timestamp() * 1000, true, true, 'message.title.load_test_task_execute_completed');
-INSERT INTO message_task_blob(id, template) VALUES (@load_execute_id, 'message.load_test_task_execute_completed');
-
-SET @load_report_id = UUID_SHORT();
-Insert into message_task(id, event, receivers, project_robot_id, task_type, test_id, project_id, enable, create_user, create_time, update_user, update_time, use_default_template, use_default_subject, subject) VALUES (@load_report_id, 'DELETE', '["CREATE_USER"]', @robot_in_site_id, 'LOAD_REPORT_TASK', 'NONE', '100001100001', true, 'admin', unix_timestamp() * 1000, 'admin',  unix_timestamp() * 1000, true, true, 'message.title.load_report_task_delete');
-INSERT INTO message_task_blob(id, template) VALUES (@load_report_id, 'message.load_report_task_delete');
 
 -- 初始化Jenkins消息数据
 SET @jenkins_execute_successful_id = UUID_SHORT();

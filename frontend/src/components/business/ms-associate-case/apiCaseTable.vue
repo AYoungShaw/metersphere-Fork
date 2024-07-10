@@ -8,10 +8,9 @@
       moreAction: [],
     }"
     v-on="propsEvent"
-    @filter-change="getModuleCount"
   >
     <template #num="{ record }">
-      <MsButton type="text">{{ record.num }}</MsButton>
+      <MsButton type="text" @click="toDetail(record)">{{ record.num }}</MsButton>
     </template>
     <template #lastReportStatus="{ record }">
       <ExecutionStatus
@@ -57,19 +56,23 @@
   import ExecuteResult from '@/components/business/ms-case-associate/executeResult.vue';
   import ExecutionStatus from '@/views/api-test/report/component/reportStatus.vue';
 
-  import { useI18n } from '@/hooks/useI18n';
+  import useOpenNewPage from '@/hooks/useOpenNewPage';
+  import useTableStore from '@/hooks/useTableStore';
   import { characterLimit } from '@/utils';
 
+  import { ApiCaseDetail } from '@/models/apiTest/management';
   import type { TableQueryParams } from '@/models/common';
   import { CasePageApiTypeEnum } from '@/enums/associateCaseEnum';
   import { CaseLinkEnum } from '@/enums/caseEnum';
   import { ReportEnum, ReportStatus } from '@/enums/reportEnum';
+  import { ApiTestRouteEnum } from '@/enums/routeEnum';
+  import { SpecialColumnEnum, TableKeyEnum } from '@/enums/tableEnum';
   import { FilterSlotNameEnum } from '@/enums/tableFilterEnum';
 
   import { getPublicLinkCaseListMap } from './utils/page';
   import { casePriorityOptions } from '@/views/api-test/components/config';
 
-  const { t } = useI18n();
+  const { openNewPage } = useOpenNewPage();
 
   const props = defineProps<{
     associationType: string; // 关联类型 项目 | 测试计划 | 用例评审
@@ -92,6 +95,8 @@
     (e: 'initModules'): void;
     (e: 'update:selectedIds'): void;
   }>();
+
+  const tableStore = useTableStore();
 
   const lastReportStatusListOptions = computed(() => {
     return Object.keys(ReportStatus).map((key) => {
@@ -152,6 +157,13 @@
       showDrag: true,
     },
     {
+      title: 'common.tag',
+      slotName: 'tags',
+      dataIndex: 'tags',
+      isTag: true,
+      width: 300,
+    },
+    {
       title: 'caseManagement.featureCase.tableColumnCreateUser',
       slotName: 'createName',
       dataIndex: 'createName',
@@ -169,6 +181,14 @@
       },
       width: 200,
       showDrag: true,
+    },
+    {
+      title: '',
+      dataIndex: 'action',
+      width: 24,
+      slotName: SpecialColumnEnum.ACTION,
+      fixed: 'right',
+      cellClass: 'operator-class',
     },
   ];
 
@@ -198,8 +218,10 @@
   } = useTable(
     getPageList.value,
     {
-      columns,
-      showSetting: false,
+      tableKey: TableKeyEnum.ASSOCIATE_CASE_API_CASE,
+      showSetting: true,
+      isSimpleSetting: true,
+      onlyPageSize: true,
       selectable: true,
       showSelectAll: true,
       heightUsed: 310,
@@ -227,26 +249,10 @@
       projectId: props.currentProject,
       moduleIds: props.activeModule === 'all' || !props.activeModule ? [] : [props.activeModule, ...props.offspringIds],
       excludeIds: [...excludeKeys],
-      condition: {
-        keyword: props.keyword,
-      },
+      filter: propsRes.value.filter,
       protocols: props.protocols,
       ...props.extraTableParams,
     };
-  }
-
-  async function getModuleCount() {
-    if (props.associatedIds && props.associatedIds.length) {
-      props.associatedIds.forEach((hasNotAssociatedId) => {
-        setTableSelected(hasNotAssociatedId);
-      });
-    }
-    const tableParams = await getTableParams();
-    emit('getModuleCount', {
-      ...tableParams,
-      current: propsRes.value.msPagination?.current,
-      pageSize: propsRes.value.msPagination?.pageSize,
-    });
   }
 
   async function loadCaseList() {
@@ -258,11 +264,6 @@
     const tableParams = await getTableParams();
     setLoadListParams(tableParams);
     loadList();
-    emit('getModuleCount', {
-      ...tableParams,
-      current: propsRes.value.msPagination?.current,
-      pageSize: propsRes.value.msPagination?.pageSize,
-    });
   }
 
   const tableRef = ref<InstanceType<typeof MsBaseTable>>();
@@ -323,10 +324,26 @@
     };
   }
 
+  // 去接口用例详情页面
+  function toDetail(record: ApiCaseDetail) {
+    openNewPage(ApiTestRouteEnum.API_TEST_MANAGEMENT, {
+      cId: record.id,
+      pId: record.projectId,
+    });
+  }
+
   defineExpose({
     getApiCaseSaveParams,
     loadCaseList,
   });
+
+  await tableStore.initColumn(TableKeyEnum.ASSOCIATE_CASE_API_CASE, columns, 'drawer');
 </script>
 
-<style scoped></style>
+<style lang="less" scoped>
+  :deep(.operator-class) {
+    .arco-table-cell-align-left {
+      padding: 0 8px !important;
+    }
+  }
+</style>

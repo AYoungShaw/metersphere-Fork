@@ -66,7 +66,11 @@
         >
           {{ t('common.execute') }}
         </MsButton>
-        <a-divider v-permission="['PROJECT_TEST_PLAN:READ+ASSOCIATION']" direction="vertical" :margin="8"></a-divider>
+        <a-divider
+          v-if="hasAllPermission(['PROJECT_TEST_PLAN:READ+EXECUTE', 'PROJECT_TEST_PLAN:READ+ASSOCIATION'])"
+          direction="vertical"
+          :margin="8"
+        ></a-divider>
         <MsPopconfirm
           :title="t('testPlan.featureCase.disassociateTip', { name: characterLimit(record.name) })"
           :sub-title-tip="t('testPlan.featureCase.disassociateTipContent')"
@@ -97,7 +101,7 @@
         {{ t('testPlan.testPlanIndex.batchExecution') }}
         <div class="text-[var(--color-text-4)]">
           {{
-            t('testPlan.testPlanIndex.selectedCount', {
+            t('common.selectedCount', {
               count: batchParams.currentSelectCount || tableSelected.length,
             })
           }}
@@ -164,7 +168,7 @@
   import useTableStore from '@/hooks/useTableStore';
   import useAppStore from '@/store/modules/app';
   import { characterLimit } from '@/utils';
-  import { hasAnyPermission } from '@/utils/permission';
+  import { hasAllPermission, hasAnyPermission } from '@/utils/permission';
 
   import { DragSortParams, ModuleTreeNode } from '@/models/common';
   import type {
@@ -183,6 +187,7 @@
   const props = defineProps<{
     modulesCount: Record<string, number>; // 模块数量统计对象
     moduleName: string;
+    moduleParentId: string;
     activeModule: string;
     offspringIds: string[];
     planId: string;
@@ -310,7 +315,7 @@
       slotName: 'operation',
       dataIndex: 'operation',
       fixed: 'right',
-      width: hasOperationPermission.value ? 200 : 50,
+      width: hasOperationPermission.value ? 150 : 50,
     },
   ]);
 
@@ -385,7 +390,6 @@
     const selectModules = await getModuleIds();
     const commonParams = {
       testPlanId: props.planId,
-      projectId: appStore.currentProjectId,
       ...(props.treeType === 'COLLECTION' ? { collectionId: collectionId.value } : { moduleIds: selectModules }),
     };
     if (isBatch) {
@@ -394,6 +398,7 @@
           keyword: keyword.value,
           filter: propsRes.value.filter,
         },
+        projectId: props.activeModule !== 'all' && props.treeType === 'MODULE' ? props.moduleParentId : '',
         ...commonParams,
       };
     }
@@ -421,7 +426,10 @@
 
   async function loadCaseList(refreshTreeCount = true) {
     const tableParams = await getTableParams(false);
-    setLoadListParams(tableParams);
+    setLoadListParams({
+      ...tableParams,
+      projectId: props.activeModule !== 'all' && props.treeType === 'MODULE' ? props.moduleParentId : '',
+    });
     loadList();
     if (refreshTreeCount) {
       emit('getModuleCount', {

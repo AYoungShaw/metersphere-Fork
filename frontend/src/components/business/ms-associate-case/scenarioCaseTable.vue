@@ -11,7 +11,7 @@
     @filter-change="getModuleCount"
   >
     <template #num="{ record }">
-      <MsButton type="text">{{ record.num }}</MsButton>
+      <MsButton type="text" @click="toDetail(record)">{{ record.num }}</MsButton>
     </template>
     <template #[FilterSlotNameEnum.CASE_MANAGEMENT_CASE_LEVEL]="{ filterContent }">
       <CaseLevel :case-level="filterContent.value" />
@@ -48,18 +48,24 @@
   import ExecutionStatus from '@/views/api-test/report/component/reportStatus.vue';
 
   import { useI18n } from '@/hooks/useI18n';
+  import useOpenNewPage from '@/hooks/useOpenNewPage';
+  import useTableStore from '@/hooks/useTableStore';
   import useAppStore from '@/store/modules/app';
 
+  import { ApiCaseDetail } from '@/models/apiTest/management';
   import type { TableQueryParams } from '@/models/common';
   import { CasePageApiTypeEnum } from '@/enums/associateCaseEnum';
   import { CaseLinkEnum } from '@/enums/caseEnum';
   import { ReportEnum, ReportStatus } from '@/enums/reportEnum';
+  import { ApiTestRouteEnum } from '@/enums/routeEnum';
+  import { SpecialColumnEnum, TableKeyEnum } from '@/enums/tableEnum';
   import { FilterRemoteMethodsEnum, FilterSlotNameEnum } from '@/enums/tableFilterEnum';
 
   import { getPublicLinkCaseListMap } from './utils/page';
   import { casePriorityOptions } from '@/views/api-test/components/config';
 
   const { t } = useI18n();
+  const { openNewPage } = useOpenNewPage();
 
   const props = defineProps<{
     associationType: string; // 关联类型 项目 | 测试计划 | 用例评审
@@ -81,6 +87,7 @@
   }>();
 
   const appStore = useAppStore();
+  const tableStore = useTableStore();
 
   const statusList = computed(() => {
     return Object.keys(ReportStatus).map((key) => {
@@ -149,16 +156,19 @@
       title: 'apiScenario.table.columns.passRate',
       dataIndex: 'requestPassRate',
       showDrag: true,
-      showInTable: false,
       width: 100,
+    },
+    {
+      title: 'apiScenario.table.columns.tags',
+      dataIndex: 'tags',
+      isTag: true,
+      isStringTag: true,
+      showDrag: true,
     },
     {
       title: 'apiScenario.table.columns.createUser',
       dataIndex: 'createUser',
       slotName: 'createUserName',
-      showInTable: false,
-      showTooltip: true,
-      showDrag: true,
       width: 109,
       filterConfig: {
         mode: 'remote',
@@ -170,33 +180,28 @@
       },
     },
     {
-      title: 'apiScenario.table.columns.tags',
-      dataIndex: 'tags',
-      isTag: true,
-      isStringTag: true,
-      showDrag: true,
+      title: '',
+      dataIndex: 'action',
+      width: 24,
+      slotName: SpecialColumnEnum.ACTION,
+      fixed: 'right',
+      cellClass: 'operator-class',
     },
   ];
   const getPageList = computed(() => {
     return getPublicLinkCaseListMap[props.getPageApiType][props.activeSourceType];
   });
-  const {
-    propsRes,
-    propsEvent,
-    loadList,
-    setLoadListParams,
-    resetSelector,
-    setPagination,
-    resetFilterParams,
-    setTableSelected,
-  } = useTable(getPageList.value, {
-    columns,
-    showSetting: false,
-    selectable: true,
-    showSelectAll: true,
-    heightUsed: 310,
-    showSelectorAll: false,
-  });
+  const { propsRes, propsEvent, loadList, setLoadListParams, resetSelector, resetFilterParams, setTableSelected } =
+    useTable(getPageList.value, {
+      tableKey: TableKeyEnum.ASSOCIATE_CASE_API_SCENARIO,
+      showSetting: true,
+      isSimpleSetting: true,
+      onlyPageSize: true,
+      selectable: true,
+      showSelectAll: true,
+      heightUsed: 310,
+      showSelectorAll: false,
+    });
 
   async function getTableParams() {
     const { excludeKeys } = propsRes.value;
@@ -205,10 +210,7 @@
       projectId: props.currentProject,
       moduleIds: props.activeModule === 'all' || !props.activeModule ? [] : [props.activeModule, ...props.offspringIds],
       excludeIds: [...excludeKeys],
-      condition: {
-        keyword: props.keyword,
-        filter: propsRes.value.filter,
-      },
+      filter: propsRes.value.filter,
       ...props.extraTableParams,
     };
   }
@@ -252,18 +254,6 @@
     }
   );
 
-  watch(
-    () => props.currentProject,
-    () => {
-      setPagination({
-        current: 1,
-      });
-      resetSelector();
-      resetFilterParams();
-      emit('refresh');
-    }
-  );
-
   function getScenarioSaveParams() {
     const { excludeKeys, selectedKeys, selectorStatus } = propsRes.value;
     const tableParams = getTableParams();
@@ -275,23 +265,35 @@
     };
   }
 
-  onMounted(() => {
+  // 去接口场景详情页面
+  function toDetail(record: ApiCaseDetail) {
+    openNewPage(ApiTestRouteEnum.API_TEST_SCENARIO, {
+      id: record.id,
+      pId: record.projectId,
+    });
+  }
+  watch([() => props.currentProject, () => props.activeModule], () => {
+    resetSelector();
+    resetFilterParams();
     loadScenarioList();
   });
 
-  watch(
-    () => props.activeModule,
-    () => {
-      resetSelector();
-      resetFilterParams();
-      loadScenarioList();
-    }
-  );
+  onMounted(() => {
+    loadScenarioList();
+  });
 
   defineExpose({
     getScenarioSaveParams,
     loadScenarioList,
   });
+
+  await tableStore.initColumn(TableKeyEnum.ASSOCIATE_CASE_API_SCENARIO, columns, 'drawer');
 </script>
 
-<style scoped></style>
+<style lang="less" scoped>
+  :deep(.operator-class) {
+    .arco-table-cell-align-left {
+      padding: 0 8px !important;
+    }
+  }
+</style>

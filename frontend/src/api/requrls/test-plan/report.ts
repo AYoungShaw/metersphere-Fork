@@ -56,4 +56,15 @@ export const ReportShareScenarioUrlGetDetail = '/test-plan/report/share/detail/s
 // 测试计划-报告明细-场景报告
 export const ReportScenarioUrl = '/test-plan/api/scenario/report/get';
 export const ReportDetailScenarioUrl = '/test-plan/api/scenario/report/get/detail';
-
+// 测试计划-报告-报告富文本预览压缩图
+export const ReportPlanPreviewImageUrl = '/test-plan/report/preview/md';
+// 测试计划-报告-详情-功能用例明细-执行历史步骤
+export const ReportFunctionalStepUrl = '/test-plan/report/detail/functional/case/step';
+// 测试计划-报告-详情-功能用例明细-执行历史步骤-分享
+export const ReportShareFunctionalStepUrl = '/test-plan/report/share/detail/functional/case/step';
+// 测试计划-报告-详情-手动生成报告
+export const ManualReportGenUrl = '/test-plan/report/manual-gen';
+// 测试计划-报告-详情-获取报告布局
+export const getReportLayoutUrl = '/test-plan/report/get-layout';
+// 测试计划-报告-详情-获取报告布局-分享
+export const getReportShareLayoutUrl = '/test-plan/report/share/get-layout';

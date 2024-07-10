@@ -2,7 +2,13 @@ import type { TableQueryParams } from '@/models/common';
 import { ColumnEditTypeEnum, SelectAllEnum, TableKeyEnum } from '@/enums/tableEnum';
 import { FilterRemoteMethodsEnum, FilterSlotNameEnum } from '@/enums/tableFilterEnum';
 
-import type { TableChangeExtra, TableColumnData, TableData, TableDraggable } from '@arco-design/web-vue';
+import type {
+  TableChangeExtra,
+  TableColumnData,
+  TableData,
+  TableDraggable,
+  TableRowSelection,
+} from '@arco-design/web-vue';
 
 export interface MsPaginationI {
   current: number;
@@ -26,6 +32,11 @@ export interface MsTableColumnFilterConfig {
   placeholderText?: string;
   firstLabelKey?: string;
   secondLabelKey?: string;
+}
+
+export interface MsTableRowSelectionDisabledConfig {
+  disabledChildren?: boolean;
+  parentKey?: string;
 }
 
 export interface MsTableColumnData extends TableColumnData {
@@ -96,6 +107,7 @@ export interface MsTableProps<T> {
   excludeKeys: Set<string>; // 排除的key
   selectorStatus: SelectAllEnum; // 选择器状态
   showSelectorAll?: boolean; // 是否显示跨页全选选择器
+  rowSelection?: TableRowSelection; // 行选择器
   /** end */
   loading?: boolean; // 加载效果
   bordered?: boolean; // 是否显示边框
@@ -112,8 +124,11 @@ export interface MsTableProps<T> {
   emptyDataShowLine?: boolean; // 空数据是否显示 "-"
   showJumpMethod?: boolean; // 是否展示跳转方法
   isSimpleSetting?: boolean; // 是否是简单的设置
+  onlyPageSize?: boolean; // 简单设置气泡下，是否只展示页码调整
   filterIconAlignLeft?: boolean; // 筛选图标是否靠左
   paginationSize?: 'small' | 'mini' | 'medium' | 'large';
+  // 行选择器禁用配置
+  rowSelectionDisabledConfig?: MsTableRowSelectionDisabledConfig;
   [key: string]: any;
 }
 

@@ -99,7 +99,7 @@ export function convertToFile(fileInfo: AssociatedList): MsFileItem {
     type: `application/${type}`,
   });
   Object.defineProperty(file, 'size', { value: fileInfo.size });
-  const { id, createUserName, createTime, local, isUpdateFlag, associateId } = fileInfo;
+  const { id, createUserName, createTime, local, isUpdateFlag, associationId } = fileInfo;
   return {
     enable: fileInfo.enable || false,
     file,
@@ -114,7 +114,7 @@ export function convertToFile(fileInfo: AssociatedList): MsFileItem {
     local: !!local,
     deleteContent: local ? '' : 'caseManagement.featureCase.cancelLink',
     isUpdateFlag,
-    associateId,
+    associationId,
   };
 }
 
@@ -234,7 +234,7 @@ export function initFormCreate(customFields: CustomAttributes[], permission: str
       currentDefaultValue = item.defaultValue;
       // 处理多选情况
     } else if (multipleType.includes(item.type)) {
-      const tempValue = JSON.parse(item.defaultValue);
+      const tempValue = typeof item.defaultValue === 'string' ? JSON.parse(item.defaultValue) : item.defaultValue;
       const optionsIds = optionsValue.map((e: any) => e.value);
       currentDefaultValue = (optionsIds || []).filter((e: any) => tempValue.includes(e));
     } else if (memberType.includes(item.type)) {
@@ -248,7 +248,7 @@ export function initFormCreate(customFields: CustomAttributes[], permission: str
         // @desc 如果默认原本的成员被系统移除则过滤掉该用户不展示
         const optionsIds = optionsValue.map((e: any) => e.value);
         if (item.type === 'MULTIPLE_MEMBER') {
-          const tempValue = JSON.parse(item.defaultValue);
+          const tempValue = typeof item.defaultValue === 'string' ? JSON.parse(item.defaultValue) : item.defaultValue;
           currentDefaultValue = (optionsIds || []).filter((e: any) => tempValue.includes(e));
         } else {
           currentDefaultValue = (optionsIds || []).find((e: any) => item.defaultValue === e) || '';

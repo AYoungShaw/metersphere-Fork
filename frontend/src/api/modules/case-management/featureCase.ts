@@ -102,6 +102,8 @@ import type { CommonList, ModuleTreeNode, MoveModules, TableQueryParams } from '
 import { ProjectListItem } from '@/models/setting/project';
 import { AssociateFunctionalCaseItem } from '@/models/testPlan/testPlan';
 
+import type { Result } from '#/axios';
+
 // 获取模块树
 export function getCaseModuleTree(params: TableQueryParams) {
   return MSR.get<ModuleTreeNode[]>({ url: `${GetCaseModuleTreeUrl}/${params.projectId}` });
@@ -154,7 +156,7 @@ export function followerCaseRequest(data: { userId: string; functionalCaseId: st
 }
 // 创建用例
 export function createCaseRequest(data: Record<string, any>) {
-  return MSR.uploadFile({ url: CreateCaseUrl }, { request: data.request, fileList: data.fileList }, '', true);
+  return MSR.uploadFile<Result>({ url: CreateCaseUrl }, { request: data.request, fileList: data.fileList }, '', true);
 }
 // 编辑用例
 export function updateCaseRequest(data: Record<string, any>) {
@@ -188,8 +190,8 @@ export function saveCaseMinder(data: FeatureCaseMinderUpdateParams) {
 }
 
 // 获取脑图
-export function getCaseMinder(data: { projectId: string; moduleId: string }) {
-  return MSR.post<MinderJsonNode[]>({ url: `${GetCaseMinderUrl}`, data });
+export function getCaseMinder(data: { projectId: string; moduleId: string; current: number }) {
+  return MSR.post<CommonList<MinderJsonNode>>({ url: `${GetCaseMinderUrl}`, data });
 }
 
 // 获取脑图模块树（包含文本节点）

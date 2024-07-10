@@ -41,7 +41,6 @@ export default {
   'testPlan.testPlanIndex.confirmBatchArchivePlan': '确认归档 {count} 个测试计划吗？',
   'testPlan.testPlanIndex.confirmBatchArchivePlanContent':
     '仅 已完成 测试计划可归档！\r\n 归档后，执行信息不再更新且不可编辑，数据不可恢复，请谨慎操作!',
-  'testPlan.testPlanIndex.selectedCount': '(已选 {count} 项数据)',
   'testPlan.testPlanIndex.createScheduledTask': '创建定时任务',
   'testPlan.testPlanIndex.updateScheduledTask': '更新定时任务',
   'testPlan.testPlanIndex.deleteScheduledTask': '删除定时任务',
@@ -65,9 +64,9 @@ export default {
   'testPlan.testPlanIndex.apiScenarioCase': '场景用例',
   'testPlan.testPlanIndex.scheduledTask': '定时任务停止并删除，',
   'testPlan.testPlanIndex.operateWithCaution': '请谨慎操作！',
-  'testPlan.testPlanIndex.deleteArchivedPlan': '计划 已归档，删除后数据不可恢复，',
-  'testPlan.testPlanIndex.deletePendingPlan': '计划 未执行，删除后数据不可恢复，',
-  'testPlan.testPlanIndex.deleteRunningPlan': '计划 进行中，删除后，终止执行且不可恢复，',
+  'testPlan.testPlanIndex.deleteArchivedPlan': ' 已归档，删除后数据不可恢复，',
+  'testPlan.testPlanIndex.deletePendingPlan': ' 未执行，删除后数据不可恢复，',
+  'testPlan.testPlanIndex.deleteRunningPlan': ' 进行中，删除后，终止执行且不可恢复，',
   'testPlan.testPlanIndex.deleteCompletedPlan':
     '建议计划 已完成 ，选择归档，用例信息及执行结果都将被保留；若继续删除，数据将不会恢复，',
   'testPlan.testPlanIndex.confirmArchivePlan': '归档后，执行信息不再更新且不可编辑，数据不可恢复，请谨慎操作！',
@@ -111,7 +110,7 @@ export default {
   'testPlan.featureCase.richTextDblclickPlaceholder': '双击可全屏输入',
   'testPlan.featureCase.autoNextTip1': '开启：提交结果后，跳转至下一条用例',
   'testPlan.featureCase.autoNextTip2': '关闭：提交结果后，还在当前',
-  'testPlan.api.testSetRequired': '测试集不能为空',
+  'testPlan.api.testSetRequired': '测试点不能为空',
   'testPlan.executeHistory.executionStartAndEndTime': '执行起止时间',
   'testPlan.executeHistory.testPlanHasTimedOut': '测试计划已超时',
   'testPlan.testPlanGroup.seeArchived': '只看已归档',
@@ -125,7 +124,7 @@ export default {
   'testPlan.testPlanGroup.planGroupArchiveContent':
     '归档后，计划执行信息不再更新且不可编辑，数据不可恢复，请谨慎操作！',
   'testPlan.testPlanGroup.planGroupDeleteContent':
-    '计划组 已完成 选择归档，用例信息及执行结果都将被保留；若继续删除，数据将不会恢复，请谨慎操作！',
+    ' 已完成 建议选择归档，用例信息及执行结果都将被保留；若继续删除，数据将不会恢复，',
   'testPlan.testPlanGroup.module': '模块',
   'testPlan.testPlanGroup.selectTestPlanGroupPlaceHolder': '请选择计划组',
   'testPlan.testPlanGroup.batchArchivedGroup': '确认归档：{count} 个测试计划组吗',
@@ -134,6 +133,8 @@ export default {
   'testPlan.testPlanGroup.enableScheduleTaskSuccess': '开启定时任务成功',
   'testPlan.testPlanGroup.closeScheduleTaskSuccess': '关闭定时任务成功',
   'testPlan.plan': '测试规划',
-  'testPlan.planTip': '1.创建测试集进行业务分类测试；2.选择测试集关联用例',
+  'testPlan.planTip': '1.创建测试点进行业务分类测试；2.选择测试点关联用例',
   'testPlan.planStartToEndTimeTip': '测试计划已超时',
+  'testPlan.planConfigReport': '自定义报告',
+  'testPlan.planAutomaticGeneration': '自动生成',
 };

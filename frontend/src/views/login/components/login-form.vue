@@ -77,7 +77,7 @@
         <tab-qr-code :tab-name="activeName === 'WE_COM' ? 'WE_COM' : orgOptions[0].value"></tab-qr-code>
       </div>
       <a-divider
-        v-if="isShowLDAP || isShowOIDC || isShowOAUTH || (isShowQRCode && orgOptions.length > 0)"
+        v-if="isShowLDAP || isShowOIDC || isShowOAUTH || isShowCAS || (isShowQRCode && orgOptions.length > 0)"
         orientation="center"
         type="dashed"
         class="m-0 mb-2"
@@ -98,14 +98,16 @@
         <div v-if="userInfo.authenticate !== 'LOCAL'" class="loginType" @click="switchLoginType('LOCAL')">
           <svg-icon width="18px" height="18px" name="userLogin"></svg-icon
         ></div>
-        <div v-if="isShowOIDC && userInfo.authenticate !== 'OIDC'" class="loginType">
+        <div v-if="isShowOIDC && userInfo.authenticate !== 'OIDC'" class="loginType" @click="redirectAuth('OIDC')">
           <span class="type-text text-[10px]">OIDC</span>
         </div>
-        <div v-if="isShowOAUTH && userInfo.authenticate !== 'OAuth2'" class="loginType">
+        <div v-if="isShowOAUTH && userInfo.authenticate !== 'OAUTH2'" class="loginType" @click="redirectAuth('OAUTH2')">
           <span class="type-text text-[7px]">OAUTH</span>
         </div>
+        <div v-if="isShowCAS && userInfo.authenticate !== 'CAS'" class="loginType" @click="redirectAuth('CAS')">
+          <span class="type-text text-[10px]">CAS</span>
+        </div>
       </div>
-
       <div v-if="props.isPreview" class="mask"></div>
     </div>
   </div>
@@ -120,10 +122,12 @@
   import TabQrCode from '@/views/login/components/tabQrCode.vue';
 
   import { getProjectInfo } from '@/api/modules/project-management/basicInfo';
+  import { getAuthDetailByType } from '@/api/modules/setting/config';
   import { getPlatformParamUrl } from '@/api/modules/user';
   import { GetLoginLogoUrl } from '@/api/requrls/setting/config';
   import { useI18n } from '@/hooks/useI18n';
   import useLoading from '@/hooks/useLoading';
+  import useModal from '@/hooks/useModal';
   import { NO_PROJECT_ROUTE_NAME, NO_RESOURCE_ROUTE_NAME } from '@/router/constants';
   import { useAppStore, useUserStore } from '@/store';
   import useLicenseStore from '@/store/modules/setting/license';
@@ -141,6 +145,8 @@
   const userStore = useUserStore();
   const appStore = useAppStore();
   const licenseStore = useLicenseStore();
+
+  const { openModal } = useModal();
 
   const orgOptions = ref<SelectOptionData[]>([]);
 
@@ -270,7 +276,10 @@
     return userStore.loginType.includes('OIDC');
   });
   const isShowOAUTH = computed(() => {
-    return userStore.loginType.includes('OAuth2');
+    return userStore.loginType.includes('OAUTH2');
+  });
+  const isShowCAS = computed(() => {
+    return userStore.loginType.includes('CAS');
   });
 
   const isShowQRCode = ref(true);
@@ -292,6 +301,62 @@
       // eslint-disable-next-line no-console
       console.log(error);
     }
+  }
+
+  function redirectAuth(authType: string) {
+    if (authType === 'LDAP' || authType === 'LOCAL') {
+      return;
+    }
+    getAuthDetailByType(authType).then((res) => {
+      if (!res) {
+        return;
+      }
+      if (!res.enable) {
+        Message.error(t('login.auth_not_enable'));
+        return;
+      }
+      const authId = res.id;
+      openModal({
+        type: 'info',
+        title: t('common.auth_redirect_tip'),
+        content: '',
+        okText: t('common.jump'),
+        cancelText: t('common.cancel'),
+        okButtonProps: {
+          status: 'normal',
+        },
+        mask: true,
+        maskStyle: { color: '#323233' },
+        onBeforeOk: async () => {
+          const config = JSON.parse(res.configuration);
+          // eslint-disable-next-line no-eval
+          const redirectUrl = eval(`\`${config.redirectUrl}\``);
+          let url;
+          if (authType === 'CAS') {
+            url = `${config.loginUrl}?service=${encodeURIComponent(redirectUrl)}`;
+          }
+          if (authType === 'OIDC') {
+            url = `${config.authUrl}?client_id=${config.clientId}&redirect_uri=${redirectUrl}&response_type=code&scope=openid+profile+email&state=${authId}`;
+            // 保存一个登录地址，禁用本地登录
+            if (config.loginUrl) {
+              localStorage.setItem('oidcLoginUrl', config.loginUrl);
+            }
+          }
+          if (authType === 'OAUTH2') {
+            url =
+              `${config.authUrl}?client_id=${config.clientId}&response_type=code` +
+              `&redirect_uri=${redirectUrl}&state=${authId}`;
+            if (config.scope) {
+              url += `&scope=${config.scope}`;
+            }
+          }
+          if (url) {
+            window.location.href = url;
+          }
+        },
+        hideCancel: false,
+      });
+    });
   }
 
   onMounted(() => {

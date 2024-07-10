@@ -19,7 +19,7 @@
           {{ t('system.user.emailInvite') }}
         </a-button>
         <a-button
-          v-permission="['SYSTEM_USER:READ+IMPORT', 'SYSTEM_USER_ROLE:READ']"
+          v-permission.all="['SYSTEM_USER:READ+IMPORT', 'SYSTEM_USER_ROLE:READ']"
           class="mr-3"
           type="outline"
           @click="showImportModal"
@@ -309,8 +309,8 @@
   import MsBatchForm from '@/components/business/ms-batch-form/index.vue';
   import type { FormItemModel } from '@/components/business/ms-batch-form/types';
   import MsSelect from '@/components/business/ms-select';
+  import inviteModal from '../components/inviteModal.vue';
   import batchModal from './components/batchModal.vue';
-  import inviteModal from './components/inviteModal.vue';
 
   import {
     batchCreateUser,
@@ -367,6 +367,7 @@
       title: 'system.user.tableColumnPhone',
       dataIndex: 'phone',
       showDrag: true,
+      width: 140,
     },
     {
       title: 'system.user.tableColumnOrg',
@@ -834,14 +835,14 @@
   const batchFormRef = ref<InstanceType<typeof MsBatchForm>>();
   const batchFormModels: Ref<FormItemModel[]> = ref([
     {
-      filed: 'name',
+      field: 'name',
       type: 'input',
       label: 'system.user.createUserName',
       rules: [{ required: true, message: t('system.user.createUserNameNotNull') }, { validator: checkUerName }],
       placeholder: 'system.user.createUserNamePlaceholder',
     },
     {
-      filed: 'email',
+      field: 'email',
       type: 'input',
       label: 'system.user.createUserEmail',
       rules: [
@@ -852,7 +853,7 @@
       placeholder: 'system.user.createUserEmailPlaceholder',
     },
     {
-      filed: 'phone',
+      field: 'phone',
       type: 'input',
       label: 'system.user.createUserPhone',
       rules: [{ validator: checkUerPhone }],

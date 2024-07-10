@@ -63,7 +63,6 @@
         <!-- 系统内置的字段 {处理人, 状态...} -->
         <DefectTemplateRightSystemField v-if="route.query.type === 'BUG'" />
         <CaseTemplateRightSystemField v-else />
-
         <!-- 自定义字段开始 -->
         <VueDraggable v-model="selectData" handle=".form" ghost-class="ghost" @change="changeDrag">
           <div v-for="(formItem, index) of selectData" :key="formItem.id" class="customWrapper">
@@ -71,10 +70,12 @@
               <span class="required">
                 <a-checkbox
                   v-model="formItem.required"
+                  :disabled="formItem.internal && formItem.internalFieldKey === 'functional_priority'"
                   class="mr-1"
                   @change="(value) => changeState(value, formItem as DefinedFieldItem)"
-                  >{{ t('system.orgTemplate.required') }}</a-checkbox
                 >
+                  {{ t('system.orgTemplate.required') }}
+                </a-checkbox>
               </span>
               <div class="actionList">
                 <a-tooltip :content="t('system.orgTemplate.toTop')">
@@ -126,11 +127,29 @@
               }"
               @click="activeHandler(index)"
             >
+              <div class="mb-[8px] flex w-full items-center">
+                <a-tooltip
+                  :content="formItem.formRules && formItem.formRules[0] ? formItem?.formRules[0]?.title : ''"
+                  position="left"
+                >
+                  <div class="one-line-text max-w-[calc(100%-200px)]">{{
+                    formItem.formRules && formItem.formRules[0] ? formItem?.formRules[0]?.title : ''
+                  }}</div>
+                </a-tooltip>
+                <div v-if="formItem.required" class="ml-[2px] flex items-center">
+                  <svg-icon
+                    width="6px"
+                    height="18px"
+                    name="form-star"
+                    class="-mt-[2px] text-[12px] font-medium text-[rgb(var(--danger-6))]"
+                /></div>
+              </div>
               <!-- 表单 -->
               <MsFormCreate
                 v-model:api="formItem.fApi"
                 v-model:rule="formItem.formRules"
                 :option="configOptions"
+                is-in-for
                 @click="activeHandler(index)"
               />
               <a-form
@@ -421,24 +440,8 @@
   // 保存
   function saveHandler(isContinue = false) {
     isContinueFlag.value = isContinue;
-    formRef.value?.validate().then((res) => {
+    formRef.value?.validate().then(async (res) => {
       if (!res) {
-        // const allThirdApi = selectData.value.filter(
-        //   (item: any) =>
-        //     item.formRules[0].value || (Array.isArray(item.formRules[0].value) && item.formRules[0].value.length)
-        // );
-
-        // const allThirdApiIds = allThirdApi.map((item) => item.fieldId);
-        // const allValidatePromises = Object.keys(refStepMap).map((key) => {
-        //   return refStepMap[key].validate();
-        // });
-
-        // Promise.all(allValidatePromises).then((results) => {
-        //   const allValid = results.every((result) => !result);
-        //   if (allValid) {
-        //     return save();
-        //   }
-        // });
         return save();
       }
       return scrollIntoView(document.querySelector('.arco-form-item-message'), { block: 'center' });
@@ -448,7 +451,9 @@
   // 处理表单数据格式
   const getFieldOptionList = () => {
     totalTemplateField.value = getTotalFieldOptionList(totalTemplateField.value as DefinedFieldItem[]);
-    selectData.value = totalTemplateField.value.filter((item) => item.internal);
+    if (!isEdit.value) {
+      selectData.value = totalTemplateField.value.filter((item) => item.internal);
+    }
   };
 
   // 获取字段列表数据
@@ -475,7 +480,6 @@
       title.value = t('system.orgTemplate.createTemplateType', {
         type: getTemplateName('organization', route.query.type as string),
       });
-      // templateForm.value.name = title.value;
     }
   });
 
@@ -543,9 +547,6 @@
 
   function changeState(value: boolean | (string | number | boolean)[], formItem: DefinedFieldItem) {
     formItem.required = !!value;
-    if (formItem.formRules) {
-      formItem.formRules[0].effect.required = value;
-    }
   }
 
   const systemFieldData = ref<CustomField[]>([]);
@@ -582,7 +583,6 @@
       } else {
         initValue = item.defaultValue;
       }
-
       return {
         ...item,
         id: item.fieldId,
@@ -592,7 +592,7 @@
             title: item.fieldName,
             field: item.fieldId,
             effect: {
-              required: item.required,
+              required: false,
             },
             value: initValue,
             props: {
@@ -707,6 +707,8 @@
       'asterisk-position': 'end',
       'validate-trigger': ['change'],
       'row-class': 'selfClass',
+      'hide-asterisk': true,
+      'hide-label': true,
     },
   });
 </script>
@@ -784,30 +786,6 @@
   :deep(.selfClass) {
     margin-bottom: 0;
   }
-
-  // :deep(.contentClass > .arco-input-wrapper) {
-  // border-color: transparent;
-  // &:hover {
-  //   border-color: var(--color-text-input-border);
-  // }
-  // &:hover > .arco-input {
-  //   font-weight: normal;
-  //   text-decoration: none;
-  //   color: var(--color-text-1);
-  // }
-  // & > .arco-input {
-  //   font-weight: 500;
-  //   text-decoration: underline;
-  //   color: var(--color-text-1);
-  // }
-  // }
-  // :deep(.contentClass > .arco-input-focus) {
-  //   border-color: rgb(var(--primary-5));
-  //   & > .arco-input {
-  //     font-weight: normal;
-  //     text-decoration: none;
-  //   }
-  // }
   .ghost {
     border: 1px solid rgba(var(--primary-5));
     background-color: var(--color-text-n9);

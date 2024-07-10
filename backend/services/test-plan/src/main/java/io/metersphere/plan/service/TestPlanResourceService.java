@@ -2,21 +2,24 @@ package io.metersphere.plan.service;
 
 import io.metersphere.plan.domain.TestPlan;
 import io.metersphere.plan.domain.TestPlanCollectionExample;
-import io.metersphere.plan.dto.ResourceLogInsertModule;
+import io.metersphere.plan.dto.ModuleSelectDTO;
 import io.metersphere.plan.dto.TestPlanCollectionDTO;
 import io.metersphere.plan.dto.TestPlanResourceAssociationParam;
+import io.metersphere.plan.dto.TestPlanResourceExecResultDTO;
 import io.metersphere.plan.dto.request.BaseCollectionAssociateRequest;
 import io.metersphere.plan.dto.request.BasePlanCaseBatchRequest;
 import io.metersphere.plan.dto.response.TestPlanAssociationResponse;
 import io.metersphere.plan.mapper.TestPlanCollectionMapper;
 import io.metersphere.plan.mapper.TestPlanMapper;
 import io.metersphere.sdk.constants.ModuleConstants;
+import io.metersphere.sdk.dto.AssociateCaseDTO;
 import io.metersphere.sdk.exception.MSException;
 import io.metersphere.sdk.util.Translator;
 import io.metersphere.system.dto.LogInsertModule;
 import io.metersphere.system.dto.sdk.SessionUser;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
@@ -57,13 +60,13 @@ public abstract class TestPlanResourceService extends TestPlanSortService {
             TestPlanResourceAssociationParam associationParam = new TestPlanResourceAssociationParam(associationIdList, testPlan.getProjectId(), testPlan.getId(), testPlan.getNum(), logInsertModule.getOperator());
             disassociate.accept(associationParam);
             response.setAssociationCount(associationIdList.size());
-            testPlanResourceLogService.saveDisassociateLog(testPlan, new ResourceLogInsertModule(resourceType, logInsertModule));
         }
         return response;
     }
 
     public abstract long copyResource(String originalTestPlanId, String newTestPlanId, Map<String, String> oldCollectionIdToNewCollectionId, String operator, long operatorTime);
 
+    public abstract List<TestPlanResourceExecResultDTO> selectDistinctExecResult(String projectId);
     /**
      * 关联用例
      *
@@ -94,5 +97,33 @@ public abstract class TestPlanResourceService extends TestPlanSortService {
         if (testPlanCollectionMapper.countByExample(collectionExample) == 0) {
             throw new MSException(Translator.get("test_plan.collection_not_exist"));
         }
+    }
+
+
+    /**
+     * 获取关联时的相关id数据
+     *
+     * @param moduleMaps
+     * @return
+     */
+    protected AssociateCaseDTO getCaseIds(List<Map<String, ModuleSelectDTO>> moduleMaps) {
+        // 排除的ids
+        List<String> excludeIds = moduleMaps.stream()
+                .flatMap(map -> map.values().stream())
+                .flatMap(moduleSelectDTO -> moduleSelectDTO.getExcludeIds().stream())
+                .toList();
+        // 选中的ids
+        List<String> selectIds = moduleMaps.stream()
+                .flatMap(map -> map.values().stream())
+                .flatMap(moduleSelectDTO -> moduleSelectDTO.getSelectIds().stream())
+                .toList();
+        // 全选的模块
+        List<String> moduleIds = moduleMaps.stream()
+                .flatMap(map -> map.entrySet().stream())
+                .filter(entry -> BooleanUtils.isTrue(entry.getValue().isSelectAll()) && org.apache.commons.collections.CollectionUtils.isEmpty(entry.getValue().getSelectIds()))
+                .map(Map.Entry::getKey)
+                .toList();
+        AssociateCaseDTO associateCaseDTO = new AssociateCaseDTO(excludeIds, selectIds, moduleIds);
+        return associateCaseDTO;
     }
 }

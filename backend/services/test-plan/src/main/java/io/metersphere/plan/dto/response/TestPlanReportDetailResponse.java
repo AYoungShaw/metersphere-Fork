@@ -16,6 +16,8 @@ public class TestPlanReportDetailResponse {
     private String id;
     @Schema(description = "报告名称")
     private String name;
+    @Schema(description = "计划名称")
+    private String testPlanName;
     @Schema(description = "报告创建时间")
     private Long createTime;
     @Schema(description = "报告开始(执行)时间")
@@ -77,4 +79,10 @@ public class TestPlanReportDetailResponse {
     private boolean deleted;
     @Schema(description = "报告状态")
     private String resultStatus;
+
+    /**
+     * 报告布局
+     */
+    @Schema(description = "报告是否默认布局")
+    private Boolean defaultLayout;
 }

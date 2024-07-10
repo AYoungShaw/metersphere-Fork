@@ -201,10 +201,11 @@
                   height: 200,
                 },
               }"
+              :filter-tree-node="filterTreeNode"
             >
               <template #tree-slot-title="node">
                 <a-tooltip :content="`${node.name}`" position="tl">
-                  <div class="one-line-text w-[300px] text-[var(--color-text-1)]">{{ node.name }}</div>
+                  <div class="one-line-text w-[300px]">{{ node.name }}</div>
                 </a-tooltip>
               </template>
             </a-tree-select>
@@ -287,7 +288,7 @@
   import useAppStore from '@/store/modules/app';
   import useFeatureCaseStore from '@/store/modules/case/featureCase';
   import useUserStore from '@/store/modules/user';
-  import { downloadByteFile, getGenerateId } from '@/utils';
+  import { downloadByteFile, filterTreeNode, getGenerateId } from '@/utils';
 
   import type {
     AssociatedList,
@@ -295,7 +296,7 @@
     CreateOrUpdateCase,
     CustomAttributes,
     DetailCase,
-    OptionsFieldId,
+    OptionsField,
     StepList,
   } from '@/models/caseManagement/featureCase';
   import type { ModuleTreeNode, TableQueryParams } from '@/models/common';
@@ -331,7 +332,7 @@
   ]);
 
   const featureCaseStore = useFeatureCaseStore();
-  const modelId = computed(() => featureCaseStore.moduleId[0]);
+  const modelId = computed(() => featureCaseStore.moduleId[0] || 'root');
 
   const initForm: DetailCase = {
     id: '',
@@ -404,7 +405,7 @@
       const result = customFields.map((item: any) => {
         const memberType = ['MEMBER', 'MULTIPLE_MEMBER'];
         let initValue = item.defaultValue;
-        const optionsValue: OptionsFieldId[] = item.options;
+        const optionsValue: OptionsField[] = item.options;
         if (memberType.includes(item.type)) {
           if (item.defaultValue === 'CREATE_USER' || item.defaultValue.includes('CREATE_USER')) {
             initValue = item.type === 'MEMBER' ? userStore.id : [userStore.id];

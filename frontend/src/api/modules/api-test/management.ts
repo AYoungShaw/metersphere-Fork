@@ -1,3 +1,5 @@
+import type { JsonSchema } from '@/components/pure/ms-json-schema/types';
+
 import MSR from '@/api/http/index';
 import {
   AddCaseUrl,
@@ -19,6 +21,7 @@ import {
   BatchUpdateDefinitionUrl,
   CasePageUrl,
   CheckDefinitionScheduleUrl,
+  ConvertJsonSchemaToJsonUrl,
   CopyMockUrl,
   DebugCaseUrl,
   DebugDefinitionUrl,
@@ -33,6 +36,7 @@ import {
   DeleteRecycleApiUrl,
   DeleteRecycleCaseUrl,
   ExecuteCaseUrl,
+  ExportDefinitionUrl,
   GetCaseDetailUrl,
   GetCaseReportByIdUrl,
   GetCaseReportDetailUrl,
@@ -98,6 +102,7 @@ import {
   ApiCasePageParams,
   ApiDefinitionBatchDeleteParams,
   ApiDefinitionBatchMoveParams,
+  ApiDefinitionBatchParams,
   ApiDefinitionBatchUpdateParams,
   ApiDefinitionCreateParams,
   ApiDefinitionDeleteParams,
@@ -115,7 +120,6 @@ import {
   DefinitionHistoryItem,
   DefinitionHistoryPageParams,
   DefinitionReferencePageParams,
-  Environment,
   EnvModule,
   ImportApiDefinitionParams,
   mockParams,
@@ -297,6 +301,11 @@ export function recoverOperationHistory(data: RecoverDefinitionParams) {
 // 接口定义-引用关系
 export function getDefinitionReference(data: DefinitionReferencePageParams) {
   return MSR.post({ url: DefinitionReferenceUrl, data });
+}
+
+// 将json-schema转换为 json 数据
+export function convertJsonSchemaToJson(data: JsonSchema) {
+  return MSR.post({ url: ConvertJsonSchemaToJsonUrl, data });
 }
 
 /**
@@ -548,4 +557,9 @@ export function getReportById(id: string) {
 
 export function getCaseReportDetail(reportId: string, stepId: string) {
   return MSR.get<ApiCaseReportDetail[]>({ url: `${GetCaseReportDetailUrl + reportId}/${stepId}` });
+}
+
+// 导出定义
+export function exportApiDefinition(data: ApiDefinitionBatchParams, type: string) {
+  return MSR.post({ url: `${ExportDefinitionUrl}/${type}`, data });
 }

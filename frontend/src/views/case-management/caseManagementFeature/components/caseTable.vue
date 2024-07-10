@@ -63,7 +63,9 @@
             @change="() => handleStatusChange(record)"
           >
             <template #label>
-              <span class="text-[var(--color-text-2)]"> <caseLevel :case-level="record.caseLevel" /></span>
+              <span class="text-[var(--color-text-2)]">
+                <caseLevel :case-level="record.caseLevel" />
+              </span>
             </template>
             <a-option v-for="item of caseLevelList" :key="item.value" :value="item.value">
               <caseLevel :case-level="item.text" />
@@ -104,6 +106,7 @@
               key: 'id',
               children: 'children',
             }"
+            :filter-tree-node="filterTreeNode"
             :tree-props="{
               virtualListProps: {
                 height: 200,
@@ -114,7 +117,7 @@
           >
             <template #tree-slot-title="node">
               <a-tooltip :content="`${node.name}`" position="tl">
-                <div class="one-line-text max-w-[200px] text-[var(--color-text-1)]">{{ node.name }}</div>
+                <div class="one-line-text max-w-[200px]">{{ node.name }}</div>
               </a-tooltip>
             </template>
           </a-tree-select>
@@ -312,7 +315,7 @@
 <script setup lang="ts">
   import { ref } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
-  import { Message, TableChangeExtra, TableData, TreeNodeData } from '@arco-design/web-vue';
+  import { Message, TableChangeExtra, TableData } from '@arco-design/web-vue';
   import { cloneDeep } from 'lodash-es';
 
   import { CustomTypeMaps, MsAdvanceFilter } from '@/components/pure/ms-advance-filter';
@@ -322,6 +325,7 @@
   import MsIcon from '@/components/pure/ms-icon-font/index.vue';
   import MsBaseTable from '@/components/pure/ms-table/base-table.vue';
   import type { BatchActionParams, BatchActionQueryParams, MsTableColumn } from '@/components/pure/ms-table/type';
+  import { MsTableProps } from '@/components/pure/ms-table/type';
   import useTable from '@/components/pure/ms-table/useTable';
   import MsTableMoreAction from '@/components/pure/ms-table-more-action/index.vue';
   import { ActionsItem } from '@/components/pure/ms-table-more-action/types';
@@ -355,7 +359,7 @@
   import { useAppStore, useTableStore } from '@/store';
   import useFeatureCaseStore from '@/store/modules/case/featureCase';
   import useMinderStore from '@/store/modules/components/minder-editor';
-  import { characterLimit, findNodeByKey, findNodePathByKey, mapTree } from '@/utils';
+  import { characterLimit, filterTreeNode, findNodeByKey, findNodePathByKey, mapTree } from '@/utils';
   import { hasAnyPermission } from '@/utils/permission';
 
   import type {
@@ -462,20 +466,19 @@
 
   const firstStaticColumn: MsTableColumn = [
     {
-      'title': 'caseManagement.featureCase.tableColumnID',
-      'slotName': 'num',
+      'title': 'ID',
       'dataIndex': 'num',
-      'width': 130,
-      'showInTable': true,
+      'slotName': 'num',
+      'sortIndex': 1,
       'sortable': {
         sortDirections: ['ascend', 'descend'],
         sorter: true,
       },
-      'filter-icon-align-left': true,
+      'fixed': 'left',
+      'width': 150,
       'showTooltip': true,
-      'ellipsis': true,
-      'showDrag': false,
       'columnSelectorDisabled': true,
+      'filter-icon-align-left': true,
     },
     {
       title: 'caseManagement.featureCase.tableColumnName',
@@ -830,17 +833,20 @@
   }
   const initDefaultFields = ref<CustomAttributes[]>([]);
 
+  const tableProps = ref<Partial<MsTableProps<CaseManagementTable>>>({
+    tableKey: TableKeyEnum.CASE_MANAGEMENT_TABLE,
+    selectable: true,
+    showSetting: true,
+    heightUsed: 236,
+    draggable: { type: 'handle' },
+    showSubdirectory: true,
+    paginationSize: 'mini',
+    draggableCondition: true,
+  });
+
   const { propsRes, propsEvent, loadList, setLoadListParams, resetSelector, setKeyword, setAdvanceFilter } = useTable(
     getCaseList,
-    {
-      tableKey: TableKeyEnum.CASE_MANAGEMENT_TABLE,
-      selectable: true,
-      showSetting: true,
-      heightUsed: 236,
-      enableDrag: true,
-      showSubdirectory: true,
-      paginationSize: 'mini',
-    },
+    tableProps.value,
     (record) => {
       return {
         ...record,
@@ -856,6 +862,18 @@
       };
     },
     updateCaseName
+  );
+
+  const hasUpdatePermission = computed(() => hasAnyPermission(['FUNCTIONAL_CASE:READ+UPDATE']));
+
+  watch(
+    () => hasUpdatePermission.value,
+    (val) => {
+      tableProps.value.draggableCondition = val;
+    },
+    {
+      immediate: true,
+    }
   );
 
   const batchParams = ref<BatchActionQueryParams>({
@@ -875,11 +893,11 @@
 
   async function initTableParams() {
     let moduleIds: string[] = [];
-    if (props.activeFolder && props.activeFolder !== 'all') {
-      moduleIds = [props.activeFolder];
+    if (props.activeFolder) {
+      const activeModuleIds = props.activeFolder === 'all' ? [] : [props.activeFolder];
       const getAllChildren = await tableStore.getSubShow(TableKeyEnum.CASE_MANAGEMENT_TABLE);
       if (getAllChildren) {
-        moduleIds = [props.activeFolder, ...props.offspringIds];
+        moduleIds = [...activeModuleIds, ...props.offspringIds];
       }
     }
 
@@ -916,10 +934,6 @@
 
   function handleTableSelect(selectArr: (string | number)[]) {
     tableSelected.value = selectArr;
-  }
-
-  function filterTreeNode(searchValue: string, nodeValue: TreeNodeData) {
-    return (nodeValue as ModuleTreeNode).name.toLowerCase().indexOf(searchValue.toLowerCase()) > -1;
   }
 
   const caseLevelFields = ref<Record<string, any>>({});
@@ -1045,8 +1059,8 @@
       }
       isMove.value = false;
       emitTableParams();
-      loadList();
       resetSelector();
+      loadList();
     } catch (error) {
       console.log(error);
     } finally {

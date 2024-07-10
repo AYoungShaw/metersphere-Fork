@@ -212,7 +212,7 @@ public class ProjectTemplateService extends BaseTemplateService {
                 .andScopeIdEqualTo(projectId)
                 .andSceneEqualTo(scene)
                 .andInternalEqualTo(true);
-        return templateMapper.selectByExample(example).get(0);
+        return templateMapper.selectByExample(example).getFirst();
     }
 
     /**
@@ -424,6 +424,7 @@ public class ProjectTemplateService extends BaseTemplateService {
                 CustomFieldOptions optionDTO = new CustomFieldOptions();
                 optionDTO.setId(customField.getId());
                 if (customField.getInternal()) {
+                    optionDTO.setInternalFieldKey(customField.getName());
                     optionDTO.setName(baseCustomFieldService.translateInternalField(customField.getName()));
                 } else {
                     optionDTO.setName(customField.getName());

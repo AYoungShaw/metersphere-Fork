@@ -2,7 +2,7 @@
   <MsDetailDrawer
     ref="detailDrawerRef"
     v-model:visible="showDrawerVisible"
-    :width="850"
+    :width="860"
     :footer="false"
     :mask="false"
     :title="t('caseManagement.featureCase.caseDetailTitle', { id: detailInfo?.num, name: detailInfo?.name })"
@@ -88,24 +88,27 @@
       </div>
     </template>
     <template #default="{ detail, loading }">
-      <div
-        ref="wrapperRef"
-        :class="[`${!commentInputIsActive ? 'h-[calc(100%-72px)]' : 'h-[calc(100%-286px)]'}`, 'bg-white']"
-      >
-        <div class="header relative h-[48px] pl-2">
-          <MsTab
-            v-model:active-key="activeTab"
-            :content-tab-list="tabSetting"
-            :get-text-func="getTotal"
-            class="no-content relative border-b"
-            @change="clickMenu"
-          />
+      <div ref="wrapperRef" class="bg-white">
+        <div class="header relative h-[48px] border-b pl-2">
+          <div class="max-w-[calc(100%-72px)]"
+            ><MsTab
+              v-model:active-key="activeTab"
+              :content-tab-list="tabSetting"
+              :get-text-func="getTotal"
+              class="no-content relative"
+              @change="clickMenu"
+          /></div>
+
           <span class="display-setting h-full text-[var(--color-text-2)]" @click="showMenuSetting">{{
             t('caseManagement.featureCase.detailDisplaySetting')
           }}</span>
         </div>
-        <div class="leftWrapper h-full">
-          <div class="w-full p-[16px] pt-4">
+        <div>
+          <div
+            :class="`${
+              !commentInputIsActive ? 'h-[calc(100vh-174px)]' : 'h-[calc(100vh-378px)]'
+            } content-wrapper w-full p-[16px] pt-4`"
+          >
             <template v-if="activeTab === 'detail'">
               <TabDetail :form="detailInfo" :allow-edit="true" :form-rules="formItem" @update-success="updateSuccess" />
             </template>
@@ -139,7 +142,6 @@
           </div>
         </div>
         <inputComment
-          v-if="activeTab !== 'detail'"
           ref="commentInputRef"
           v-model:content="content"
           v-model:notice-user-ids="noticeUserIds"
@@ -601,6 +603,10 @@
       padding: 0 16px;
       border-bottom: 1px solid var(--color-text-n8);
     }
+  }
+  .content-wrapper {
+    @apply overflow-y-auto overflow-x-hidden;
+    .ms-scroll-bar();
   }
   .rightButtons {
     :deep(.ms-button--secondary):hover,

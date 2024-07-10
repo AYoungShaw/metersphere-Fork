@@ -128,12 +128,13 @@
           :data="envTree"
           class="w-full"
           :tree-checkable="true"
-          :allow-search="true"
+          allow-search
           :field-names="{
             title: 'name',
             key: 'id',
             children: 'children',
           }"
+          :filter-tree-node="filterTreeNode"
           tree-checked-strategy="child"
           :tree-props="{
             virtualListProps: {
@@ -143,7 +144,7 @@
         >
           <template #tree-slot-title="node">
             <a-tooltip :content="`${node.name}`" position="tl">
-              <div class="one-line-text w-[300px] text-[var(--color-text-1)]">{{ node.name }}</div>
+              <div class="one-line-text w-[300px]">{{ node.name }}</div>
             </a-tooltip>
           </template>
         </a-tree-select>
@@ -224,18 +225,15 @@
 </template>
 
 <script lang="ts" setup>
-  import { defineModel } from 'vue';
   import { Message, ValidatedError } from '@arco-design/web-vue';
 
   import MsDrawer from '@/components/pure/ms-drawer/index.vue';
-  import type { ActionsItem } from '@/components/pure/ms-table-more-action/types';
-  import type { MsTreeNodeData } from '@/components/business/ms-tree/types';
 
   import { getEnvModules } from '@/api/modules/api-test/management';
   import { useI18n } from '@/hooks/useI18n';
   import { useAppStore } from '@/store';
   import useProjectEnvStore from '@/store/modules/setting/useProjectEnvStore';
-  import { getGenerateId } from '@/utils';
+  import { filterTreeNode, getGenerateId } from '@/utils';
 
   import type { ModuleTreeNode } from '@/models/common';
   import { HttpForm } from '@/models/projectManagement/environmental';

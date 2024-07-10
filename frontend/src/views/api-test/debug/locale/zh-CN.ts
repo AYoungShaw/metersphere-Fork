@@ -1,7 +1,7 @@
 export default {
   'apiTestDebug.newApi': '新建请求',
   'apiTestDebug.importApi': '导入请求',
-  'apiTestDebug.urlPlaceholder': '请输入包含 http 或 https 的完整URL',
+  'apiTestDebug.urlPlaceholder': '请输入包含 http/https 的完整URL',
   'apiTestDebug.definitionUrlPlaceholder': '输入接口URL，以“/”开始',
   'apiTestDebug.serverExec': '服务端执行',
   'apiTestDebug.localExec': '本地执行',
@@ -196,4 +196,7 @@ export default {
   'apiTestDebug.condition': '匹配条件',
   'apiTestDebug.expectedValue': '匹配值',
   'apiTestDebug.extractValue': '提取值',
+  'apiTestDebug.standardAdditions': '标准添加',
+  'apiTestDebug.standardAdditionsTip': '书写格式：参数名，类型，必填，参数值；多条记录换行分隔',
+  'apiTestDebug.quickAdditions': '快捷添加',
 };

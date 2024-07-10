@@ -18,6 +18,7 @@ export const TransferFileModuleOptionUrl = '/api/definition/transfer/options'; /
 export const UploadTempFileUrl = '/api/definition/upload/temp/file'; // 临时文件上传
 export const DeleteDefinitionUrl = '/api/definition/delete-to-gc'; // 删除接口定义
 export const ImportDefinitionUrl = '/api/definition/import'; // 导入接口定义
+export const ExportDefinitionUrl = '/api/definition/export'; // 导入接口定义
 export const SortDefinitionUrl = '/api/definition/edit/pos'; // 接口定义拖拽
 export const CopyDefinitionUrl = '/api/definition/copy'; // 复制接口定义
 export const BatchUpdateDefinitionUrl = '/api/definition/batch-update'; // 批量更新接口定义
@@ -35,6 +36,7 @@ export const OperationHistoryUrl = '/api/definition/operation-history'; // 接�
 export const SaveOperationHistoryUrl = '/api/definition/operation-history/save'; // 接口定义-另存变更历史为指定版本
 export const RecoverOperationHistoryUrl = '/api/definition/operation-history/recover'; // 接口定义-变更历史恢复
 export const DefinitionReferenceUrl = '/api/definition/get-reference'; // 获取接口引用关系
+export const ConvertJsonSchemaToJsonUrl = '/api/definition/preview'; // 将json-schema转换为 json 数据
 
 /**
  * Mock
