@@ -19,12 +19,12 @@
   import { useUserStore } from '@/store';
   import useAppStore from '@/store/modules/app';
   import useLicenseStore from '@/store/modules/setting/license';
-  import { getQueryVariable } from '@/utils';
-  import { setLoginExpires, setToken } from '@/utils/auth';
+  import { getQueryVariable, getUrlParameterWidthRegExp } from '@/utils';
+  import { setLoginExpires, setLongType, setToken } from '@/utils/auth';
   import { getLocalStorage, setLocalStorage } from '@/utils/local-storage';
   import { setFavicon, watchStyle, watchTheme } from '@/utils/theme';
 
-  import { getPublicKeyRequest } from './api/modules/user';
+  import { getLarkCallback, getLarkSuiteCallback, getPublicKeyRequest } from './api/modules/user';
   import enUS from '@arco-design/web-vue/es/locale/lang/en-us';
   import zhCN from '@arco-design/web-vue/es/locale/lang/zh-cn';
 
@@ -53,7 +53,7 @@
     try {
       appStore.initSystemVersion(); // 初始化系统版本
       // 企业版才校验license
-      if (appStore.packageType === 'enterprise') {
+      if (appStore.getPackageType === 'enterprise') {
         licenseStore.getValidateLicense();
       }
       if (licenseStore.hasLicense()) {
@@ -78,15 +78,55 @@
 
   onBeforeMount(async () => {
     await getPublicKey();
-    if (WHITE_LIST.find((el) => el.path === window.location.hash.split('#')[1]) === undefined) {
+    if (WHITE_LIST.find((el) => window.location.hash.split('#')[1].includes(el.path)) === undefined) {
       const TOKEN = getQueryVariable('_token');
       const CSRF = getQueryVariable('_csrf');
       if (TOKEN !== null && TOKEN !== undefined && CSRF !== null && CSRF !== undefined) {
         setToken(window.atob(TOKEN), CSRF);
         setLoginExpires();
       }
+      const state = ref('');
+      const code = getQueryVariable('code');
+      state.value = getQueryVariable('state') || '';
+      if (state.value.split('#')[0] === 'fit2cloud-lark-qr') {
+        try {
+          appStore.setLoginLoading(true);
+          const larkCallback = await getLarkCallback(code || '');
+          userStore.qrCodeLogin(larkCallback);
+          setLongType('LARK');
+          setLoginExpires();
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.log(err);
+        }
+      }
+      if (state.value.split('#')[0] === 'fit2cloud-lark-suite-qr') {
+        try {
+          appStore.setLoginLoading(true);
+          const larkCallback = await getLarkSuiteCallback(code || '');
+          userStore.qrCodeLogin(larkCallback);
+          setLongType('LARK_SUITE');
+          setLoginExpires();
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.log(err);
+        }
+      }
       await userStore.checkIsLogin();
+      appStore.setLoginLoading(false);
     }
+    if (getQueryVariable('code') && getQueryVariable('state')) {
+      const currentUrl = window.location.href;
+      const url = new URL(currentUrl);
+      getUrlParameterWidthRegExp('code');
+      getUrlParameterWidthRegExp('state');
+      url.searchParams.delete('code');
+      url.searchParams.delete('state');
+      const newUrl = url.toString();
+      // 或者在不刷新页面的情况下更新URL（比如使用 History API）
+      window.history.replaceState({}, document.title, newUrl);
+    }
+
     const { height } = useWindowSize();
     appStore.innerHeight = height.value;
     if (userStore.id) {

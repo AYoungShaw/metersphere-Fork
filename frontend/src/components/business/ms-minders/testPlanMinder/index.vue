@@ -4,6 +4,7 @@
     v-model:loading="loading"
     v-model:import-json="importJson"
     :tags="[]"
+    :minder-key="MinderKeyEnum.TEST_PLAN_MINDER"
     :insert-node="(node, type) => insertNode(node as PlanMinderNode,type)"
     :can-show-enter-node="false"
     :insert-sibling-menus="[]"
@@ -14,6 +15,7 @@
     :can-show-float-menu="canShowFloatMenu"
     :can-show-delete-menu="canShowDeleteMenu"
     :disabled="!hasEditPermission"
+    :can-show-batch-delete="canShowBatchDelete"
     custom-priority
     single-tag
     tag-enable
@@ -25,7 +27,7 @@
     <template #extractMenu>
       <a-tooltip v-if="canShowAddTestPointsMenu" :content="t('ms.minders.addTestSet')">
         <MsButton type="icon" class="ms-minder-node-float-menu-icon-button" @click="addTestSet">
-          <MsIcon type="icon-icon_test_set1" class="text-[var(--color-text-4)]" />
+          <MsIcon type="icon-icon_title-left-align_outlined" class="text-[var(--color-text-4)]" />
         </MsButton>
       </a-tooltip>
       <a-tooltip
@@ -36,44 +38,25 @@
           <MsIcon type="icon-icon_add_outlined" class="text-[var(--color-text-4)]" />
         </MsButton>
       </a-tooltip>
-      <a-dropdown
-        v-if="canShowExecuteMethodMenu"
-        v-model:popup-visible="executeMethodMenuVisible"
-        class="ms-minder-dropdown"
-        :popup-translate="[0, 4]"
-        position="bl"
-        trigger="click"
-        @select="(val) => handleExecuteMethodMenuSelect(val as RunMode)"
-      >
-        <a-tooltip :content="t('ms.minders.executeMethod')">
-          <MsButton
-            type="icon"
-            class="ms-minder-node-float-menu-icon-button"
-            :class="[executeMethodMenuVisible ? 'ms-minder-node-float-menu-icon-button--focus' : '']"
-          >
-            <MsIcon type="icon-icon_play-round_filled" class="text-[var(--color-text-4)]" />
-          </MsButton>
-        </a-tooltip>
-        <template #content>
-          <div class="mx-[6px] px-[8px] py-[3px] text-[var(--color-text-4)]">
-            {{ t('ms.minders.executeMethod') }}
-          </div>
-          <a-doption :value="RunMode.SERIAL">
-            <div
-              class="flex h-[20px] w-[20px] items-center justify-center rounded-full bg-[rgb(var(--link-1))] text-[12px] font-medium text-[rgb(var(--link-5))]"
-            >
-              {{ t('ms.minders.serial') }}
-            </div>
-          </a-doption>
-          <a-doption :value="RunMode.PARALLEL">
-            <div
-              class="flex h-[20px] w-[20px] items-center justify-center rounded-full bg-[rgb(var(--success-1))] text-[12px] font-medium text-[rgb(var(--success-6))]"
-            >
-              {{ t('ms.minders.parallel') }}
-            </div>
-          </a-doption>
-        </template>
-      </a-dropdown>
+      <a-tooltip v-if="canShowExecuteMethodMenu && selectNodeExecuteMethod" :content="t('ms.minders.executeMethod')">
+        <div
+          :class="[
+            'flex h-[20px] w-[20px] cursor-pointer items-center justify-center rounded-full text-[12px] font-medium',
+            `${
+              selectNodeExecuteMethod === RunMode.SERIAL
+                ? 'bg-[rgb(var(--link-1))] text-[rgb(var(--link-5))]'
+                : 'bg-[rgb(var(--success-1))] text-[rgb(var(--success-6))]'
+            }`,
+          ]"
+          @click="
+            handleExecuteMethodMenuSelect(
+              selectNodeExecuteMethod === RunMode.SERIAL ? RunMode.PARALLEL : RunMode.SERIAL
+            )
+          "
+        >
+          {{ selectNodeExecuteMethod === RunMode.SERIAL ? t('ms.minders.serial') : t('ms.minders.parallel') }}
+        </div>
+      </a-tooltip>
       <a-tooltip v-if="showConfigMenu" :content="t('common.config')">
         <MsButton
           type="icon"
@@ -105,10 +88,7 @@
                 <a-divider margin="4px" direction="vertical" />
                 <MsButton
                   type="text"
-                  :disabled="
-                    !hasEditPermission ||
-                    (selectedAssociateCasesParams.totalCount || selectedAssociateCasesParams.selectIds.length) === 0
-                  "
+                  :disabled="!hasEditPermission || selectedAssociateCasesParams.totalCount === 0"
                   @click="clearSelectedCases"
                 >
                   {{ t('caseManagement.caseReview.clearSelectedCases') }}
@@ -120,9 +100,7 @@
                 <div class="text-[var(--color-text-2)]">
                   {{
                     t('ms.minders.selectedCases', {
-                      count: selectedAssociateCasesParams.selectAll
-                        ? selectedAssociateCasesParams.totalCount
-                        : selectedAssociateCasesParams.selectIds.length,
+                      count: selectedAssociateCasesParams.totalCount || 0,
                     })
                   }}
                 </div>
@@ -149,11 +127,13 @@
           </a-form-item>
           <template v-if="configForm.type !== PlanMinderCollectionType.FUNCTIONAL">
             <a-form-item :label="t('system.project.resourcePool')">
-              <a-select
+              <MsSelect
                 v-model:model-value="configForm.testResourcePoolId"
                 :options="resourcePoolOptions"
                 :disabled="configForm.level === 2 && configForm.extended"
-              ></a-select>
+                :option-not-exits-text="t('system.resourcePool.notExit')"
+              >
+              </MsSelect>
             </a-form-item>
             <a-form-item :label="t('project.environmental.env')">
               <a-select
@@ -183,7 +163,11 @@
             </a-form-item>
             <a-form-item class="hidden-item">
               <div class="flex items-center gap-[8px]">
-                <a-switch v-model:model-value="configForm.retryOnFail" size="small"></a-switch>
+                <a-switch
+                  v-model:model-value="configForm.retryOnFail"
+                  :disabled="configForm.level === 2 && configForm.extended"
+                  size="small"
+                ></a-switch>
                 <div>{{ t('ms.minders.failRetry') }}</div>
               </div>
             </a-form-item>
@@ -200,7 +184,9 @@
                   mode="button"
                   :step="1"
                   :min="1"
+                  :max="10"
                   :precision="0"
+                  :disabled="configForm.level === 2 && configForm.extended"
                   size="small"
                   class="w-[120px]"
                 ></a-input-number>
@@ -218,6 +204,7 @@
                   :step="100"
                   :min="0"
                   :precision="0"
+                  :disabled="configForm.level === 2 && configForm.extended"
                   size="small"
                   class="w-[120px]"
                 ></a-input-number>
@@ -237,8 +224,9 @@
   <caseAssociate
     v-model:visible="caseAssociateVisible"
     :association-type="currentSelectCase"
-    :has-not-associated-ids="selectedAssociateCasesParams.selectIds"
     :test-plan-id="props.planId"
+    :modules-maps="selectedAssociateCasesParams.moduleMaps"
+    :protocols="selectedAssociateCasesParams.protocols"
     @success="writeAssociateCases"
   />
 </template>
@@ -256,6 +244,7 @@
     MinderJsonNodeData,
   } from '@/components/pure/ms-minder-editor/props';
   import { setCustomPriorityView } from '@/components/pure/ms-minder-editor/script/tool/utils';
+  import MsSelect from '@/components/business/ms-select';
   import caseAssociate from './associateDrawer.vue';
 
   import { getPoolOption } from '@/api/modules/api-test/management';
@@ -267,13 +256,13 @@
   import { hasAnyPermission } from '@/utils/permission';
 
   import {
-    AssociateCaseRequest,
+    AssociateCaseRequestParams,
     PlanMinderEditListItem,
     PlanMinderNode,
     PlanMinderNodeData,
   } from '@/models/testPlan/testPlan';
   import { CaseLinkEnum } from '@/enums/caseEnum';
-  import { MinderEventName } from '@/enums/minderEnum';
+  import { MinderEventName, MinderKeyEnum } from '@/enums/minderEnum';
   import { PlanMinderAssociateType, PlanMinderCollectionType, RunMode } from '@/enums/testPlanEnum';
 
   const props = defineProps<{
@@ -290,7 +279,6 @@
   const loading = ref(false);
   const importJson = ref<MinderJson>({
     root: {} as MinderJsonNode,
-    template: 'default',
     treePath: [],
   });
   const caseCountTag = t('ms.minders.caseCount');
@@ -301,7 +289,6 @@
   const canShowAddTestPointsMenu = ref(false);
   const showAssociateCaseMenu = ref(false);
   const canShowExecuteMethodMenu = ref(false);
-  const executeMethodMenuVisible = ref(false);
   const showConfigMenu = ref(false);
   const canShowDeleteMenu = ref(false);
   const extraVisible = ref<boolean>(false);
@@ -358,12 +345,15 @@
         canShowDeleteMenu.value = true;
       }
     } else {
-      canShowFloatMenu.value = false;
-      canShowExecuteMethodMenu.value = false;
+      nextTick(() => {
+        canShowFloatMenu.value = node.data.id === 'root';
+        canShowExecuteMethodMenu.value = node.data.id === 'root';
+      });
       showAssociateCaseMenu.value = false;
       showConfigMenu.value = false;
       extraVisible.value = false;
       canShowDeleteMenu.value = false;
+      canShowAddTestPointsMenu.value = false;
     }
   }
 
@@ -386,6 +376,12 @@
    * @param value 插入值
    */
   function insertNode(node: PlanMinderNode, type: string) {
+    if (
+      (node.data?.level === 2 && type === 'AppendChildNode') ||
+      (node.data?.level === 1 && type === 'AppendSiblingNode')
+    ) {
+      return;
+    }
     let child: PlanMinderNodeData | undefined;
     // 用例数子节点
     const caseCountNodeData = {
@@ -466,9 +462,11 @@
 
   // 当前激活的测试点节点
   const activePlanSet = ref<PlanMinderNode>();
+  const selectNodeExecuteMethod = ref<RunMode>(); // 当前选中节点的串/并
 
   // 优先级与串行/并行文本映射
   const priorityTextMap: Record<number, string> = {
+    1: '!',
     2: t('ms.minders.serial'),
     3: t('ms.minders.parallel'),
   };
@@ -487,7 +485,7 @@
 
   const configFormRef = ref<FormInstance>();
   const configForm = ref<PlanMinderNodeData>();
-  const resourcePoolOptions = ref<SelectOptionData[]>();
+  const resourcePoolOptions = ref<SelectOptionData[]>([]);
   const environmentOptions = computed(() => [
     {
       label: t('testPlan.testPlanIndex.defaultEnv'),
@@ -528,8 +526,13 @@
       Message.warning(t('ms.minders.unsavedTip'));
       return;
     }
+    const nodes: MinderJsonNode[] = window.minder.getSelectedNodes();
+    if (nodes.length > 1) {
+      extraVisible.value = false;
+      return;
+    }
     extraVisible.value = !extraVisible.value;
-    const node: MinderJsonNode = window.minder.getSelectedNode();
+    const node = nodes[0];
     switchingConfigFormData.value = true;
     if (extraVisible.value) {
       activePlanSet.value = node as PlanMinderNode;
@@ -552,6 +555,7 @@
     window.minder.execCommand('priority', priorityMap[val]);
     // 手动设置一次脑图的优先级 DOM 内容替换
     setCustomPriorityView(priorityTextMap);
+    selectNodeExecuteMethod.value = val;
     const node: PlanMinderNode = window.minder.getSelectedNode();
     if (configForm.value?.id === node?.data.id) {
       // 更新表单的执行方式
@@ -563,48 +567,45 @@
   const caseAssociateVisible = ref<boolean>(false);
 
   // 批量关联用例表格参数
-  const selectedAssociateCasesParams = ref<AssociateCaseRequest>({
-    excludeIds: [],
-    selectIds: [],
-    selectAll: false,
-    condition: {},
-    moduleIds: [],
-    versionId: '',
-    refId: '',
+  const selectedAssociateCasesParams = ref<AssociateCaseRequestParams>({
     projectId: '',
+    moduleMaps: {},
+    syncCase: true,
+    apiCaseCollectionId: '',
+    apiScenarioCollectionId: '',
+    selectAllModule: false,
+    protocols: [],
   });
 
-  function writeAssociateCases(param: AssociateCaseRequest) {
+  function writeAssociateCases(param: AssociateCaseRequestParams) {
     selectedAssociateCasesParams.value = { ...param };
     const node: PlanMinderNode = window.minder.getSelectedNode();
     let associateType: string = '';
     if (node.data.type === PlanMinderCollectionType.SCENARIO) {
       associateType = PlanMinderAssociateType.SCENARIO_CASE;
     } else {
-      associateType =
-        node.data.type === PlanMinderCollectionType.API && param.associateApiType
-          ? param.associateApiType
-          : node.data.type;
+      associateType = param?.associateType ?? node.data.type;
     }
+
     node.data.associateDTOS = [
       {
-        ids: param.selectIds,
+        ...cloneDeep(param),
         associateType,
       },
     ];
+
     caseAssociateVisible.value = false;
   }
 
   function clearSelectedCases() {
     selectedAssociateCasesParams.value = {
-      excludeIds: [],
-      selectIds: [],
-      selectAll: false,
-      condition: {},
-      moduleIds: [],
-      versionId: '',
-      refId: '',
       projectId: '',
+      moduleMaps: {},
+      syncCase: true,
+      apiCaseCollectionId: '',
+      apiScenarioCollectionId: '',
+      selectAllModule: false,
+      protocols: [],
     };
     const node: PlanMinderNode = window.minder.getNodeById(activePlanSet.value?.data.id);
     if (node?.data) {
@@ -634,7 +635,7 @@
   }
 
   watch(
-    () => [configForm.value, selectedAssociateCasesParams.value.selectIds],
+    () => [configForm.value, selectedAssociateCasesParams.value.moduleMaps],
     () => {
       if (!switchingConfigFormData.value && configForm.value) {
         configFormUnsaved.value = true;
@@ -643,6 +644,15 @@
     },
     {
       deep: true,
+    }
+  );
+
+  watch(
+    () => minderStore.event.eventId,
+    () => {
+      if ([MinderEventName.EXPAND, MinderEventName.COLLAPSE].includes(minderStore.event.name)) {
+        setCustomPriorityView(priorityTextMap);
+      }
     }
   );
 
@@ -655,12 +665,40 @@
   }
 
   /**
+   * 是否可以显示批量删除
+   */
+  const canShowBatchDelete = ref(false);
+  watch(
+    () => minderStore.event.eventId,
+    async () => {
+      if (window.minder) {
+        const selectedNodes: MinderJsonNode[] = window.minder.getSelectedNodes();
+        if (
+          minderStore.event.name === MinderEventName.DRAG_FINISH ||
+          minderStore.event.name === MinderEventName.NODE_UNSELECT ||
+          minderStore.event.name === MinderEventName.NODE_SELECT
+        ) {
+          canShowBatchDelete.value = selectedNodes.every((node) => node.data?.level === 2);
+        }
+      }
+    },
+    {
+      immediate: true,
+    }
+  );
+
+  /**
    * 处理节点选中
    * @param node 节点
    */
   function handleNodeSelect(node: PlanMinderNode) {
     if (checkConfigFormUnsaved()) {
       return;
+    }
+    if (node.data.priority) {
+      selectNodeExecuteMethod.value = getExecuteMethod(node.data);
+    } else {
+      selectNodeExecuteMethod.value = undefined;
     }
     if (node.data?.level === 3 && node.data?.resource?.[0] === caseCountTag) {
       window.minder.toggleSelect(node);
@@ -788,19 +826,16 @@
           level,
           isNew: false,
           changed: false,
+          priority: node.data.priority === 0 ? 1 : node.data.priority,
           disabled: level !== 2, // 只有测试点能改文本
         };
         return node;
       });
+      const template = await minderStore.getMode(MinderKeyEnum.TEST_PLAN_MINDER);
+      importJson.value.template = template;
       window.minder.importJson(importJson.value);
       if (firstInit) {
-        window.minder.execCommand('template', Object.keys(window.kityminder.Minder.getTemplateList())[3]);
-        setTimeout(() => {
-          // 初始化脑图完毕后，中心节点移动至左侧边缘
-          const position = window.minder.getViewDragger().getMovement();
-          position.x -= position.x - 40;
-          window.minder.getViewDragger().moveTo(position);
-        }, 200);
+        await minderStore.setMode(MinderKeyEnum.TEST_PLAN_MINDER, importJson.value.template);
       }
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -817,10 +852,29 @@
   });
 
   /**
+   * 保存测试点配置
+   */
+  function handleConfigSave() {
+    configFormRef.value?.validate((errors) => {
+      if (!errors) {
+        const node: MinderJsonNode = window.minder.getSelectedNode();
+        if (node && node?.data && configForm.value) {
+          node.data = {
+            ...node.data,
+            ...cloneDeep(configForm.value),
+          };
+        }
+        // 派发SAVE_MINDER事件触发脑图的保存处理
+        minderStore.dispatchEvent(MinderEventName.SAVE_MINDER);
+      }
+    });
+  }
+
+  /**
    * 生成脑图保存的入参
    */
   function makeMinderParams(fullJson: MinderJson) {
-    filterTree(fullJson.root.children, (node, nodeIndex) => {
+    filterTree(fullJson.root, (node, nodeIndex) => {
       if (node.data.isNew) {
         tempMinderParams.value.editList.push({
           ...node.data,
@@ -842,8 +896,25 @@
 
   async function handleMinderSave(fullJson: MinderJson, callback: () => void) {
     try {
+      let configFormValidResult = false;
+      if (extraVisible.value) {
+        //  如果此时配置抽屉是打开状态，则校验配置表单并写入最新表单数据
+        await configFormRef.value?.validate((errors) => {
+          if (!errors) {
+            const node: MinderJsonNode = window.minder.getSelectedNode();
+            if (node && node?.data && configForm.value) {
+              node.data = {
+                ...node.data,
+                ...cloneDeep(configForm.value),
+              };
+            }
+            configFormValidResult = true;
+          }
+        });
+      }
+      if (!configFormValidResult) return;
       loading.value = true;
-      await editPlanMinder(makeMinderParams(fullJson));
+      await editPlanMinder(makeMinderParams(extraVisible.value ? window.minder.exportJson() : fullJson));
       Message.success(t('common.saveSuccess'));
       emit('save');
       clearSelectedCases();
@@ -862,25 +933,6 @@
       };
       clearSelectedCases();
     }
-  }
-
-  /**
-   * 保存测试点配置
-   */
-  function handleConfigSave() {
-    configFormRef.value?.validate((errors) => {
-      if (!errors) {
-        const node: MinderJsonNode = window.minder.getSelectedNode();
-        if (node.data && configForm.value) {
-          node.data = {
-            ...node.data,
-            ...cloneDeep(configForm.value),
-          };
-        }
-        // 派发SAVE_MINDER事件触发脑图的保存处理
-        minderStore.dispatchEvent(MinderEventName.SAVE_MINDER);
-      }
-    });
   }
 
   async function initResourcePoolList() {

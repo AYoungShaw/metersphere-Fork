@@ -35,7 +35,7 @@
             class="ms-minder-node-float-menu-icon-button"
             :class="[insertSiblingMenuVisible ? 'ms-minder-node-float-menu-icon-button--focus' : '']"
           >
-            <MsIcon type="icon-icon_title-top-align_outlined1" class="text-[var(--color-text-4)]" />
+            <MsIcon type="icon-icon_title-top-align_outlined" class="text-[var(--color-text-4)]" />
           </MsButton>
         </a-tooltip>
         <template #content>
@@ -62,7 +62,7 @@
             class="ms-minder-node-float-menu-icon-button"
             :class="[insertSonMenuVisible ? 'ms-minder-node-float-menu-icon-button--focus' : '']"
           >
-            <MsIcon type="icon-icon_title-left-align_outlined1" class="text-[var(--color-text-4)]" />
+            <MsIcon type="icon-icon_title-left-align_outlined" class="text-[var(--color-text-4)]" />
           </MsButton>
         </a-tooltip>
         <template #content>
@@ -137,32 +137,32 @@
           <a-doption v-if="props.canShowEnterNode" value="enterNode">
             <div class="flex items-center">
               <div>{{ t('minder.hotboxMenu.enterNode') }}</div>
-              <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl+ Enter)</div> -->
+              <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl+ Enter)</div>
             </div>
           </a-doption>
           <template v-if="props.canShowMoreMenuNodeOperation">
             <a-doption value="copy">
               <div class="flex items-center">
                 <div>{{ t('minder.hotboxMenu.copy') }}</div>
-                <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + C)</div> -->
+                <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + C)</div>
               </div>
             </a-doption>
             <a-doption value="cut">
               <div class="flex items-center">
                 <div>{{ t('minder.hotboxMenu.cut') }}</div>
-                <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + X)</div> -->
+                <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + X)</div>
               </div>
             </a-doption>
             <a-doption v-if="props.canShowPasteMenu && minderStore.clipboard.length > 0" value="paste">
               <div class="flex items-center">
                 <div>{{ t('minder.hotboxMenu.paste') }}</div>
-                <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + V)</div> -->
+                <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + V)</div>
               </div>
             </a-doption>
             <a-doption value="delete">
               <div class="flex items-center">
                 <div>{{ t('minder.hotboxMenu.delete') }}</div>
-                <!-- <div class="ml-[4px] text-[var(--color-text-4)]">(Backspace)</div> -->
+                <div class="ml-[4px] text-[var(--color-text-4)]">(Backspace)</div>
               </div>
             </a-doption>
           </template>
@@ -179,7 +179,7 @@
       </a-dropdown>
       <a-tooltip v-else-if="props.canShowDeleteMenu" :content="t('common.delete')">
         <MsButton type="icon" class="ms-minder-node-float-menu-icon-button" @click="handleMinderMenuSelect('delete')">
-          <MsIcon type="icon-icon_delete-trash_outlined" class="text-[var(--color-text-4)]" />
+          <MsIcon type="icon-icon_delete-trash_outlined1" class="text-[var(--color-text-4)]" />
         </MsButton>
       </a-tooltip>
     </template>
@@ -195,25 +195,18 @@
   import { useI18n } from '@/hooks/useI18n';
   import useMinderStore from '@/store/modules/components/minder-editor/index';
   import { MinderNodePosition } from '@/store/modules/components/minder-editor/types';
-  import { getGenerateId, sleep } from '@/utils';
+  import { sleep } from '@/utils';
 
   import { MinderEventName } from '@/enums/minderEnum';
 
-  import {
-    floatMenuProps,
-    insertProps,
-    mainEditorProps,
-    MinderJsonNode,
-    MinderJsonNodeData,
-    priorityProps,
-    tagProps,
-  } from '../props';
-  import { isDisableNode, isNodeInMinderView, setPriorityView } from '../script/tool/utils';
+  import useMinderOperation from '../hooks/useMinderOperation';
+  import usePriority from '../hooks/useMinderPriority';
+  import { floatMenuProps, mainEditorProps, MinderJsonNode, priorityColorMap, priorityProps, tagProps } from '../props';
+  import { isNodeInMinderView } from '../script/tool/utils';
 
   const props = defineProps({
     ...mainEditorProps,
     ...floatMenuProps,
-    ...insertProps,
     ...tagProps,
     ...priorityProps,
   });
@@ -223,6 +216,7 @@
 
   const { t } = useI18n();
   const minderStore = useMinderStore();
+  const { setPriority } = usePriority(props);
 
   const currentNodeTags = ref<string[]>([]);
   const tags = ref<string[]>([]);
@@ -248,7 +242,7 @@
           }
         }
         if (selectedNodes.length > 1) {
-          // 多选时隐藏悬浮菜单 TODO:支持批量操作
+          // 多选时隐藏悬浮菜单
           menuVisible.value = false;
           return;
         }
@@ -276,31 +270,6 @@
   const insertSonMenuVisible = ref(false);
   const priorityMenuVisible = ref(false);
   const moreMenuVisible = ref(false);
-
-  /**
-   * 执行插入
-   * @param command 插入命令
-   */
-  function execInsertCommand(command: string, value?: string) {
-    const node: MinderJsonNode = window.minder.getSelectedNode();
-    if (props.insertNode) {
-      props.insertNode(node, command, value);
-      return;
-    }
-    if (window.minder.queryCommandState(command) !== -1) {
-      window.minder.execCommand(command);
-      nextTick(() => {
-        const newNode: MinderJsonNode = window.minder.getSelectedNode();
-        if (!newNode.data) {
-          newNode.data = {
-            id: getGenerateId(),
-            text: '',
-          };
-        }
-        newNode.data.isNew = true; // 新建的节点标记为新建
-      });
-    }
-  }
 
   /**
    * 切换标签
@@ -337,27 +306,8 @@
     }
   }
 
-  const priorityColorMap: Record<number, string> = {
-    1: 'rgb(var(--danger-6))',
-    2: 'rgb(var(--link-6))',
-    3: 'rgb(var(--success-6))',
-    4: 'rgb(var(--warning-6))',
-  };
-  const priorityDisabled = ref(true);
-  function isDisable(): boolean {
-    if (Object.keys(window.minder).length === 0) return true;
-    nextTick(() => {
-      setPriorityView(props.priorityStartWithZero, props.priorityPrefix);
-    });
-    const node = window.minder.getSelectedNode();
-    if (isDisableNode(window.minder) || !node || node.parent === null) {
-      return true;
-    }
-    if (props.priorityDisableCheck) {
-      return props.priorityDisableCheck(node);
-    }
-    return !!window.minder.queryCommandState && window.minder.queryCommandState('priority') === -1;
-  }
+  const { minderCopy, minderCut, minderPaste, appendChildNode, appendSiblingNode, minderDelete } =
+    useMinderOperation(props);
 
   /**
    * 处理快捷菜单选择
@@ -368,59 +318,28 @@
     if (selectedNodes.length > 0) {
       switch (type) {
         case 'AppendChildNode':
-          execInsertCommand('AppendChildNode', value);
-          minderStore.dispatchEvent(MinderEventName.INSERT_CHILD, value, undefined, undefined, selectedNodes);
+          appendChildNode(selectedNodes, value);
           break;
         case 'AppendSiblingNode':
-          execInsertCommand('AppendSiblingNode', value);
-          minderStore.dispatchEvent(MinderEventName.INSERT_SIBLING, value, undefined, undefined, selectedNodes);
+          appendSiblingNode(selectedNodes, value);
           break;
         case 'copy':
-          minderStore.dispatchEvent(MinderEventName.COPY_NODE, undefined, undefined, undefined, selectedNodes);
-          window.minder.execCommand('Copy');
+          minderCopy();
           break;
         case 'cut':
-          minderStore.dispatchEvent(MinderEventName.CUT_NODE, undefined, undefined, undefined, selectedNodes);
-          window.minder.execCommand('Cut');
+          minderCut();
           break;
         case 'paste':
-          minderStore.dispatchEvent(MinderEventName.PASTE_NODE, undefined, undefined, undefined, selectedNodes);
-          window.minder.execCommand('Paste');
-          let pastedNodes: MinderJsonNode[] = window.minder.getSelectedNodes();
-          if (pastedNodes.length > 0) {
-            pastedNodes = pastedNodes
-              .filter((e) => {
-                if (e.data?.id !== 'fakeNode' && e.data?.type !== 'tmp') {
-                  return true;
-                }
-                window.minder.removeNode(e);
-                return false;
-              })
-              .map((e) => {
-                e.data = {
-                  ...(e.data as MinderJsonNodeData),
-                  isNew: true,
-                  id: getGenerateId(),
-                  count: e.children?.length || 0,
-                };
-                return e;
-              });
-          }
+          minderPaste();
           break;
         case 'delete':
-          minderStore.dispatchEvent(MinderEventName.DELETE_NODE, undefined, undefined, undefined, selectedNodes);
-          window.minder.execCommand('RemoveNode');
+          minderDelete(selectedNodes);
           break;
         case 'enterNode':
           minderStore.dispatchEvent(MinderEventName.ENTER_NODE, undefined, undefined, undefined, [selectedNodes[0]]);
           break;
         case 'priority':
-          if (value && !priorityDisabled.value) {
-            window.minder.execCommand('priority', value);
-            setPriorityView(props.priorityStartWithZero, props.priorityPrefix);
-          } else if (window.minder.execCommand && !priorityDisabled.value) {
-            window.minder.execCommand('priority');
-          }
+          setPriority(value);
           break;
         default:
           break;
@@ -440,23 +359,6 @@
       }
     }
   );
-
-  onMounted(() => {
-    nextTick(() => {
-      const freshFuc = setPriorityView;
-      if (window.minder && !props.customPriority) {
-        window.minder.on('contentchange', () => {
-          // 异步执行，否则执行完，还会被重置
-          setTimeout(() => {
-            freshFuc(props.priorityStartWithZero, props.priorityPrefix);
-          }, 0);
-        });
-        window.minder.on('selectionchange', () => {
-          priorityDisabled.value = isDisable();
-        });
-      }
-    });
-  });
 </script>
 
 <style lang="less">

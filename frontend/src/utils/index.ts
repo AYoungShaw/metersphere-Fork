@@ -494,7 +494,6 @@ export function insertNodes<T>(
     }
     return false;
   }
-
   insertNodeInTree(treeArr);
 }
 
@@ -696,6 +695,16 @@ export function getQueryVariable(variable: string) {
   }
 }
 
+export function getUrlParameterWidthRegExp(name: string) {
+  const url = window.location.href;
+  name = name.replace(/[[\]]/g, '\\$&');
+  const regex = new RegExp(`[?&]${name}(=([^&#]*)|&|#|$)`);
+  const results = regex.exec(url);
+  if (!results) return null;
+  if (!results[2]) return '';
+  return decodeURIComponent(results[2].replace(/\+/g, ' '));
+}
+
 let lastTimestamp = 0;
 let sequence = 0;
 
@@ -894,7 +903,7 @@ export function getCustomFieldIndex(field: CustomFieldItem) {
 // 表格自定义字段转column
 export function customFieldToColumns(customFields: CustomFieldItem[]) {
   return customFields.map((field) => {
-    const { fieldName, fieldKey, fieldId } = field;
+    const { fieldName, fieldKey, fieldId, options, platformOptionJson } = field;
     const column: MsTableColumnData = {
       title: fieldName,
       dataIndex: ['handleUser', 'status'].includes(fieldId) ? fieldKey : getCustomFieldIndex(field),
@@ -902,6 +911,7 @@ export function customFieldToColumns(customFields: CustomFieldItem[]) {
       showDrag: true,
       showInTable: true,
       width: 200,
+      options: options || JSON.parse(platformOptionJson),
     };
     return column;
   });

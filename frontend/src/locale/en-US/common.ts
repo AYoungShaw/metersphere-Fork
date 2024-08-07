@@ -199,4 +199,8 @@ export default {
   'common.auth_redirect_tip': 'You will be redirected to the certification source page for certification',
   'common.default': 'Default',
   'common.jump': 'Jump',
+  'common.gotIt': 'Got it',
+  'common.inputPleaseEnterTags': 'Please enter the update tag enter add, not more than 64 characters',
+  'common.cutSuccess': 'Cut successfully',
+  'common.copySuccessToClipboard': 'Copied to clipboard',
 };

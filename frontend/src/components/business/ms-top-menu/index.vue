@@ -1,12 +1,12 @@
 <template>
   <a-menu
-    v-show="appStore.topMenus.length > 0"
+    v-show="appStore.getTopMenus.length > 0"
     v-model:selected-keys="activeMenus"
     class="bg-transparent"
     mode="horizontal"
     @menu-item-click="menuClickHandler"
   >
-    <a-menu-item v-for="menu of appStore.topMenus" :key="(menu.name as string)" @click="jumpPath(menu.name)">
+    <a-menu-item v-for="menu of appStore.getTopMenus" :key="(menu.name as string)" @click="jumpPath(menu.name)">
       {{ t(menu.meta?.locale || '') }}
     </a-menu-item>
   </a-menu>
@@ -36,7 +36,7 @@
 
   function checkAuthMenu() {
     const topMenus = appStore.getTopMenus;
-    if (appStore.packageType === 'community') {
+    if (appStore.getPackageType === 'community') {
       appStore.setTopMenus(topMenus.filter((item) => item.name !== RouteEnum.SETTING_SYSTEM_AUTHORIZED_MANAGEMENT));
     } else {
       appStore.setTopMenus(topMenus);
@@ -99,7 +99,6 @@
 
           appStore.setTopMenus(filterMenuTopRouter);
           setCurrentTopMenu(name as string);
-
           return;
         }
       }
@@ -120,7 +119,7 @@
     () => appStore.currentOrgId,
     async () => {
       await appStore.initSystemPackage();
-      if (appStore.packageType === 'enterprise') {
+      if (appStore.getPackageType === 'enterprise') {
         licenseStore.getValidateLicense();
       }
     },
@@ -130,8 +129,8 @@
   );
 
   watch(
-    () => appStore.packageType,
-    (val) => {
+    () => appStore.getPackageType,
+    () => {
       checkAuthMenu();
     }
   );

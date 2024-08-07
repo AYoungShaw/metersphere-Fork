@@ -1,16 +1,23 @@
 <template>
   <div ref="mec" class="ms-minder-container">
-    <minderHeader :icon-buttons="props.iconButtons" :disabled="props.disabled" @save="save" />
+    <minderHeader
+      :minder-key="props.minderKey"
+      :icon-buttons="props.iconButtons"
+      :disabled="props.disabled"
+      @save="save"
+    />
     <Navigator />
     <div
       v-if="currentTreePath?.length > 0"
-      class="absolute left-[50%] top-[24px] z-50 translate-x-[-50%] bg-white p-[8px]"
+      class="absolute left-[50%] top-[16px] z-[9] w-[60%] translate-x-[-50%] overflow-hidden bg-white p-[8px]"
     >
-      <a-breadcrumb>
-        <a-breadcrumb-item v-for="crumb of currentTreePath" :key="crumb.name" @click="switchNode(crumb)">
-          {{ crumb.text }}
-        </a-breadcrumb-item>
-      </a-breadcrumb>
+      <a-menu v-model:selected-keys="selectedBreadcrumbKeys" mode="horizontal" class="ms-minder-breadcrumb">
+        <a-menu-item v-for="(crumb, i) of currentTreePath" :key="crumb.id" @click="switchNode(crumb, i)">
+          <a-tooltip :content="crumb.text" :mouse-enter-delay="300">
+            <div class="one-line-text">{{ crumb.text }}</div>
+          </a-tooltip>
+        </a-menu-item>
+      </a-menu>
     </div>
     <nodeFloatMenu
       v-if="props.canShowFloatMenu"
@@ -22,12 +29,14 @@
         <slot name="extractMenu"></slot>
       </template>
     </nodeFloatMenu>
+    <batchMenu v-bind="props" />
   </div>
 </template>
 
 <script lang="ts" name="minderContainer" setup>
   import { cloneDeep } from 'lodash-es';
 
+  import batchMenu from '../menu/batchMenu.vue';
   import nodeFloatMenu from '../menu/nodeFloatMenu.vue';
   import minderHeader from './header.vue';
   import Navigator from './navigator.vue';
@@ -40,10 +49,10 @@
 
   import useEventListener from '../hooks/useMinderEventListener';
   import {
+    batchMenuProps,
     editMenuProps,
     floatMenuProps,
     headerProps,
-    insertProps,
     mainEditorProps,
     MinderJson,
     MinderJsonNode,
@@ -59,10 +68,10 @@
     ...headerProps,
     ...floatMenuProps,
     ...editMenuProps,
-    ...insertProps,
     ...mainEditorProps,
     ...tagProps,
     ...priorityProps,
+    ...batchMenuProps,
   });
   const emit = defineEmits<{
     (e: 'save', data: MinderJson, callback: () => void): void;
@@ -82,7 +91,6 @@
   });
   const innerImportJson = ref<MinderJson>({
     root: {},
-    template: 'default',
     treePath: [],
   });
   const currentTreePath = ref<MinderJsonNodeData[]>([]);
@@ -129,6 +137,9 @@
           'zoomin',
           'zoomout',
         ]);
+        if (props.disabled) {
+          ['movetoparent', 'arrange'].forEach((item) => notChangeCommands.add(item));
+        }
         if (selectNodes.length > 0 && !notChangeCommands.has(event.commandName.toLocaleLowerCase())) {
           minderStore.setMinderUnsaved(true);
           selectNodes.forEach((node: MinderJsonNode) => {
@@ -153,11 +164,24 @@
     return innerImportJson.value.treePath?.filter((e, i) => i <= index) || [];
   }
 
+  const selectedBreadcrumbKeys = computed({
+    get: () => [currentTreePath.value[currentTreePath.value.length - 1]?.id],
+    set: (val) => {
+      return val;
+    },
+  });
+
   /**
    * 切换脑图展示的节点层级
    * @param node 切换的节点
    */
-  function switchNode(node?: MinderJsonNode | MinderJsonNodeData) {
+  async function switchNode(node?: MinderJsonNode | MinderJsonNodeData, index?: number) {
+    if (!props.minderKey || index === currentTreePath.value.length - 1) return;
+    const currentSelectedNodes: MinderJsonNode[] = window.minder.getSelectedNodes();
+    if (currentSelectedNodes && currentSelectedNodes.length > 0) {
+      // 切换前，如果有选中节点，先取消选中
+      window.minder.toggleSelect(currentSelectedNodes);
+    }
     if (minderStore.minderUnsaved) {
       // 切换前，如果脑图未保存，先把更改的节点信息同步一次
       replaceNodeInTree(
@@ -175,7 +199,10 @@
     } else {
       innerImportJson.value = findNodePathByKey([importJson.value.root], node?.id, 'data', 'id') as MinderJson;
     }
+    const template = await minderStore.getMode(props.minderKey);
+    importJson.value.template = template;
     window.minder.importJson(innerImportJson.value);
+    await minderStore.setMode(props.minderKey, importJson.value.template);
     const root: MinderJsonNode = window.minder.getRoot();
     window.minder.toggleSelect(root); // 先取消选中
     window.minder.select(root); // 再选中，才能触发选中变化事件
@@ -264,6 +291,7 @@
 </script>
 
 <style lang="less">
+  @import '@/assets/icon-font/iconfont.css';
   @import '../style/editor.less';
   .save-btn {
     @apply !absolute;
@@ -274,6 +302,49 @@
   .ms-minder-dropdown {
     .arco-dropdown-list-wrapper {
       max-height: none;
+    }
+  }
+  .ms-minder-breadcrumb {
+    @apply bg-white p-0;
+    .arco-menu-inner {
+      @apply bg-white p-0;
+      .arco-menu-item {
+        @apply relative p-0;
+
+        padding-right: 24px;
+        max-width: 200px;
+        &:hover {
+          color: rgb(var(--primary-4));
+        }
+        &:not(:last-child)::after {
+          @apply absolute;
+
+          top: 50%;
+          right: 7px;
+          font-size: 12px;
+          font-family: iconfont;
+          content: '\e6d5';
+          color: var(--color-text-brand);
+          line-height: 16px;
+          transform: translateY(-50%);
+        }
+      }
+      .arco-menu-item,
+      .arco-menu-overflow-sub-menu {
+        @apply ml-0 bg-white;
+
+        color: var(--color-text-4);
+      }
+      .arco-menu-selected {
+        color: rgb(var(--primary-4));
+        &:hover {
+          @apply !bg-white;
+        }
+      }
+      .arco-menu-pop::after,
+      .arco-menu-selected-label {
+        @apply hidden;
+      }
     }
   }
 </style>

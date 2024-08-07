@@ -5,7 +5,7 @@ export default {
   'system.resourcePool.tableEnable': 'Enable',
   'system.resourcePool.tableEnabled': 'Enabled',
   'system.resourcePool.tableDisable': 'Disabled',
-  'system.resourcePool.tableDisabled': '已禁用',
+  'system.resourcePool.tableDisabled': 'Disabled',
   'system.resourcePool.editPool': 'Edit',
   'system.resourcePool.tableColumnName': 'Name',
   'system.resourcePool.tableColumnStatus': 'Status',
@@ -130,4 +130,5 @@ export default {
     'The community edition only supports 1 resource, if you need to add more resources, you can apply',
   'system.resourcePool.concurrentNumberMinToolTip':
     'The maximum number of concurrent requests for a single node in the Community version is 10. If you want more, you can apply',
+  'system.resourcePool.notExit': 'Resource pool does not exist',
 };

@@ -28,6 +28,13 @@
         set pos =#{pos}
         where id = #{id}
     </update>
+    <update id="setApiChangeByApiDefinitionId">
+        update api_test_case
+        set api_change = true, ignore_api_diff = false
+        where api_definition_id = #{apiDefinitionId}
+          and api_change is false
+          and ignore_api_change is false
+    </update>
 
     <select id="getPos" resultType="java.lang.Long">
         SELECT pos
@@ -60,7 +67,9 @@
         a.path,
         a.method,
         a.protocol,
-        atc.pos
+        atc.pos,
+        atc.api_change,
+        atc.ignore_api_change
         FROM
         api_test_case atc
         INNER JOIN api_definition a ON atc.api_definition_id = a.id
@@ -624,8 +633,15 @@
         api_test_case.create_user,
         api_test_case.environment_id
         from api_test_case
+        INNER JOIN api_definition ON api_test_case.api_definition_id = api_definition.id
         where api_test_case.deleted = false
         and api_test_case.project_id = #{projectId}
+        <if test="protocols != null and protocols.size() > 0">
+            and api_definition.protocol in
+            <foreach collection="protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
         <if test="!isRepeat">
             AND api_test_case.id not in (
             select test_plan_api_case.api_case_id from test_plan_api_case where test_plan_api_case.test_plan_id = #{testPlanId}
@@ -634,75 +650,83 @@
         order by api_test_case.pos asc
     </select>
 
-    <select id="selectCaseByModules" resultType="io.metersphere.api.domain.ApiTestCase">
+
+    <select id="getListBySelectModules" resultType="io.metersphere.api.domain.ApiTestCase">
         select
         api_test_case.id,
         api_test_case.create_user,
-        api_test_case.environment_id
+        api_test_case.environment_id,
+        api_test_case.pos
         from api_test_case
         inner join api_definition on api_definition.id = api_test_case.api_definition_id
         where api_test_case.deleted = false
         and api_test_case.project_id = #{projectId}
+        and api_definition.module_id in
+        <foreach collection="moduleIds" item="moduleId" open="(" separator="," close=")">
+            #{moduleId}
+        </foreach>
+        <if test="protocols != null and protocols.size() > 0">
+            and api_definition.protocol in
+            <foreach collection="protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
         <if test="!isRepeat">
             AND api_test_case.id not in (
-            select test_plan_api_case.api_case_id from test_plan_api_case where test_plan_api_case.test_plan_id = #{testPlanId}
+            select api_case_id from test_plan_api_case where test_plan_id = #{testPlanId}
             )
         </if>
-        <if test="dto.moduleIds != null and dto.moduleIds.size() > 0">
-            and api_definition.module_id in
-            <foreach collection="dto.moduleIds" item="moduleId" open="(" separator="," close=")">
-                #{moduleId}
-            </foreach>
-        </if>
-        <if test="dto.excludeIds != null and dto.excludeIds.size() > 0">
-            AND api_test_case.id not in
-            <foreach collection="dto.excludeIds" item="excludeId" separator="," open="(" close=")">
-                #{excludeId}
-            </foreach>
-        </if>
-        <if test="dto.selectIds != null and dto.selectIds.size() > 0">
-            or api_test_case.id in
-            <foreach collection="dto.selectIds" item="selectId" separator="," open="(" close=")">
-                #{selectId}
-            </foreach>
-        </if>
-        order by api_test_case.pos asc
     </select>
 
-    <select id="selectCaseByApiModules" resultType="io.metersphere.api.domain.ApiTestCase">
+    <select id="getListBySelectIds" resultType="io.metersphere.api.domain.ApiTestCase">
         select
         api_test_case.id,
         api_test_case.create_user,
-        api_test_case.environment_id
+        api_test_case.environment_id,
+        api_test_case.pos
         from api_test_case
         inner join api_definition on api_definition.id = api_test_case.api_definition_id
         where api_test_case.deleted = false
         and api_test_case.project_id = #{projectId}
+        AND api_test_case.id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+        <if test="protocols != null and protocols.size() > 0">
+            and api_definition.protocol in
+            <foreach collection="protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
+    </select>
+
+
+    <select id="getCaseListBySelectIds" resultType="io.metersphere.api.domain.ApiTestCase">
+        select
+        api_test_case.id,
+        api_test_case.create_user,
+        api_test_case.environment_id,
+        api_test_case.pos
+        from api_test_case
+        inner join api_definition on api_definition.id = api_test_case.api_definition_id
+        where api_test_case.deleted = false
+        and api_test_case.project_id = #{projectId}
+        and api_definition.id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+        <if test="protocols != null and protocols.size() > 0">
+            and api_definition.protocol in
+            <foreach collection="protocols" item="protocol" separator="," open="(" close=")">
+                #{protocol}
+            </foreach>
+        </if>
         <if test="!isRepeat">
             AND api_test_case.id not in (
-            select test_plan_api_case.api_case_id from test_plan_api_case where test_plan_api_case.test_plan_id =
-            #{testPlanId}
+            select api_case_id from test_plan_api_case where test_plan_id = #{testPlanId}
             )
         </if>
-        <if test="dto.moduleIds != null and dto.moduleIds.size() > 0">
-            and api_definition.module_id in
-            <foreach collection="dto.moduleIds" item="moduleId" open="(" separator="," close=")">
-                #{moduleId}
-            </foreach>
-        </if>
-        <if test="dto.excludeIds != null and dto.excludeIds.size() > 0">
-            AND api_definition.id not in
-            <foreach collection="dto.excludeIds" item="excludeId" separator="," open="(" close=")">
-                #{excludeId}
-            </foreach>
-        </if>
-        <if test="dto.selectIds != null and dto.selectIds.size() > 0">
-            or api_definition.id in
-            <foreach collection="dto.selectIds" item="selectId" separator="," open="(" close=")">
-                #{selectId}
-            </foreach>
-        </if>
-        order by api_test_case.pos asc
     </select>
+
 
 </mapper>

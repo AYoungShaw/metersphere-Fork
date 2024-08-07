@@ -84,6 +84,7 @@ export default {
   'caseManagement.caseReview.reviewResult': '评审结果',
   'caseManagement.caseReview.reviewResultTip': '“只看我的”开启时，可在列表上查看我的评审结果',
   'caseManagement.caseReview.disassociate': '取消关联',
+  'caseManagement.caseReview.disassociateCase': '取消关联用例',
   'caseManagement.caseReview.disassociateConfirmTitle': '确认取消关联 {count} 条用例吗？',
   'caseManagement.caseReview.version': '版本',
   'caseManagement.caseReview.unReview': '未评审',
@@ -103,7 +104,7 @@ export default {
   'caseManagement.caseReview.append': '追加',
   'caseManagement.caseReview.appendTip1': '开启：新增评审人',
   'caseManagement.caseReview.appendTip2': '关闭：更新评审人',
-  'caseManagement.caseReview.myReviewStatus': '我的评审状态',
+  'caseManagement.caseReview.myReviewStatus': '我的评审结果',
   'caseManagement.caseReview.caseLevel': '用例等级',
   'caseManagement.caseReview.caseVersion': '用例版本',
   'caseManagement.caseReview.caseStatus': '用例状态',
@@ -136,4 +137,6 @@ export default {
   'caseManagement.caseReview.reviewSuccess.widthAdmin':
     '提交成功！ 您不是当前项目指定的评审人，系统只会记录您的评审，不影响最终评审结果',
   'caseManagement.caseReview.reviewFormTip': '添加操作人的评审结果，多人评审需所有评审人评审通过',
+  'caseManagement.caseReview.reviewerTip': '如需评审用例，需要将用户添加为评审人；仅评审人的评审结果生效',
+  'caseManagement.caseReview.reviewDisabledTip': '非评审人不可评审，更改后可评审',
 };

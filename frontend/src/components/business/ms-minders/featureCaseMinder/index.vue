@@ -5,6 +5,7 @@
       v-model:extra-visible="extraVisible"
       v-model:loading="loading"
       v-model:import-json="importJson"
+      :minder-key="MinderKeyEnum.FEATURE_CASE_MINDER"
       :tags="[]"
       :replaceable-tags="replaceableTags"
       :insert-node="insertNode"
@@ -18,8 +19,14 @@
       :can-show-paste-menu="!stopPaste()"
       :can-show-more-menu="canShowMoreMenu()"
       :can-show-priority-menu="canShowPriorityMenu()"
+      :custom-batch-expand="customBatchExpand"
+      :can-show-batch-expand="canShowBatchExpand()"
+      :can-show-batch-cut="true"
+      :can-show-batch-copy="true"
+      :can-show-batch-delete="true"
       :priority-tooltip="t('caseManagement.caseReview.caseLevel')"
       :disabled="!hasEditPermission"
+      can-show-more-batch-menu
       single-tag
       tag-enable
       sequence-enable
@@ -70,7 +77,11 @@
   import MsButton from '@/components/pure/ms-button/index.vue';
   import MsMinderEditor from '@/components/pure/ms-minder-editor/minderEditor.vue';
   import type { MinderJson, MinderJsonNode, MinderJsonNodeData } from '@/components/pure/ms-minder-editor/props';
-  import { setPriorityView } from '@/components/pure/ms-minder-editor/script/tool/utils';
+  import {
+    clearSelectedNodes,
+    expendNodeAndChildren,
+    setPriorityView,
+  } from '@/components/pure/ms-minder-editor/script/tool/utils';
   import { MsFileItem } from '@/components/pure/ms-upload/types';
   import attachment from './attachment.vue';
   import baseInfo from './basInfo.vue';
@@ -88,7 +99,7 @@
   import useAppStore from '@/store/modules/app';
   import useMinderStore from '@/store/modules/components/minder-editor/index';
   import { MinderCustomEvent } from '@/store/modules/components/minder-editor/types';
-  import { filterTree, findNodeByKey, getGenerateId, mapTree, replaceNodeInTree } from '@/utils';
+  import { filterTree, findNodeByKey, getGenerateId, mapTree, replaceNodeInTree, traverseTree } from '@/utils';
   import { hasAnyPermission } from '@/utils/permission';
 
   import {
@@ -97,7 +108,7 @@
     FeatureCaseMinderUpdateParams,
   } from '@/models/caseManagement/featureCase';
   import { MoveMode, TableQueryParams } from '@/models/common';
-  import { MinderEventName } from '@/enums/minderEnum';
+  import { MinderEventName, MinderKeyEnum } from '@/enums/minderEnum';
 
   import useMinderBaseApi from './useMinderBaseApi';
   import { convertToFile } from '@/views/case-management/caseManagementFeature/components/utils';
@@ -139,7 +150,6 @@
   } = useMinderBaseApi({ hasEditPermission });
   const importJson = ref<MinderJson>({
     root: {} as MinderJsonNode,
-    template: 'default',
     treePath: [],
   });
   const caseTree = ref<MinderJsonNode[]>([]);
@@ -195,12 +205,13 @@
         children: caseTree.value,
         data: {
           id: 'NONE',
-          text: t('ms.minders.allModule'),
+          text: t('caseManagement.caseReview.allCases'),
           resource: [moduleTag],
           disabled: true,
         },
       };
       importJson.value.treePath = [];
+      clearSelectedNodes();
       window.minder.importJson(importJson.value);
       if (props.moduleId !== 'all') {
         // 携带具体的模块 ID 加载时，进入该模块内
@@ -449,7 +460,11 @@
         waitingRenderNodes.push(moreNode);
       }
       window.minder.renderNodeBatch(waitingRenderNodes);
-      node.layout();
+      if (node.parent) {
+        node.parent?.layout();
+      } else {
+        node.layout();
+      }
       data.isLoaded = true;
       // 加载完用例数据后，更新当前importJson数据
       replaceNodeInTree([importJson.value.root], node.data?.id || '', window.minder.exportNode(node), 'data', 'id');
@@ -586,6 +601,8 @@
       if (extraVisible.value) {
         toggleDetail(true);
       }
+      // 用例下面所有节点都展开
+      expendNodeAndChildren(node);
     } else if (data?.resource?.includes(moduleTag) && data.count > 0 && data.isLoaded !== true) {
       // 模块节点且有用例且未加载过用例数据
       await initNodeCases(node);
@@ -692,12 +709,32 @@
   }
 
   /**
+   * 批量展开节点
+   */
+  function customBatchExpand(node: MinderJsonNode) {
+    if (node.data?.resource?.includes(caseTag)) {
+      expendNodeAndChildren(node);
+    }
+  }
+
+  /**
+   * 判断是否显示批量展开按钮
+   */
+  function canShowBatchExpand() {
+    if (window.minder) {
+      const nodes: MinderJsonNode[] = window.minder.getSelectedNodes();
+      return nodes.some((node) => !!node.data?.resource?.includes(caseTag));
+    }
+    return false;
+  }
+
+  /**
    * 解析用例节点信息
    * @param node 用例节点
    */
   function getCaseNodeInfo(node?: MinderJsonNode) {
     let textStep: MinderJsonNode | undefined; // 文本描述
-    let prerequisiteNode: MinderJsonNode | undefined; // 前置条件
+    let prerequisiteNode: MinderJsonNode | undefined; // 前置操作
     let remarkNode: MinderJsonNode | undefined; // 备注
     const stepNodes: MinderJsonNode[] = []; // 步骤描述
     node?.children?.forEach((item) => {
@@ -760,6 +797,21 @@
       deleteResourceList: clearDeleteResource ? [] : tempMinderParams.value.deleteResourceList, // 请求错误的时候，删除的资源不清空，因为此时节点已经被脑图删除
       additionalNodeList: [],
     };
+    if (clearDeleteResource) {
+      traverseTree(importJson.value.root.children, (node) => {
+        const minderNode: MinderJsonNode = window.minder.getNodeById(node.data.id);
+        if (minderNode?.data) {
+          // 能找到对应的脑图节点，重置 isNew 和 changed 状态
+          minderNode.data.isNew = false;
+          minderNode.data.changed = false;
+        } else {
+          // 找不到对应的脑图节点，说明当前是进入了模块层级，之前更改的节点没有渲染，重置源数据 isNew 和 changed 状态
+          node.data.isNew = false;
+          node.data.changed = false;
+        }
+        return true;
+      });
+    }
   }
 
   /**
@@ -808,16 +860,6 @@
           });
         }
       }
-      const minderNode: MinderJsonNode = window.minder.getNodeById(node.data.id);
-      if (minderNode?.data) {
-        // 能找到对应的脑图节点，重置 isNew 和 changed 状态
-        minderNode.data.isNew = false;
-        minderNode.data.changed = false;
-      } else {
-        // 找不到对应的脑图节点，说明当前是进入了模块层级，之前更改的节点没有渲染，重置源数据 isNew 和 changed 状态
-        node.data.isNew = false;
-        node.data.changed = false;
-      }
       return true;
     });
     return tempMinderParams.value;
@@ -828,7 +870,7 @@
    * @param fullJson 脑图导出的完整数据
    * @param callback 保存成功回调
    */
-  async function handleMinderSave(fullJson: MinderJson, callback: (refersh: boolean) => void) {
+  async function handleMinderSave(fullJson: MinderJson, callback: (refresh: boolean) => void) {
     try {
       loading.value = true;
       await saveCaseMinder(makeMinderParams(fullJson));

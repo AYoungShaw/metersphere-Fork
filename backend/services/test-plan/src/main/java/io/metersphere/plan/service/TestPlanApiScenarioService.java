@@ -57,10 +57,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -113,9 +110,15 @@ public class TestPlanApiScenarioService extends TestPlanResourceService {
     private TestPlanConfigService testPlanConfigService;
 
     @Override
-    public List<TestPlanResourceExecResultDTO> selectDistinctExecResult(String projectId) {
+    public List<TestPlanResourceExecResultDTO> selectDistinctExecResultByProjectId(String projectId) {
         return extTestPlanApiScenarioMapper.selectDistinctExecResult(projectId);
     }
+
+    @Override
+    public List<TestPlanResourceExecResultDTO> selectDistinctExecResultByTestPlanIds(List<String> testPlanIds) {
+        return extTestPlanApiScenarioMapper.selectDistinctExecResultByTestPlanIds(testPlanIds);
+    }
+
     @Override
     public void deleteBatchByTestPlanId(List<String> testPlanIdList) {
         TestPlanApiScenarioExample example = new TestPlanApiScenarioExample();
@@ -198,15 +201,38 @@ public class TestPlanApiScenarioService extends TestPlanResourceService {
             apiScenarioList.forEach(apiScenario -> {
                 super.checkCollection(testPlan.getId(), apiScenario.getCollectionId(), CaseType.SCENARIO_CASE.getKey());
                 boolean selectAllModule = apiScenario.getModules().isSelectAllModule();
-                List<Map<String, ModuleSelectDTO>> moduleMaps = apiScenario.getModules().getModuleMaps();
+                Map<String, ModuleSelectDTO> moduleMaps = apiScenario.getModules().getModuleMaps();
+                moduleMaps.remove(MODULE_ALL);
                 if (selectAllModule) {
                     // 选择了全部模块
                     List<ApiScenario> scenarioList = extApiScenarioMapper.selectAllCase(isRepeat, apiScenario.getModules().getProjectId(), testPlan.getId());
-                    buildTestPlanApiScenarioDTO(apiScenario, scenarioList, testPlan, user, testPlanApiScenarioList);
+                    buildTestPlanApiScenarioDTO(apiScenario.getCollectionId(), scenarioList, testPlan, user, testPlanApiScenarioList);
                 } else {
                     AssociateCaseDTO dto = super.getCaseIds(moduleMaps);
-                    List<ApiScenario> scenarioList = extApiScenarioMapper.selectCaseByModules(isRepeat, apiScenario.getModules().getProjectId(), dto, testPlan.getId());
-                    buildTestPlanApiScenarioDTO(apiScenario, scenarioList, testPlan, user, testPlanApiScenarioList);
+                    List<ApiScenario> scenarioList = new ArrayList<>();
+                    //获取全选的模块数据
+                    if (CollectionUtils.isNotEmpty(dto.getModuleIds())) {
+                        scenarioList = extApiScenarioMapper.getListBySelectModules(isRepeat, apiScenario.getModules().getProjectId(), dto.getModuleIds(), testPlan.getId());
+                    }
+
+                    if (CollectionUtils.isNotEmpty(dto.getSelectIds())) {
+                        CollectionUtils.removeAll(dto.getSelectIds(), scenarioList.stream().map(ApiScenario::getId).toList());
+                        //获取选中的ids数据
+                        List<ApiScenario> selectIdList = extApiScenarioMapper.getListBySelectIds(apiScenario.getModules().getProjectId(), dto.getSelectIds(), testPlan.getId());
+                        scenarioList.addAll(selectIdList);
+                    }
+
+                    if (CollectionUtils.isNotEmpty(dto.getExcludeIds())) {
+                        //排除的ids
+                        List<String> excludeIds = dto.getExcludeIds();
+                        scenarioList = scenarioList.stream().filter(item -> !excludeIds.contains(item.getId())).toList();
+                    }
+
+                    if (CollectionUtils.isNotEmpty(scenarioList)) {
+                        List<ApiScenario> list = scenarioList.stream().sorted(Comparator.comparing(ApiScenario::getPos)).toList();
+                        buildTestPlanApiScenarioDTO(apiScenario.getCollectionId(), list, testPlan, user, testPlanApiScenarioList);
+                    }
+
                 }
             });
         }
@@ -215,20 +241,20 @@ public class TestPlanApiScenarioService extends TestPlanResourceService {
     /**
      * 构建测试计划场景用例对象
      *
-     * @param apiScenario
+     * @param collectionId
      * @param scenarioList
      * @param testPlan
      * @param user
      * @param testPlanApiScenarioList
      */
-    public void buildTestPlanApiScenarioDTO(BaseCollectionAssociateRequest apiScenario, List<ApiScenario> scenarioList, TestPlan testPlan, SessionUser user, List<TestPlanApiScenario> testPlanApiScenarioList) {
-        AtomicLong nextOrder = new AtomicLong(getNextOrder(apiScenario.getCollectionId()));
+    public void buildTestPlanApiScenarioDTO(String collectionId, List<ApiScenario> scenarioList, TestPlan testPlan, SessionUser user, List<TestPlanApiScenario> testPlanApiScenarioList) {
+        AtomicLong nextOrder = new AtomicLong(getNextOrder(collectionId));
         scenarioList.forEach(scenario -> {
             TestPlanApiScenario testPlanApiScenario = new TestPlanApiScenario();
             testPlanApiScenario.setId(IDGenerator.nextStr());
             testPlanApiScenario.setTestPlanId(testPlan.getId());
             testPlanApiScenario.setApiScenarioId(scenario.getId());
-            testPlanApiScenario.setTestPlanCollectionId(apiScenario.getCollectionId());
+            testPlanApiScenario.setTestPlanCollectionId(collectionId);
             testPlanApiScenario.setGrouped(scenario.getGrouped());
             testPlanApiScenario.setEnvironmentId(scenario.getEnvironmentId());
             testPlanApiScenario.setCreateTime(System.currentTimeMillis());
@@ -502,10 +528,8 @@ public class TestPlanApiScenarioService extends TestPlanResourceService {
         List<FunctionalCaseModuleCountDTO> projectModuleCountDTOList = extTestPlanApiScenarioMapper.countModuleIdByRequest(request, false);
         Map<String, List<FunctionalCaseModuleCountDTO>> projectCountMap = projectModuleCountDTOList.stream().collect(Collectors.groupingBy(FunctionalCaseModuleCountDTO::getProjectId));
         Map<String, Long> projectModuleCountMap = projectModuleCountDTOList.stream()
-                .collect(Collectors.groupingBy(
-                        FunctionalCaseModuleCountDTO::getModuleId,
-                        Collectors.summingLong(FunctionalCaseModuleCountDTO::getDataCount)));
-
+                .filter(item -> StringUtils.equals(item.getModuleId(), item.getProjectId() + "_" + ModuleConstants.DEFAULT_NODE_ID))
+                .collect(Collectors.groupingBy(FunctionalCaseModuleCountDTO::getModuleId, Collectors.summingLong(FunctionalCaseModuleCountDTO::getDataCount)));
         projectCountMap.forEach((projectId, moduleCountDTOList) -> {
             List<ModuleCountDTO> moduleCountDTOS = new ArrayList<>();
             for (FunctionalCaseModuleCountDTO functionalCaseModuleCountDTO : moduleCountDTOList) {

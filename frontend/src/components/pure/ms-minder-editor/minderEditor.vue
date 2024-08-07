@@ -34,12 +34,14 @@
   import { MinderEventName } from '@/enums/minderEnum';
 
   import useMinderEventListener from './hooks/useMinderEventListener';
+  import useMinderOperation from './hooks/useMinderOperation';
+  import useShortCut from './hooks/useShortCut';
   import {
+    batchMenuProps,
     delProps,
     editMenuProps,
     floatMenuProps,
     headerProps,
-    insertProps,
     mainEditorProps,
     MinderEvent,
     MinderJson,
@@ -56,6 +58,7 @@
     (e: 'save', data: MinderJson, callback: () => void): void;
     (e: 'afterMount'): void;
     (e: 'nodeSelect', data: MinderJsonNode): void;
+    (e: 'nodeBatchSelect', data: MinderJsonNode[]): void;
     (e: 'contentChange', data?: MinderJsonNode): void;
     (e: 'action', event: MinderCustomEvent): void;
     (e: 'beforeExecCommand', event: MinderEvent): void;
@@ -66,7 +69,6 @@
   const props = defineProps({
     ...headerProps,
     ...floatMenuProps,
-    ...insertProps,
     ...editMenuProps,
     ...mainEditorProps,
     ...moleProps,
@@ -74,6 +76,7 @@
     ...tagProps,
     ...delProps,
     ...viewMenuProps,
+    ...batchMenuProps,
   });
 
   const minderStore = useMinderStore();
@@ -115,10 +118,54 @@
     emit('save', data, callback);
   }
 
+  const { appendChildNode, appendSiblingNode, minderDelete, minderExpand } = useMinderOperation(props);
+  const { unbindShortcuts } = useShortCut(
+    {
+      undo: () => {
+        window.minderHistory?.undo();
+      },
+      redo: () => {
+        window.minderHistory?.redo();
+      },
+      enter: () => {
+        if (props.canShowEnterNode) {
+          const selectedNodes: MinderJsonNode[] = window.minder.getSelectedNodes();
+          minderStore.dispatchEvent(MinderEventName.ENTER_NODE, undefined, undefined, undefined, [selectedNodes[0]]);
+        }
+      },
+      delete: () => {
+        const selectedNodes: MinderJsonNode[] = window.minder.getSelectedNodes();
+        minderDelete(selectedNodes);
+      },
+      expand: () => {
+        const selectedNodes: MinderJsonNode[] = window.minder.getSelectedNodes();
+        minderExpand(selectedNodes);
+      },
+      appendChildNode: () => {
+        if (props.insertSonMenus.length > 0 || props.insertNode) {
+          const selectedNodes: MinderJsonNode[] = window.minder.getSelectedNodes();
+          appendChildNode(selectedNodes);
+        }
+      },
+      appendSiblingNode: () => {
+        if (props.insertSiblingMenus.length > 0 || props.insertNode) {
+          const selectedNodes: MinderJsonNode[] = window.minder.getSelectedNodes();
+          appendSiblingNode(selectedNodes);
+        }
+      },
+    },
+    props
+  );
+
   onMounted(() => {
     window.minderProps = props;
     useMinderEventListener({
-      handleSelectionChange: (node?: MinderJsonNode) => {
+      handleSelectionChange: (nodes: MinderJsonNode[]) => {
+        if (nodes && nodes.length > 1) {
+          emit('nodeBatchSelect', nodes);
+          return;
+        }
+        const node = nodes[0];
         if (node) {
           emit('nodeSelect', node);
           const box = node.getRenderBox();
@@ -143,6 +190,10 @@
         emit('action', event);
       },
       handleBeforeExecCommand: (event) => {
+        if (['movetoparent', 'arrange'].includes(event.commandName) && props.disabled) {
+          event.stopPropagation();
+          return;
+        }
         emit('beforeExecCommand', event);
       },
       handleViewChange() {
@@ -152,6 +203,10 @@
         minderStore.dispatchEvent(MinderEventName.DRAG_FINISH);
       },
     });
+  });
+
+  onUnmounted(() => {
+    unbindShortcuts();
   });
 </script>
 

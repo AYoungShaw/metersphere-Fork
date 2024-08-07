@@ -17,7 +17,7 @@
       :init-file-save-tips="t('ms.upload.waiting_save')"
       :show-upload-type-desc="true"
       :handle-delete="deleteFileHandler"
-      show-delete
+      :show-delete="!props.disabled"
       button-in-title
     >
       <template #title="{ item }">
@@ -30,7 +30,7 @@
         <!-- 本地文件 -->
         <div v-if="item.local || item.status === 'init'" class="flex flex-nowrap">
           <MsButton
-            v-if="item.status !== 'init' && item.file.type.includes('image/')"
+            v-if="item.file.type.includes('/image')"
             type="button"
             status="primary"
             class="!mr-[4px]"
@@ -38,7 +38,7 @@
           >
             {{ t('ms.upload.preview') }}
           </MsButton>
-          <MsButton type="button" status="primary" class="!mr-[4px]" @click="transferFile(item)">
+          <MsButton v-if="!props.disabled" type="button" status="primary" class="!mr-[4px]" @click="transferFile(item)">
             {{ t('caseManagement.featureCase.storage') }}
           </MsButton>
           <SaveAsFilePopover
@@ -136,6 +136,7 @@
   const props = defineProps<{
     activeCase: Record<string, any>;
     notShowAddButton?: boolean;
+    disabled?: boolean;
   }>();
   const emit = defineEmits<{
     (e: 'uploadSuccess'): void;
@@ -224,9 +225,7 @@
   // 预览图片
   async function handlePreview(item: MsFileItem) {
     try {
-      imageUrl.value = '';
-      previewVisible.value = true;
-      if (!item.local) {
+      if (item.status !== 'init') {
         const res = await previewFile({
           projectId: appStore.currentProjectId,
           caseId: props.activeCase.id,
@@ -238,6 +237,7 @@
       } else {
         imageUrl.value = item.url || '';
       }
+      previewVisible.value = true;
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
@@ -335,4 +335,8 @@
   }
 </script>
 
-<style lang="less" scoped></style>
+<style lang="less" scoped>
+  :deep(.file-name-first) {
+    max-width: 170px;
+  }
+</style>

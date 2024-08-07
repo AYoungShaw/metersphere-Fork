@@ -49,8 +49,6 @@
         </popConfirm>
       </div>
     </div>
-    <a-divider class="my-[8px]" />
-
     <a-spin class="w-full" :style="{ height: `calc(100vh - 248px)` }" :loading="loading">
       <MsTree
         v-model:focus-node-key="focusNodeKey"
@@ -145,7 +143,7 @@
   import { useI18n } from '@/hooks/useI18n';
   import useModal from '@/hooks/useModal';
   import useAppStore from '@/store/modules/app';
-  import { mapTree } from '@/utils';
+  import { characterLimit, mapTree } from '@/utils';
   import { hasAnyPermission } from '@/utils/permission';
 
   import { ApiScenarioGetModuleParams } from '@/models/apiTest/scenario';
@@ -341,7 +339,7 @@
   function deleteFolder(node: MsTreeNodeData) {
     openModal({
       type: 'error',
-      title: t('apiScenario.module.deleteTipTitle', { name: node.name }),
+      title: t('apiScenario.module.deleteTipTitle', { name: characterLimit(node.name) }),
       content: t('apiScenario.module.deleteTipContent'),
       okText: t('apiScenario.deleteConfirm'),
       okButtonProps: {

@@ -70,6 +70,17 @@
         <template #statusName="{ record }">
           {{ record.statusName || '-' }}
         </template>
+        <template #handleUserTitle>
+          <div class="flex items-center text-[var(--color-text-3)]">
+            {{ t('bugManagement.handleMan') }}
+            <a-tooltip :content="t('bugManagement.handleManTips')" position="right">
+              <icon-question-circle
+                class="ml-[4px] text-[var(--color-text-4)] hover:text-[rgb(var(--primary-5))]"
+                size="16"
+              />
+            </a-tooltip>
+          </div>
+        </template>
       </MsBaseTable>
     </div>
   </MsCard>
@@ -116,13 +127,16 @@
     v-model:visible="exportVisible"
     :export-loading="exportLoading"
     :all-data="exportOptionData"
+    :disabled-cancel-keys="['name']"
     @confirm="exportConfirm"
   >
     <template #title>
-      <span class="text-[var(--color-text-1)]">{{ t('bugManagement.exportBug') }}</span>
-      <span v-if="currentSelectParams.currentSelectCount" class="text-[var(--color-text-4)]"
-        >({{ t('bugManagement.exportBugCount', { count: currentSelectParams.currentSelectCount }) }})</span
-      >
+      <div>
+        <span class="text-[var(--color-text-1)]">{{ t('bugManagement.exportBug') }}</span>
+        <span v-if="currentSelectParams.currentSelectCount" class="text-[var(--color-text-4)]">
+          ({{ t('bugManagement.exportBugCount', { count: currentSelectParams.currentSelectCount }) }})
+        </span>
+      </div>
     </template>
   </MsExportDrawer>
   <BugDetailDrawer
@@ -156,7 +170,6 @@
   import { useRoute } from 'vue-router';
   import { useIntervalFn } from '@vueuse/core';
   import { Message, TableData } from '@arco-design/web-vue';
-  import { cloneDeep } from 'lodash-es';
 
   import { MsAdvanceFilter, timeSelectOptions } from '@/components/pure/ms-advance-filter';
   import { BackEndEnum, FilterFormItem, FilterResult, FilterType } from '@/components/pure/ms-advance-filter/type';
@@ -186,7 +199,6 @@
   import useModal from '@/hooks/useModal';
   import router from '@/router';
   import { useAppStore, useTableStore } from '@/store';
-  import useLicenseStore from '@/store/modules/setting/license';
   import { customFieldDataToTableData, customFieldToColumns, downloadByteFile } from '@/utils';
   import { hasAnyPermission } from '@/utils/permission';
 
@@ -221,8 +233,6 @@
   const batchEditVisible = ref(false);
   const keyword = ref('');
   const filterResult = ref<FilterResult>({ accordBelow: 'AND', combine: {} });
-  const licenseStore = useLicenseStore();
-  const isXpack = computed(() => licenseStore.hasLicense());
   const { openDeleteModal } = useModal();
   const route = useRoute();
   const severityFilterOptions = ref<BugOptionItem[]>([]);
@@ -315,7 +325,7 @@
       title: 'bugManagement.status',
       dataIndex: 'status',
       width: 100,
-      showTooltip: true,
+      showTooltip: false,
       slotName: 'statusName',
       filterConfig: {
         options: [],
@@ -328,6 +338,7 @@
       title: 'bugManagement.handleMan',
       dataIndex: 'handleUser',
       slotName: 'handleUser',
+      titleSlotName: 'handleUserTitle',
       showTooltip: true,
       width: 125,
       filterConfig: {
@@ -773,11 +784,12 @@
     try {
       customColumns = await getCustomFieldColumns();
       customColumns.forEach((item) => {
+        // 目前自定义字段的过滤只支持严重程度
         if (item.title === '严重程度' || item.title === 'Bug Degree') {
           item.showInTable = true;
           item.slotName = 'severity';
           item.filterConfig = {
-            options: cloneDeep(unref(severityFilterOptions.value)) || [],
+            options: item.options || [],
             labelKey: 'text',
           };
         } else {

@@ -67,7 +67,7 @@
             >
             <div class="flex-1 overflow-hidden">
               <a-tooltip :content="caseDetail.name">
-                <div class="one-line-text max-w-[100%] font-medium">
+                <div class="one-line-text w-[fit-content] max-w-[100%] font-medium">
                   {{ caseDetail.name }}
                 </div>
               </a-tooltip>
@@ -130,7 +130,12 @@
                     <span class="ml-1 text-[rgb(var(--danger-6))]">{{ caseDetail.bugListCount }}</span>
                   </MsTag>
                   <a-dropdown @select="handleSelect">
-                    <a-button v-if="hasAnyPermission(['PROJECT_BUG:READ'])" type="outline" size="small" class="ml-1">
+                    <a-button
+                      v-if="hasAllPermission(['PROJECT_BUG:READ', 'PROJECT_TEST_PLAN:READ+EXECUTE'])"
+                      type="outline"
+                      size="small"
+                      class="ml-1"
+                    >
                       <template #icon> <icon-plus class="text-[12px]" /> </template>
                     </a-button>
                     <template #content>
@@ -186,7 +191,7 @@
             ref="bugRef"
             :case-id="activeCaseId"
             :test-plan-case-id="activeId"
-            :can-edit="canEdit"
+            :can-edit="canEdit && hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])"
             @link="linkDefect"
             @new="addBug"
             @update-count="loadCaseDetail()"
@@ -195,6 +200,8 @@
             v-if="activeTab === 'executionHistory'"
             :execute-list="executeHistoryList"
             :loading="executeLoading"
+            height="h-[calc(100vh-240px)]"
+            show-step-detail-trigger
           />
         </div>
       </a-spin>
@@ -254,7 +261,7 @@
   import { useI18n } from '@/hooks/useI18n';
   import useOpenNewPage from '@/hooks/useOpenNewPage';
   import useAppStore from '@/store/modules/app';
-  import { hasAnyPermission } from '@/utils/permission';
+  import { hasAllPermission, hasAnyPermission } from '@/utils/permission';
 
   import type { TableQueryParams } from '@/models/common';
   import type { ExecuteHistoryItem, PlanDetailFeatureCaseItem, TestPlanDetail } from '@/models/testPlan/testPlan';
@@ -313,7 +320,6 @@
     try {
       caseListLoading.value = true;
       const res = await getPlanDetailFeatureCaseList({
-        projectId: appStore.currentProjectId,
         testPlanId: route.query.id as string,
         keyword: keyword.value,
         current: pageNation.value.current || 1,
@@ -557,7 +563,17 @@
   onBeforeMount(async () => {
     const lastPageParams = window.history.state.params ? JSON.parse(window.history.state.params) : null; // 获取上个页面带过来的表格查询参数
     if (lastPageParams) {
-      const { total, pageSize, current, keyword: _keyword, sort, moduleIds } = lastPageParams;
+      const {
+        total,
+        pageSize,
+        current,
+        keyword: _keyword,
+        sort,
+        moduleIds,
+        collectionId,
+        treeType,
+        projectId,
+      } = lastPageParams;
       pageNation.value = {
         total: total || 0,
         pageSize,
@@ -567,6 +583,9 @@
       otherListQueryParams.value = {
         sort,
         moduleIds,
+        collectionId,
+        treeType,
+        projectId,
       };
     }
     getPlanDetail();

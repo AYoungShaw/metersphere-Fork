@@ -26,9 +26,8 @@
             field="title"
             :label="t('bugManagement.bugName')"
             :rules="[{ required: true, message: t('bugManagement.edit.nameIsRequired') }]"
-            :placeholder="t('bugManagement.edit.pleaseInputBugName')"
           >
-            <a-input v-model="form.title" :max-length="255" />
+            <a-input v-model="form.title" :placeholder="t('bugManagement.edit.pleaseInputBugName')" :max-length="255" />
           </a-form-item>
           <a-form-item v-if="!isPlatformDefaultTemplate" field="description" :label="t('bugManagement.edit.content')">
             <MsRichText
@@ -38,7 +37,7 @@
               :preview-url="EditorPreviewFileUrl"
             />
           </a-form-item>
-          <!-- 平台默认模板展示字段, 暂时支持输入框, 富文本类型   -->
+          <!-- 平台默认模板展示字段, 暂时支持输入框, 富文本类型 -->
           <div v-if="isPlatformDefaultTemplate">
             <a-form-item
               v-for="(value, key) in form.platformSystemFields"
@@ -260,6 +259,7 @@
   import { AssociatedList, AttachFileInfo } from '@/models/caseManagement/featureCase';
   import { TableQueryParams } from '@/models/common';
   import { SelectValue } from '@/models/projectManagement/menuManagement';
+  import type { CustomField } from '@/models/setting/template';
   import { BugManagementRouteEnum } from '@/enums/routeEnum';
 
   import { convertToFile } from '../case-management/caseManagementFeature/components/utils';
@@ -383,15 +383,32 @@
   const getFormRules = (arr: BugEditCustomField[]) => {
     formRules.value = [];
     const memberType = ['MEMBER', 'MULTIPLE_MEMBER'];
+    const multipleType = ['MULTIPLE_SELECT', 'CHECKBOX'];
+    const numberType = ['INT', 'FLOAT'];
 
     if (Array.isArray(arr) && arr.length) {
       formRules.value = arr.map((item: any) => {
-        let initValue = item.defaultValue;
         const initOptions = item.options ? item.options : JSON.parse(item.platformOptionJson);
-        if (memberType.includes(item.type)) {
-          if (item.defaultValue === 'CREATE_USER' || item.defaultValue.includes('CREATE_USER')) {
-            initValue = item.type === 'MEMBER' ? userStore.id : [userStore.id];
+        let initValue;
+        if (!isEditOrCopy.value) {
+          initValue = item.defaultValue;
+          if (memberType.includes(item.type)) {
+            if (item.defaultValue === 'CREATE_USER' || item.defaultValue.includes('CREATE_USER')) {
+              initValue = item.type === 'MEMBER' ? userStore.id : [userStore.id];
+            } else if (item.type === 'MULTIPLE_MEMBER' && item.defaultValue) {
+              initValue = JSON.parse(item.defaultValue);
+            }
+          } else if (multipleType.includes(item.type)) {
+            if (item.defaultValue && Array.isArray(item.defaultValue) && item.defaultValue.length > 0) {
+              initValue = item.defaultValue;
+            } else if (item.defaultValue && typeof item.defaultValue === 'string') {
+              initValue = item.defaultValue ? JSON.parse(item.defaultValue) : [];
+            }
+          } else if (numberType.includes(item.type)) {
+            initValue = Number(initValue);
           }
+        } else {
+          initValue = null;
         }
         return {
           type: item.type,
@@ -432,6 +449,10 @@
           });
         }
         getFormRules(res.customFields.filter((field: Record<string, any>) => !field.platformSystemField));
+        // 回显默认系统模板字段
+        res.systemFields.forEach((item: CustomField) => {
+          form.value[item.fieldId] = item.defaultValue;
+        });
       } catch (error) {
         // eslint-disable-next-line no-console
         console.log(error);
@@ -578,7 +599,7 @@
                     value: form.value.platformSystemFields[key],
                   });
                 });
-                delete form.value.platformSystemFields;
+                // delete form.value.platformSystemFields;
                 // 平台默认模板不传递名称, 描述, 标签等参数
                 delete form.value.title;
                 delete form.value.description;
@@ -742,11 +763,12 @@
         } else if (item.type === 'INT' || item.type === 'FLOAT') {
           tmpObj[item.id] = Number(item.value);
         } else if (item.type === 'CASCADER') {
-          const arr = JSON.parse(item.value);
-          if (arr && arr instanceof Array && arr.length > 0) {
-            tmpObj[item.id] = arr[arr.length - 1];
+          if (item.value) {
+            const arr = JSON.parse(item.value);
+            if (arr && arr instanceof Array && arr.length > 0) {
+              tmpObj[item.id] = arr[arr.length - 1];
+            }
           }
-          // 单选多选项
         } else if (SINGRADIO_TYPE.includes(item.type)) {
           const multipleOptions = getOptionFromTemplate(
             currentCustomFields.value.find((filed: any) => item.id === filed.fieldId)

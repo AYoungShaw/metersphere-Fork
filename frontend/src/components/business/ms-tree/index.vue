@@ -6,6 +6,7 @@
       ref="treeRef"
       v-model:selected-keys="selectedKeys"
       v-model:checked-keys="checkedKeys"
+      v-model:half-checked-keys="halfCheckedKeys"
       :data="filterTreeData"
       class="ms-tree"
       :allow-drop="handleAllowDrop"
@@ -30,7 +31,7 @@
               <icon-caret-down v-if="_props.expanded" class="text-[var(--color-text-4)]" />
               <icon-caret-right v-else class="text-[var(--color-text-4)]" />
             </div>
-            <div v-else class="h-full w-[16px]"></div>
+            <div v-else-if="!props.hideSwitcherIfNoChildren" class="h-full w-[16px]"></div>
           </template>
           <a-tooltip
             v-if="$slots['title']"
@@ -97,7 +98,7 @@
   import type { ActionsItem } from '@/components/pure/ms-table-more-action/types';
 
   import useContainerShadow from '@/hooks/useContainerShadow';
-  import { mapTree } from '@/utils';
+  import { findNodeByKey, mapTree, traverseTree } from '@/utils';
 
   import type { MsTreeExpandedData, MsTreeFieldNames, MsTreeNodeData, MsTreeSelectedData } from './types';
   import { VirtualListProps } from '@arco-design/web-vue/es/_components/virtual-list-v2/interface';
@@ -119,11 +120,17 @@
       emptyText?: string; // 空数据时的文案
       checkable?: boolean; // 是否可选中
       checkedStrategy?: 'all' | 'parent' | 'child'; // 选中节点时的策略
+      checkStrictly?: boolean; // 是否取消父子节点关联
       virtualListProps?: VirtualListProps; // 虚拟滚动列表的属性
       disabledTitleTooltip?: boolean; // 是否禁用标题 tooltip
       actionOnNodeClick?: 'expand'; // 点击节点时的操作
       nodeHighlightClass?: string; // 节点高亮背景色
       hideSwitcher?: boolean; // 隐藏展开折叠图标
+      hideSwitcherIfNoChildren?: boolean; // 隐藏无子节点的节点的展开折叠图标
+      handleDrop?: boolean; // 是否处理拖拽
+      // 是否使用新的映射数据
+      // (使用映射数据代表会根据传入的 data 深拷贝出新的 filterTreeData 树，此时针对 slot 传入的 node 节点的操作都不会影响data；不使用则代表 data 和 filterTreeData 节点数据是共用的，区别只在搜索展示数量不同)
+      useMapData?: boolean;
       titleTooltipPosition?:
         | 'top'
         | 'tl'
@@ -153,6 +160,8 @@
         isLeaf: 'isLeaf',
       }),
       disabledTitleTooltip: false,
+      useMapData: true,
+      hideSwitcherIfNoChildren: false,
     }
   );
 
@@ -167,8 +176,8 @@
     ): void;
     (e: 'moreActionSelect', item: ActionsItem, node: MsTreeNodeData): void;
     (e: 'moreActionsClose'): void;
-    (e: 'check', val: Array<string | number>): void;
-    (e: 'expand', node: MsTreeExpandedData): void;
+    (e: 'check', val: Array<string | number>, node: MsTreeNodeData): void;
+    (e: 'expand', node: MsTreeExpandedData, _expandKeys: Array<string | number>): void;
   }>();
 
   const data = defineModel<MsTreeNodeData[]>('data', {
@@ -180,9 +189,13 @@
   const checkedKeys = defineModel<(string | number)[]>('checkedKeys', {
     default: [],
   });
+  const halfCheckedKeys = defineModel<(string | number)[]>('halfCheckedKeys', {
+    default: [],
+  });
   const focusNodeKey = defineModel<string | number>('focusNodeKey', {
     default: '',
   });
+  const expandKeys = ref<Set<string | number>>(new Set([]));
 
   const treeContainerRef: Ref = ref(null);
   const treeRef = ref<TreeInstance>();
@@ -250,16 +263,39 @@
     }
   }, props.searchDebounce);
 
+  onBeforeMount(() => {
+    if (props.useMapData) {
+      filterTreeData.value = mapTree(data.value, (node) => {
+        node.expanded = props.defaultExpandAll;
+        return node;
+      });
+    } else {
+      traverseTree(data.value, (node) => {
+        node.expanded = props.defaultExpandAll;
+      });
+      filterTreeData.value = data.value;
+    }
+    nextTick(() => {
+      if (props.defaultExpandAll && treeRef.value) {
+        treeRef.value.expandAll(true);
+      }
+    });
+  });
+
   watch(
     () => data.value,
     debounce((val) => {
       if (!props.keyword) {
-        filterTreeData.value = mapTree(val, (node) => {
-          node.expanded = props.defaultExpandAll;
-          return node;
-        });
-        if (props.defaultExpandAll && treeRef.value) {
-          treeRef.value.expandAll(true);
+        if (props.useMapData) {
+          filterTreeData.value = mapTree(val, (node) => {
+            node.expanded = expandKeys.value.has(node[props.fieldNames.key]);
+            return node;
+          });
+        } else {
+          traverseTree(val, (node) => {
+            node.expanded = expandKeys.value.has(node[props.fieldNames.key]);
+          });
+          filterTreeData.value = val;
         }
       } else {
         updateDebouncedSearch();
@@ -267,7 +303,6 @@
     }, 0),
     {
       deep: true,
-      immediate: true,
     }
   );
 
@@ -275,7 +310,20 @@
     () => props.keyword,
     (val) => {
       if (!val) {
-        filterTreeData.value = data.value;
+        if (props.useMapData) {
+          filterTreeData.value = mapTree(data.value, (node) => {
+            node.expanded = props.defaultExpandAll;
+            return node;
+          });
+        } else {
+          traverseTree(data.value, (node) => {
+            node.expanded = props.defaultExpandAll;
+          });
+          filterTreeData.value = data.value;
+        }
+        nextTick(() => {
+          treeRef.value?.expandAll(false);
+        });
       } else {
         updateDebouncedSearch();
       }
@@ -328,6 +376,10 @@
     dropNode: MsTreeNodeData; // 放入的节点
     dropPosition: number; // 放入的位置，-1 为放入节点前，1 为放入节点后，0 为放入节点内
   }) {
+    if (props.handleDrop) {
+      emit('drop', data.value, dragNode, dropNode, dropPosition);
+      return;
+    }
     loop(data.value, dragNode.key, (item, index, arr) => {
       arr.splice(index, 1);
     });
@@ -362,8 +414,8 @@
     emit('select', _selectedKeys, selectNode);
   }
 
-  function checked(_checkedKeys: Array<string | number>) {
-    emit('check', _checkedKeys);
+  function checked(_checkedKeys: Array<string | number>, checkedNodes: MsTreeNodeData) {
+    emit('check', _checkedKeys, checkedNodes);
   }
 
   const focusEl = ref<HTMLElement | null>(); // 存储聚焦的节点元素
@@ -399,7 +451,7 @@
     (val) => {
       if (typeof val === 'boolean') {
         treeRef.value?.expandAll(val);
-        filterTreeData.value = mapTree(filterTreeData.value, (node) => {
+        traverseTree(filterTreeData.value, (node) => {
           node.expanded = val;
           return node;
         });
@@ -409,11 +461,18 @@
 
   function handleExpand(node: MsTreeNodeData) {
     node.expanded = !node.expanded;
+    if (props.useMapData) {
+      const realNode = findNodeByKey<MsTreeNodeData>(data.value, node[props.fieldNames.key]);
+      if (realNode) {
+        realNode.expanded = node.expanded;
+      }
+    }
     treeRef.value?.expandNode(node[props.fieldNames.key], node.expanded);
   }
 
-  function expand(expandKeys: Array<string | number>, node: MsTreeExpandedData) {
-    emit('expand', node);
+  function expand(_expandKeys: Array<string | number>, node: MsTreeExpandedData) {
+    expandKeys.value = new Set(_expandKeys);
+    emit('expand', node, _expandKeys);
   }
 
   function checkAll(val: boolean) {

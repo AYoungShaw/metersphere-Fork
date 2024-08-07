@@ -338,7 +338,7 @@
         field="values"
         :label="t('api_scenario.table.batchUpdate')"
         :validate-trigger="['blur', 'input']"
-        :rules="[{ required: true, message: t('api_scenario.table.valueRequired') }]"
+        :rules="[{ required: true, message: t('common.inputPleaseEnterTags') }]"
         asterisk-position="end"
         class="mb-0"
         required
@@ -350,6 +350,7 @@
           unique-value
           retain-input-value
         />
+        <div class="text-[12px] leading-[20px] text-[var(--color-text-4)]">{{ t('ms.tagsInput.tagLimitTip') }}</div>
       </a-form-item>
       <a-form-item
         v-else-if="batchForm.attr === 'Priority'"
@@ -827,6 +828,7 @@
     },
     (item) => ({
       ...item,
+      requestPassRate: item.requestPassRate ? `${item.requestPassRate}%` : '-',
       createTime: dayjs(item.createTime).format('YYYY-MM-DD HH:mm:ss'),
       updateTime: dayjs(item.updateTime).format('YYYY-MM-DD HH:mm:ss'),
     })
@@ -964,7 +966,7 @@
    * 删除接口
    */
   function deleteScenario(record?: ApiScenarioTableItem, isBatch?: boolean, params?: ApiScenarioBatchParam) {
-    let title = t('api_scenario.table.deleteScenarioTipTitle', { name: record?.name });
+    let title = t('api_scenario.table.deleteScenarioTipTitle', { name: characterLimit(record?.name) });
     let selectIds = [record?.id || ''];
     if (isBatch) {
       title = t('api_scenario.table.batchDeleteScenarioTip', {

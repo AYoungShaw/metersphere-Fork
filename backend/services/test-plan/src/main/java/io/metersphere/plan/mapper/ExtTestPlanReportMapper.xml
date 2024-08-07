@@ -45,11 +45,10 @@
     </select>
     <select id="selectReportIdByProjectIdAndTime" resultType="java.lang.String">
         select report.id
-        from test_plan_report report
-                 inner join test_plan_report_summary summary
-                            on report.id = summary.test_plan_report_id = report.id
+        from test_plan_report report left join test_plan_report_summary summary
+            on report.id = summary.test_plan_report_id
         where report.project_id = #{projectId}
-          and report.start_time = #{time}
+          and report.start_time &lt;= #{time}
     </select>
     <select id="selectReportIdTestPlanIds" resultType="java.lang.String">
         select report.id
@@ -142,8 +141,7 @@
         tpr.deleted
 
         from test_plan_report tpr
-            INNER JOIN test_plan_report_summary tprs on tpr.id = tprs.test_plan_report_id
-
+            LEFT JOIN test_plan_report_summary tprs on tpr.id = tprs.test_plan_report_id
         <include refid="queryWhereConditionByParentId"/>
     </select>
     <select id="getReports" resultType="io.metersphere.api.dto.report.ReportDTO">
@@ -259,6 +257,10 @@
             #{id}
         </foreach>
     </select>
+
+    <delete id="deleteGroupReport" parameterType="java.lang.String">
+        delete from test_plan_report where id = #{id} or parent_id = #{id}
+    </delete>
 
     <update id="batchUpdateExecuteTimeAndStatus" parameterType="java.lang.String">
         update test_plan_report

@@ -1,0 +1,844 @@
+<template>
+  <div class="h-full">
+    <MsMinderEditor
+      v-model:activeExtraKey="activeExtraKey"
+      v-model:extra-visible="extraVisible"
+      v-model:loading="loading"
+      v-model:import-json="importJson"
+      :minder-key="MinderKeyEnum.TEST_PLAN_FEATURE_CASE_MINDER"
+      :extract-content-tab-list="extractContentTabList"
+      :can-show-float-menu="canShowFloatMenu"
+      :can-show-priority-menu="false"
+      :can-show-more-menu="canShowMoreMenu"
+      :can-show-enter-node="canShowEnterNode"
+      :can-show-more-menu-node-operation="false"
+      :more-menu-other-operation-list="canShowFloatMenu && hasOperationPermission ? moreMenuOtherOperationList : []"
+      disabled
+      @node-select="handleNodeSelect"
+      @node-unselect="handleNodeUnselect"
+    >
+      <template #extractMenu>
+        <!-- 缺陷 -->
+        <a-dropdown position="bl">
+          <a-tooltip
+            v-if="
+              props.canEdit &&
+              showAssociateBugMenu &&
+              hasAllPermission(['PROJECT_BUG:READ', 'PROJECT_TEST_PLAN:READ+EXECUTE'])
+            "
+            :content="t('common.add')"
+          >
+            <MsButton type="icon" class="ms-minder-node-float-menu-icon-button">
+              <MsIcon type="icon-icon_add_outlined" class="text-[var(--color-text-4)]" />
+            </MsButton>
+          </a-tooltip>
+          <template #content>
+            <a-doption v-permission="['PROJECT_BUG:READ+ADD']" value="new" @click="showAddDefectDrawer = true">
+              {{ t('testPlan.featureCase.noBugDataNewBug') }}
+            </a-doption>
+            <a-doption v-permission="['PROJECT_BUG:READ']" value="link" @click="showLinkDefectDrawer = true">
+              {{ t('caseManagement.featureCase.linkDefect') }}
+            </a-doption>
+          </template>
+        </a-dropdown>
+        <!-- 执行 -->
+        <a-trigger
+          v-model:popup-visible="executeVisible"
+          trigger="click"
+          position="bl"
+          :click-outside-to-close="false"
+          popup-container=".ms-minder-container"
+        >
+          <a-tooltip
+            v-if="props.canEdit && hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])"
+            :content="t('common.execute')"
+          >
+            <MsButton
+              type="icon"
+              :class="[
+                'ms-minder-node-float-menu-icon-button',
+                `${executeVisible ? 'ms-minder-node-float-menu-icon-button--focus' : ''}`,
+              ]"
+            >
+              <MsIcon type="icon-icon_play-round_filled" class="text-[var(--color-text-4)]" />
+            </MsButton>
+          </a-tooltip>
+          <template #content>
+            <div class="w-[440px] rounded bg-white p-[16px] shadow-[0_0_10px_rgba(0,0,0,0.05)]">
+              <ExecuteSubmit :select-node="selectNode" :test-plan-id="props.planId" @done="handleExecuteDone" />
+            </div>
+          </template>
+        </a-trigger>
+        <!-- 查看详情 -->
+        <a-tooltip v-if="canShowDetail" :content="t('common.detail')">
+          <MsButton
+            type="icon"
+            :class="[
+              'ms-minder-node-float-menu-icon-button',
+              `${extraVisible ? 'ms-minder-node-float-menu-icon-button--focus' : ''}`,
+            ]"
+            @click="toggleDetail"
+          >
+            <MsIcon type="icon-icon_describe_outlined" class="text-[var(--color-text-4)]" />
+          </MsButton>
+        </a-tooltip>
+      </template>
+
+      <template #extractTabContent>
+        <MsDescription
+          v-if="activeExtraKey === 'baseInfo'"
+          :loading="baseInfoLoading"
+          :descriptions="descriptions"
+          label-width="90px"
+          class="pl-[16px]"
+        />
+        <Attachment
+          v-else-if="activeExtraKey === 'attachment'"
+          v-model:model-value="fileList"
+          not-show-add-button
+          disabled
+          :active-case="activeCaseInfo"
+        />
+        <BugList
+          v-else-if="activeExtraKey === 'bug'"
+          ref="bugListRef"
+          :active-case="activeCaseInfo"
+          is-test-plan-case
+          :show-disassociate-button="props.canEdit && hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])"
+        />
+        <ReviewCommentList
+          v-else
+          class="pl-[16px]"
+          :review-comment-list="executeHistoryList"
+          active-comment="executiveComment"
+          not-show-review-name
+        />
+      </template>
+    </MsMinderEditor>
+    <LinkDefectDrawer
+      v-model:visible="showLinkDefectDrawer"
+      :case-id="selectNode?.data?.caseId ?? ''"
+      :drawer-loading="linkDrawerLoading"
+      :show-selector-all="false"
+      @save="associateSuccessHandler"
+    />
+    <AddDefectDrawer
+      v-model:visible="showAddDefectDrawer"
+      :case-id="selectNode?.data?.id ?? ''"
+      :extra-params="{
+        testPlanCaseId: selectNode?.data?.id,
+        caseId: selectNode?.data?.caseId,
+        testPlanId: props.planId,
+      }"
+      @success="handleAddBugDone"
+    />
+    <a-modal
+      v-model:visible="stepExecuteModelVisible"
+      :title="t('common.executionResult')"
+      class="p-[4px]"
+      title-align="start"
+      body-class="p-0"
+      :width="800"
+      :cancel-button-props="{ disabled: submitStepExecuteLoading }"
+      :ok-loading="submitStepExecuteLoading"
+      :ok-text="t('caseManagement.caseReview.commitResult')"
+      @before-ok="submitStepExecute"
+      @cancel="cancelStepExecute"
+    >
+      <AddStep
+        v-model:step-list="stepData"
+        is-scroll-y
+        is-test-plan
+        :scroll-y="190"
+        :is-disabled-test-plan="false"
+        is-disabled
+      />
+      <ExecuteForm v-model:form="executeForm" class="mt-[24px]" rich-text-max-height="150px" />
+    </a-modal>
+  </div>
+</template>
+
+<script setup lang="ts">
+  import { Message } from '@arco-design/web-vue';
+
+  import MsButton from '@/components/pure/ms-button/index.vue';
+  import MsDescription, { Description } from '@/components/pure/ms-description/index.vue';
+  import MsMinderEditor from '@/components/pure/ms-minder-editor/minderEditor.vue';
+  import type { MinderJson, MinderJsonNode, MinderJsonNodeData } from '@/components/pure/ms-minder-editor/props';
+  import {
+    clearSelectedNodes,
+    createNode,
+    expendNodeAndChildren,
+    handleRenderNode,
+    removeFakeNode,
+    renderSubNodes,
+    setPriorityView,
+  } from '@/components/pure/ms-minder-editor/script/tool/utils';
+  import { MsFileItem } from '@/components/pure/ms-upload/types';
+  import Attachment from '@/components/business/ms-minders/featureCaseMinder/attachment.vue';
+  import BugList from '@/components/business/ms-minders/featureCaseMinder/bugList.vue';
+  import useMinderBaseApi from '@/components/business/ms-minders/featureCaseMinder/useMinderBaseApi';
+  import AddStep from '@/views/case-management/caseManagementFeature/components/addStep.vue';
+  import AddDefectDrawer from '@/views/case-management/caseManagementFeature/components/tabContent/tabBug/addDefectDrawer.vue';
+  import LinkDefectDrawer from '@/views/case-management/caseManagementFeature/components/tabContent/tabBug/linkDefectDrawer.vue';
+  import ReviewCommentList from '@/views/case-management/caseManagementFeature/components/tabContent/tabComment/reviewCommentList.vue';
+  import ExecuteForm from '@/views/test-plan/testPlan/detail/featureCase/components/executeForm.vue';
+  import ExecuteSubmit from '@/views/test-plan/testPlan/detail/featureCase/detail/executeSubmit.vue';
+
+  import { getCasePlanMinder } from '@/api/modules/case-management/caseReview';
+  import { associateBugToPlan, executeHistory, getCaseDetail, runFeatureCase } from '@/api/modules/test-plan/testPlan';
+  import { defaultExecuteForm } from '@/config/testPlan';
+  import { useI18n } from '@/hooks/useI18n';
+  import useAppStore from '@/store/modules/app';
+  import useMinderStore from '@/store/modules/components/minder-editor/index';
+  import useTestPlanFeatureCaseStore from '@/store/modules/testPlan/testPlanFeatureCase';
+  import { findNodeByKey, getGenerateId, mapTree, replaceNodeInTree } from '@/utils';
+  import { hasAllPermission, hasAnyPermission } from '@/utils/permission';
+
+  import type { StepList } from '@/models/caseManagement/featureCase';
+  import type { TableQueryParams } from '@/models/common';
+  import { ModuleTreeNode } from '@/models/common';
+  import type { ExecuteFeatureCaseFormParams, ExecuteHistoryItem } from '@/models/testPlan/testPlan';
+  import { LastExecuteResults } from '@/enums/caseEnum';
+  import { MinderEventName, MinderKeyEnum } from '@/enums/minderEnum';
+
+  import {
+    convertToFile,
+    executionResultMap,
+    getCustomField,
+  } from '@/views/case-management/caseManagementFeature/components/utils';
+
+  const props = defineProps<{
+    activeModule: string;
+    moduleTree: ModuleTreeNode[];
+    planId: string;
+    canEdit: boolean; // 已归档的测试计划不能操作
+  }>();
+
+  const emit = defineEmits<{
+    (e: 'operation', type: string, node: MinderJsonNode): void;
+    (e: 'refreshPlan'): void;
+  }>();
+
+  const { t } = useI18n();
+  const appStore = useAppStore();
+  const minderStore = useMinderStore();
+  const testPlanFeatureCaseStore = useTestPlanFeatureCaseStore();
+
+  const { caseTag, moduleTag, stepTag, stepExpectTag } = useMinderBaseApi({});
+  const actualResultTag = t('system.orgTemplate.actualResult');
+  const importJson = ref<MinderJson>({
+    root: {} as MinderJsonNode,
+    treePath: [],
+  });
+  const loading = ref(false);
+  const modulesCount = computed(() => testPlanFeatureCaseStore.modulesCount);
+
+  /**
+   * 找到最顶层的父节点id
+   * @param node 选中节点
+   */
+  function getMinderNodeParentId(node: MinderJsonNode): string {
+    while (node?.parent && node.parent.data?.id !== 'NONE') {
+      node = node.parent;
+    }
+    return node.id ?? '';
+  }
+
+  /**
+   * 初始化用例模块树
+   */
+  async function initCaseTree() {
+    const tree = mapTree<MinderJsonNode>(props.moduleTree, (e) => ({
+      ...e,
+      data: {
+        ...e.data,
+        id: e.id || e.data?.id || '',
+        text: e.name || e.data?.text || '',
+        resource: modulesCount.value[e.id] !== undefined ? [moduleTag] : e.data?.resource,
+        expandState: e.level === 0 ? 'expand' : 'collapse',
+        count: modulesCount.value[e.id],
+        disabled: true,
+        projectId: getMinderNodeParentId(e),
+      },
+      children:
+        modulesCount.value[e.id] > 0 && !e.children?.length
+          ? [
+              {
+                data: {
+                  id: 'fakeNode',
+                  text: 'fakeNode',
+                  resource: ['fakeNode'],
+                },
+              },
+            ]
+          : e.children,
+    }));
+    importJson.value.root = {
+      children: tree,
+      data: {
+        id: 'NONE',
+        text: t('testPlan.testPlanIndex.functionalUseCase'),
+        resource: [moduleTag],
+        disabled: true,
+        count: modulesCount.value.all,
+      },
+    };
+    importJson.value.treePath = [];
+    clearSelectedNodes();
+    window.minder.importJson(importJson.value);
+    if (props.activeModule !== 'all') {
+      // 携带具体的模块 ID 加载时，进入该模块内
+      nextTick(() => {
+        minderStore.dispatchEvent(MinderEventName.ENTER_NODE, undefined, undefined, undefined, [
+          findNodeByKey(importJson.value.root.children || [], props.activeModule, 'id', 'data') as MinderJsonNode,
+        ]);
+      });
+    } else {
+      // 刷新时不需要重新请求数据，进入根节点
+      nextTick(() => {
+        minderStore.dispatchEvent(MinderEventName.ENTER_NODE, undefined, undefined, undefined, [importJson.value.root]);
+      });
+    }
+  }
+
+  onMounted(() => {
+    initCaseTree();
+    // 固定标签颜色
+    window.minder._resourceColorMapping = {
+      [executionResultMap.SUCCESS.statusText]: 4,
+      [executionResultMap.ERROR.statusText]: 5,
+      [executionResultMap.BLOCKED.statusText]: 6,
+    };
+  });
+
+  watch(
+    () => props.activeModule,
+    () => {
+      initCaseTree();
+    }
+  );
+
+  /**
+   * 加载模块节点下的用例节点
+   * @param node 选中节点
+   * @param loadMoreCurrent 加载模块下更多用例时的当前页码
+   */
+  async function initNodeCases(node: MinderJsonNode, loadMoreCurrent?: number) {
+    try {
+      loading.value = true;
+      if (!node?.data) return;
+      const { list, total } = await getCasePlanMinder({
+        current: (loadMoreCurrent ?? 0) + 1,
+        moduleId: node.data?.id,
+        projectId: node.data?.projectId,
+        planId: props.planId,
+      });
+      // 移除占位的虚拟节点
+      removeFakeNode(node, loadMoreCurrent ? `tmp-${node.data?.id}` : 'fakeNode');
+      // 如果模块下没有用例且有别的模块节点，正常展开
+      if ((!list || list.length === 0) && node.children?.length && !loadMoreCurrent) {
+        node.expand();
+        handleRenderNode(node, node.children);
+        return;
+      }
+
+      // 渲染节点
+      let waitingRenderNodes: MinderJsonNode[] = [];
+      list.forEach((e: MinderJsonNode) => {
+        // 用例节点
+        const child = createNode(
+          {
+            ...(e.data as MinderJsonNodeData),
+            resource: [
+              ...(executionResultMap[e.data?.status]?.statusText
+                ? [executionResultMap[e.data?.status].statusText]
+                : []),
+              ...(e.data?.resource ?? []),
+            ],
+          },
+          node
+        );
+        waitingRenderNodes.push(child);
+        // 前置/步骤/备注/预期结果节点
+        const grandChildren = renderSubNodes(child, e.children);
+        window.minder.renderNodeBatch(grandChildren);
+      });
+
+      node.expand();
+      if (node.children && node.children.length > 0) {
+        waitingRenderNodes = waitingRenderNodes.concat(node.children);
+      }
+      // 更多用例节点
+      if (total > 100 * ((loadMoreCurrent ?? 0) + 1)) {
+        const moreNode = window.minder.createNode(
+          {
+            id: `tmp-${node.data?.id}`,
+            text: '...',
+            type: 'tmp',
+            expandState: 'collapse',
+            current: (loadMoreCurrent ?? 0) + 1,
+            disabled: true,
+          },
+          node
+        );
+        waitingRenderNodes.push(moreNode);
+      }
+      handleRenderNode(node, waitingRenderNodes);
+      // 加载完用例数据后，更新当前importJson数据
+      replaceNodeInTree([importJson.value.root], node.data?.id || '', window.minder.exportNode(node), 'data', 'id');
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  const extraVisible = ref<boolean>(false);
+  const activeExtraKey = ref<'baseInfo' | 'attachment' | 'history' | 'bug'>('history');
+  const baseInfoLoading = ref(false);
+  const activeCaseInfo = ref<Record<string, any>>({});
+  const descriptions = ref<Description[]>([]);
+  const fileList = ref<MsFileItem[]>([]);
+  const extractContentTabList = [
+    {
+      value: 'baseInfo',
+      label: t('common.baseInfo'),
+    },
+    {
+      value: 'attachment',
+      label: t('caseManagement.featureCase.attachment'),
+    },
+    {
+      value: 'bug',
+      label: t('testPlan.featureCase.bug'),
+    },
+    {
+      value: 'history',
+      label: t('testPlan.featureCase.executionHistory'),
+    },
+  ];
+  function resetExtractInfo() {
+    activeCaseInfo.value = {};
+    fileList.value = [];
+  }
+
+  /**
+   * 初始化用例详情
+   * @param data 节点数据
+   */
+  async function initCaseDetail(data: MinderJsonNodeData) {
+    try {
+      baseInfoLoading.value = true;
+      const res = await getCaseDetail(data?.id || activeCaseInfo.value.id);
+      activeCaseInfo.value = res;
+      // 基本信息
+      descriptions.value = [
+        {
+          label: t('caseManagement.caseReview.caseName'),
+          value: res.name,
+        },
+        {
+          label: t('common.tag'),
+          value: res.tags,
+          isTag: true,
+        },
+        // 解析用例模板的自定义字段
+        ...res.customFields.map((e: Record<string, any>) => {
+          try {
+            return {
+              label: e.fieldName,
+              value: getCustomField(e),
+            };
+          } catch (error) {
+            return {
+              label: e.fieldName,
+              value: e.defaultValue,
+            };
+          }
+        }),
+      ].map((item) => ({ ...item, tooltipPosition: 'tr' }));
+      // 附件文件
+      if (activeCaseInfo.value.attachments) {
+        fileList.value = activeCaseInfo.value.attachments
+          .map((fileInfo: any) => {
+            return {
+              ...fileInfo,
+              name: fileInfo.fileName,
+            };
+          })
+          .map((fileInfo: any) => {
+            return convertToFile(fileInfo);
+          });
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    } finally {
+      baseInfoLoading.value = false;
+    }
+  }
+  // 执行历史
+  const executeHistoryList = ref<ExecuteHistoryItem[]>([]);
+  async function initExecuteHistory(data: MinderJsonNodeData) {
+    try {
+      executeHistoryList.value = await executeHistory({
+        caseId: data?.caseId,
+        id: data.id,
+        testPlanId: props.planId,
+      });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    }
+  }
+
+  /**
+   * 切换用例详情显示
+   */
+  async function toggleDetail(val?: boolean) {
+    extraVisible.value = val !== undefined ? val : !extraVisible.value;
+    const node: MinderJsonNode = window.minder.getSelectedNode();
+    const { data } = node;
+    if (extraVisible.value && data?.resource?.includes(caseTag)) {
+      activeExtraKey.value = 'history';
+      initExecuteHistory(data);
+      initCaseDetail(data);
+    }
+  }
+
+  const selectNode = ref();
+
+  // 添加缺陷
+  const showLinkDefectDrawer = ref(false);
+  const showAddDefectDrawer = ref(false);
+  const linkDrawerLoading = ref(false);
+  const bugListRef = ref<InstanceType<typeof BugList>>();
+  function handleAddBugDone() {
+    if (extraVisible.value && activeExtraKey.value === 'bug') {
+      bugListRef.value?.handleShowTypeChange();
+    }
+    emit('refreshPlan');
+  }
+  async function associateSuccessHandler(params: TableQueryParams) {
+    try {
+      linkDrawerLoading.value = true;
+      await associateBugToPlan({
+        ...params,
+        testPlanCaseId: selectNode.value.data?.id,
+        caseId: selectNode.value.data?.caseId,
+        testPlanId: props.planId,
+      });
+      Message.success(t('caseManagement.featureCase.associatedSuccess'));
+      linkDrawerLoading.value = false;
+      handleAddBugDone();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    } finally {
+      linkDrawerLoading.value = false;
+    }
+  }
+
+  // 执行
+  const executeVisible = ref(false);
+  // 新增或更新用例的实际结果节点
+  function updateCaseActualResultNode(node: MinderJsonNode, content: string) {
+    let actualResultNode;
+    actualResultNode = node.children?.find((item: MinderJsonNode) => item.data?.id === `actualResult-${node.data?.id}`);
+    if (actualResultNode) {
+      actualResultNode
+        .setData('resource', [actualResultTag])
+        .setData('text', content ?? '')
+        .render();
+    } else {
+      actualResultNode = createNode(
+        { resource: [actualResultTag], text: content ?? '', id: `actualResult-${node.data?.id}` },
+        node
+      );
+      handleRenderNode(node, [actualResultNode]);
+    }
+  }
+  // 点击模块/用例执行
+  function handleExecuteDone(status: LastExecuteResults, content: string) {
+    executeVisible.value = false;
+    const resource = selectNode.value.data?.resource;
+    if (resource?.includes(caseTag)) {
+      //  用例添加标签
+      window.minder.execCommand('resource', [executionResultMap[status].statusText, caseTag]);
+      // 新增或更新用例的实际结果节点
+      updateCaseActualResultNode(selectNode.value, content);
+      // 更新执行历史
+      if (extraVisible.value && activeExtraKey.value === 'history') {
+        initExecuteHistory(selectNode.value.data);
+      }
+    } else if (resource?.includes(moduleTag)) {
+      initCaseTree();
+    }
+    emit('refreshPlan');
+  }
+
+  const stepExecuteModelVisible = ref(false);
+  const caseNodeAboveSelectStep = ref(); // 选中的步骤节点对应的用例节点信息
+  const submitStepExecuteLoading = ref(false);
+  const executeForm = ref<ExecuteFeatureCaseFormParams>({ ...defaultExecuteForm });
+  const stepData = ref<StepList[]>([
+    {
+      id: getGenerateId(),
+      step: '',
+      expected: '',
+      showStep: false,
+      showExpected: false,
+    },
+  ]);
+  async function getStepData(id: string) {
+    try {
+      const res = await getCaseDetail(id);
+      if (res.steps) {
+        stepData.value = JSON.parse(res.steps).map((item: any) => {
+          return {
+            id: item.id,
+            step: item.desc,
+            expected: item.result,
+            actualResult: item.actualResult,
+            executeResult: item.executeResult,
+          };
+        });
+      } else {
+        stepData.value = [];
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    }
+  }
+  watch(
+    () => stepData.value,
+    () => {
+      const executionResultList = stepData.value?.map((item) => item.executeResult);
+      if (executionResultList?.includes(LastExecuteResults.ERROR)) {
+        executeForm.value.lastExecResult = LastExecuteResults.ERROR;
+      } else if (executionResultList?.includes(LastExecuteResults.BLOCKED)) {
+        executeForm.value.lastExecResult = LastExecuteResults.BLOCKED;
+      } else {
+        executeForm.value.lastExecResult = LastExecuteResults.SUCCESS;
+      }
+    },
+    { deep: true }
+  );
+  function cancelStepExecute() {
+    executeForm.value = { ...defaultExecuteForm };
+  }
+  /**
+   * 步骤/用例执行后 更新脑图数据
+   * @param status 用例执行状态
+   * @param content 用例实际结果内容
+   */
+  function submitStepExecuteDone(status: string, content: string) {
+    // 用例更新标签
+    caseNodeAboveSelectStep.value.setData('resource', [executionResultMap[status].statusText, caseTag]).render();
+    // 新增或更新用例的实际结果节点
+    updateCaseActualResultNode(caseNodeAboveSelectStep.value, content);
+    // 更新步骤数据：标签和实际结果
+    caseNodeAboveSelectStep.value.children.forEach((child: MinderJsonNode) => {
+      const step = stepData.value.find((item) => item.id === child.data?.id);
+      if (step?.executeResult?.length) {
+        child.setData('resource', [executionResultMap[step?.executeResult].statusText, stepTag]).render();
+      }
+      if (step?.actualResult?.length) {
+        child.children?.[0].children?.[0].setData('text', step?.actualResult).render();
+      }
+    });
+    caseNodeAboveSelectStep.value.layout();
+  }
+  /**
+   * 步骤/用例执行
+   */
+  async function submitStepExecute() {
+    try {
+      submitStepExecuteLoading.value = true;
+      const params = {
+        projectId: appStore.currentProjectId,
+        testPlanId: props.planId,
+        caseId: caseNodeAboveSelectStep.value.data.caseId,
+        id: caseNodeAboveSelectStep.value.data.id,
+        ...executeForm.value,
+        notifier: executeForm.value?.commentIds?.join(';'),
+        stepsExecResult: JSON.stringify(
+          stepData.value.map((item, index) => {
+            return {
+              id: item.id,
+              num: index,
+              desc: item.step,
+              result: item.expected,
+              actualResult: item.actualResult,
+              executeResult: item.executeResult,
+            };
+          })
+        ),
+      };
+      await runFeatureCase(params);
+      stepExecuteModelVisible.value = false;
+      Message.success(t('common.updateSuccess'));
+      cancelStepExecute();
+      emit('refreshPlan');
+      submitStepExecuteDone(params.lastExecResult, params.content ?? '');
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    } finally {
+      submitStepExecuteLoading.value = false;
+    }
+  }
+
+  // 菜单显隐
+  const hasOperationPermission = computed(
+    () => hasAnyPermission(['PROJECT_TEST_PLAN:READ+UPDATE', 'PROJECT_TEST_PLAN:READ+ASSOCIATION']) && props.canEdit
+  );
+  const canShowFloatMenu = ref(false); // 是否展示浮动菜单
+  const canShowMoreMenu = ref(false); // 更多
+  const canShowEnterNode = ref(false);
+  const showAssociateBugMenu = ref(false);
+  const canShowDetail = ref(false);
+  const moreMenuOtherOperationList = ref();
+  function setMoreMenuOtherOperationList(node: MinderJsonNode) {
+    moreMenuOtherOperationList.value = [
+      {
+        value: 'changeExecutor',
+        label: t('testPlan.featureCase.changeExecutor'),
+        permission: ['PROJECT_TEST_PLAN:READ+UPDATE'],
+        onClick: () => {
+          emit('operation', 'changeExecutor', node);
+        },
+      },
+      {
+        value: 'disassociate',
+        label: t('caseManagement.caseReview.disassociateCase'),
+        permission: ['PROJECT_TEST_PLAN:READ+ASSOCIATION'],
+        onClick: () => {
+          emit('operation', 'disassociate', node);
+        },
+      },
+    ];
+  }
+
+  /**
+   * 获取步骤节点对应的用例节点
+   * @param node 选中节点
+   * @param resource 标签
+   */
+  function getCaseNodeWithResource(node: MinderJsonNode, resource: string) {
+    while (node.parent) {
+      if (node?.data?.resource?.includes(resource)) {
+        return node.parent;
+      }
+      if (node.data?.resource?.includes(caseTag)) {
+        return null;
+      }
+      node = node.parent;
+    }
+    return null;
+  }
+
+  // 选中节点
+  async function handleNodeSelect(node: MinderJsonNode) {
+    const { data } = node;
+    // 点击更多节点，加载更多用例
+    if (data?.type === 'tmp' && node.parent?.data?.resource?.includes(moduleTag)) {
+      canShowFloatMenu.value = false;
+      await initNodeCases(node.parent, data.current);
+      setPriorityView(true, 'P');
+      return;
+    }
+    selectNode.value = node;
+
+    // 展示浮动菜单: 模块节点且有子节点且不是没权限的根结点、用例节点
+    if (
+      node.data?.resource?.includes(caseTag) ||
+      (node.data?.resource?.includes(moduleTag) &&
+        (node.children || []).length > 0 &&
+        !(!hasOperationPermission.value && node.type === 'root'))
+    ) {
+      canShowFloatMenu.value = true;
+      setMoreMenuOtherOperationList(node);
+    } else {
+      canShowFloatMenu.value = false;
+    }
+
+    // 点步骤描述下的【步骤描述/预期结果/实际结果】标签
+    if ([actualResultTag, stepTag, stepExpectTag].some((item) => node.data?.resource?.includes(item))) {
+      caseNodeAboveSelectStep.value = getCaseNodeWithResource(node, stepTag);
+      if (caseNodeAboveSelectStep.value?.data?.id) {
+        getStepData(caseNodeAboveSelectStep.value.data.id);
+        stepExecuteModelVisible.value = true;
+      }
+      return;
+    }
+
+    // 不展示更多：没操作权限的用例
+    if (node.data?.resource?.includes(caseTag) && !hasOperationPermission.value) {
+      canShowMoreMenu.value = false;
+    } else {
+      canShowMoreMenu.value = true;
+    }
+
+    // 展示进入节点菜单: 模块节点
+    if (data?.resource?.includes(moduleTag) && (node.children || []).length > 0 && node.type !== 'root') {
+      canShowEnterNode.value = true;
+    } else {
+      canShowEnterNode.value = false;
+    }
+
+    executeVisible.value = false;
+
+    if (data?.resource?.includes(caseTag)) {
+      canShowDetail.value = true;
+      showAssociateBugMenu.value = true;
+      if (extraVisible.value) {
+        toggleDetail(true);
+      }
+      // 用例下面所有节点都展开
+      expendNodeAndChildren(node);
+    } else if (data?.resource?.includes(moduleTag) && data.count > 0 && data.isLoaded !== true) {
+      // 模块节点且有用例且未加载过用例数据
+      if (data.id !== 'NONE') {
+        await initNodeCases(node);
+      }
+      extraVisible.value = false;
+      canShowDetail.value = false;
+      showAssociateBugMenu.value = false;
+    } else {
+      extraVisible.value = false;
+      canShowDetail.value = false;
+      showAssociateBugMenu.value = false;
+      resetExtractInfo();
+      removeFakeNode(node, 'fakeNode');
+    }
+    setPriorityView(true, 'P');
+  }
+
+  function handleNodeUnselect() {
+    extraVisible.value = false;
+  }
+
+  defineExpose({
+    initCaseTree,
+  });
+</script>
+
+<style lang="less" scoped>
+  :deep(.comment-list-item-name) {
+    max-width: 200px;
+  }
+  :deep(.ms-list) {
+    margin: 0;
+    height: 100%;
+  }
+  :deep(.execute-form) .rich-wrapper .halo-rich-text-editor .editor-content {
+    max-height: 54px !important;
+    .ProseMirror {
+      min-height: 38px;
+    }
+  }
+</style>

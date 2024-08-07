@@ -61,7 +61,7 @@ export default {
     main: {
       header: {
         minder: '思维导图',
-        style: '外观样式',
+        style: '样式',
       },
       main: {
         save: '保存',
@@ -87,7 +87,7 @@ export default {
     tag: {
       case: '用例',
       module: '模块',
-      precondition: '前置条件',
+      precondition: '前置操作',
       desc: '步骤描述',
       expect: '预期结果',
       remark: '备注',

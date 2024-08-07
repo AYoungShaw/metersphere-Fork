@@ -2,7 +2,7 @@
   <MsCard :min-width="1100" has-breadcrumb hide-footer no-content-padding hide-divider show-full-screen>
     <template #headerLeft>
       <a-tooltip :content="reviewDetail.name">
-        <div class="one-line-text mr-[8px] max-w-[260px] font-medium text-[var(--color-text-000)]">
+        <div class="one-line-text mr-[8px] max-w-[300px] font-medium text-[var(--color-text-000)]">
           {{ reviewDetail.name }}
         </div>
       </a-tooltip>
@@ -54,7 +54,7 @@
                 <div>{{ item.num }}</div>
                 <div v-if="onlyMineStatus" class="flex items-center gap-[4px] leading-[22px]">
                   <MsIcon
-                    :type="reviewResultMap[item.myStatus]?.icon"
+                    :type="reviewResultMap[item.myStatus]?.icon ?? ''"
                     :style="{ color: reviewResultMap[item.myStatus]?.color }"
                   />
                   {{ t(reviewResultMap[item.myStatus]?.label) }}
@@ -85,18 +85,20 @@
           />
         </a-spin>
       </div>
-      <a-spin :loading="caseDetailLoading" class="relative flex flex-1 flex-col">
+      <a-spin :loading="caseDetailLoading" class="relative flex flex-1 flex-col overflow-hidden">
         <div class="content-center">
           <div class="rounded-[var(--border-radius-small)] bg-[var(--color-text-n9)] p-[16px]">
-            <div class="mb-[12px] flex items-center justify-between">
-              <a-tooltip :content="`【${caseDetail.num}】${caseDetail.name}`">
-                <div
-                  class="one-line-text cursor-pointer font-medium text-[rgb(var(--primary-5))]"
-                  @click="goCaseDetail"
-                >
-                  【{{ caseDetail.num }}】{{ caseDetail.name }}
-                </div>
-              </a-tooltip>
+            <div class="mb-[12px] flex items-center">
+              <div class="mr-[16px] flex-1 overflow-hidden">
+                <a-tooltip :content="`【${caseDetail.num}】${caseDetail.name}`">
+                  <div
+                    class="one-line-text w-[fit-content] max-w-[100%] cursor-pointer font-medium text-[rgb(var(--primary-5))]"
+                    @click="goCaseDetail"
+                  >
+                    【{{ caseDetail.num }}】{{ caseDetail.name }}
+                  </div>
+                </a-tooltip>
+              </div>
               <a-button
                 v-permission="['FUNCTIONAL_CASE:READ+UPDATE']"
                 type="outline"
@@ -110,7 +112,7 @@
             <div class="flex items-center">
               <MsIcon type="icon-icon_folder_filled1" class="mr-[4px] text-[var(--color-text-4)]" />
               <a-tooltip :content="caseDetail.moduleName || t('common.root')">
-                <div class="one-line-text mr-[8px] max-w-[260px] font-medium text-[var(--color-text-000)]">
+                <div class="one-line-text mr-[8px] max-w-[300px] font-medium text-[var(--color-text-000)]">
                   {{ caseDetail.moduleName || t('common.root') }}
                 </div>
               </a-tooltip>
@@ -131,7 +133,11 @@
                 {{ t('caseManagement.caseReview.reviewResult') }}
               </div>
               <div class="case-detail-value">
-                <div v-if="reviewResultMap[activeCaseReviewStatus as ReviewResult]" class="flex items-center gap-[4px]">
+                <ReviewStatusTrigger v-if="reviewDetail.reviewPassRule === 'MULTIPLE'" ref="reviewStatusTriggerRef" />
+                <div
+                  v-if="reviewResultMap[activeCaseReviewStatus as ReviewResult] && reviewDetail.reviewPassRule !== 'MULTIPLE'"
+                  class="flex items-center gap-[4px]"
+                >
                   <MsIcon
                     :type="reviewResultMap[activeCaseReviewStatus as ReviewResult].icon"
                     :style="{
@@ -200,9 +206,17 @@
               <a-spin :loading="reviewHistoryListLoading" class="h-full w-full">
                 <div v-for="item of reviewHistoryList" :key="item.id" class="ms-comment-list-item">
                   <MSAvatar :avatar="item.userLogo" />
-                  <div class="flex-1">
+                  <div class="flex-1 overflow-hidden">
                     <div class="flex items-center gap-[8px]">
-                      <div class="font-medium text-[var(--color-text-1)]">{{ item.userName }}</div>
+                      <div class="flex-1 overflow-hidden">
+                        <a-tooltip :content="item.userName">
+                          <div
+                            class="one-line-text w-[fit-content] max-w-[100%] font-medium text-[var(--color-text-1)]"
+                          >
+                            {{ item.userName }}
+                          </div>
+                        </a-tooltip>
+                      </div>
                       <div v-if="item.status === 'PASS'" class="flex items-center">
                         <MsIcon type="icon-icon_succeed_filled" class="mr-[4px] text-[rgb(var(--success-6))]" />
                         {{ t('caseManagement.caseReview.pass') }}
@@ -279,6 +293,7 @@
   import MsPagination from '@/components/pure/ms-pagination/index';
   import caseLevel from '@/components/business/ms-case-associate/caseLevel.vue';
   import type { CaseLevel } from '@/components/business/ms-case-associate/types';
+  import ReviewStatusTrigger from '@/components/business/ms-minders/caseReviewMinder/components/reviewStatusTrigger.vue';
   import caseTabDemand from '../caseManagementFeature/components/tabContent/tabDemand/associatedDemandTable.vue';
   import caseTabDetail from '../caseManagementFeature/components/tabContent/tabDetail.vue';
   import EditCaseDetailDrawer from './components/editCaseDetailDrawer.vue';
@@ -383,7 +398,8 @@
 
   const activeCaseId = ref(route.query.caseId as string);
   const activeCaseReviewStatus = computed(() => {
-    return caseList.value.find((e) => e.caseId === activeCaseId.value)?.status;
+    const activeCase = caseList.value.find((e) => e.caseId === activeCaseId.value);
+    return onlyMineStatus.value ? activeCase?.myStatus : activeCase?.status;
   });
   const defaultCaseDetail: DetailCase = {
     id: '',
@@ -500,10 +516,16 @@
     }
   }
 
+  const reviewStatusTriggerRef = ref<InstanceType<typeof ReviewStatusTrigger>>();
+  function initReviewerAndStatus() {
+    reviewStatusTriggerRef.value?.initReviewerAndStatus(reviewId.value, activeCaseId.value);
+  }
+
   watch(
     () => activeCaseId.value,
     () => {
       loadCaseDetail();
+      initReviewerAndStatus();
       initReviewHistoryList();
     }
   );
@@ -541,12 +563,14 @@
         loadCaseDetail();
         initReviewHistoryList();
         loadCaseList();
+        initReviewerAndStatus();
       }
     } else {
       // 不自动下一个才请求详情
       loadCaseDetail();
       initReviewHistoryList();
       loadCaseList();
+      initReviewerAndStatus();
     }
   }
 
@@ -557,7 +581,7 @@
     loadCaseDetail();
   }
 
-  onBeforeMount(() => {
+  onBeforeMount(async () => {
     const lastPageParams = window.history.state.params ? JSON.parse(window.history.state.params) : null; // 获取上个页面带过来的表格查询参数
     if (lastPageParams) {
       const {
@@ -587,8 +611,9 @@
     } else {
       keyword.value = route.query.reviewId as string;
     }
-    initDetail();
+    await initDetail();
     loadCase();
+    initReviewerAndStatus();
     if (showTab.value === 'detail') {
       initReviewHistoryList();
     }
@@ -647,5 +672,14 @@
     :deep(.arco-radio-label) {
       @apply inline-flex;
     }
+  }
+  :deep(.overall-review-result) {
+    padding: 0;
+  }
+</style>
+
+<style lang="less">
+  .review-result-trigger-content {
+    width: 160px;
   }
 </style>

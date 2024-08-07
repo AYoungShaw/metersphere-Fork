@@ -1,5 +1,5 @@
 <template>
-  <a-spin class="min-h-[400px] w-full" :loading="loading">
+  <a-spin class="w-full" :loading="loading">
     <a-input
       v-if="props.isModal"
       v-model:model-value="moduleKeyword"
@@ -99,7 +99,7 @@
   import useModal from '@/hooks/useModal';
   import useAppStore from '@/store/modules/app';
   import useFeatureCaseStore from '@/store/modules/case/featureCase';
-  import { mapTree, traverseTree } from '@/utils';
+  import { characterLimit, mapTree, traverseTree } from '@/utils';
   import { hasAnyPermission } from '@/utils/permission';
 
   import type { CreateOrUpdateModule, UpdateModule } from '@/models/caseManagement/featureCase';
@@ -217,7 +217,7 @@
   const deleteHandler = (node: MsTreeNodeData) => {
     openModal({
       type: 'error',
-      title: t('caseManagement.featureCase.moduleDeleteTipTitle', { name: node.name }),
+      title: t('caseManagement.featureCase.moduleDeleteTipTitle', { name: characterLimit(node.name) }),
       content: t('caseManagement.featureCase.deleteCaseTipContent'),
       okText: t('caseManagement.featureCase.deleteConfirm'),
       okButtonProps: {
@@ -394,7 +394,8 @@
         node.count = obj?.[node.id] || 0;
         node.hideMoreAction = node.id === 'root' || props.isModal;
       });
-    }
+    },
+    { deep: true }
   );
 
   onBeforeMount(() => {

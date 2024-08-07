@@ -36,7 +36,12 @@ export const OperationHistoryUrl = '/api/definition/operation-history'; // 接�
 export const SaveOperationHistoryUrl = '/api/definition/operation-history/save'; // 接口定义-另存变更历史为指定版本
 export const RecoverOperationHistoryUrl = '/api/definition/operation-history/recover'; // 接口定义-变更历史恢复
 export const DefinitionReferenceUrl = '/api/definition/get-reference'; // 获取接口引用关系
-export const ConvertJsonSchemaToJsonUrl = '/api/definition/preview'; // 将json-schema转换为 json 数据
+export const ConvertJsonSchemaToJsonUrl = '/api/definition/json-schema/preview'; // 将json-schema转换为 json 数据
+export const JsonSchemaAutoGenerateUrl = '/api/definition/json-schema/auto-generate'; // 将json-schema转换为 json 数据
+export const clearThisChangeUrl = '/api/case/api-change/clear'; // 接口定义-变更对比-清除本次变更
+export const caseTableBatchSyncUrl = '/api/case/batch/api-change/sync'; // 接口测试-接口管理-接口用例-批量同步
+export const ignoreEveryTimeApiChangeUrl = '/api/case/api-change/ignore'; // 接口测试-接口用例-忽略每次接口变更
+export const diffDataUrl = '/api/case/api/compare'; // 接口测试-接口用例-定义对比用例
 
 /**
  * Mock

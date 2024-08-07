@@ -96,6 +96,7 @@
     </div>
     <div class="config-right-container">
       <ViewReport
+        ref="viewReportRef"
         v-model:card-list="cardItemList"
         :detail-info="props.detailInfo"
         :is-drawer="props.isDrawer"
@@ -273,6 +274,7 @@
       };
     });
   }
+  const isInit = ref(true);
 
   watch(
     [() => configList.value, () => cardItemList.value],
@@ -281,10 +283,14 @@
       const cardItemValue = resetConfigEditList(cardItemList.value);
 
       const isisEqualList = props.isGroup ? cloneDeep(defaultGroupConfig) : cloneDeep(defaultSingleConfig);
-      if (!isEqual(configValue, isisEqualList) || !isEqual(cardItemValue, isisEqualList)) {
-        nextTick(() => {
-          hasChange.value = true;
-        });
+      if (!isEqual(configValue, isisEqualList) || (!isEqual(cardItemValue, isisEqualList) && !isInit.value)) {
+        if (isInit.value) {
+          isInit.value = false;
+        } else {
+          nextTick(() => {
+            hasChange.value = true;
+          });
+        }
       }
     },
     { deep: true }
@@ -358,6 +364,7 @@
   }
 
   const confirmLoading = ref<boolean>(false);
+  const viewReportRef = ref<InstanceType<typeof ViewReport>>();
   // 保存配置
   async function handleSave() {
     if (!reportForm.value.reportName) {
@@ -369,6 +376,7 @@
     try {
       const params: manualReportGenParams = makeParams();
       const reportId = await manualReportGen(params);
+      viewReportRef.value?.setIsSave(true);
       Message.success(t('report.detail.manualGenReportSuccess'));
       if (reportId) {
         router.push({

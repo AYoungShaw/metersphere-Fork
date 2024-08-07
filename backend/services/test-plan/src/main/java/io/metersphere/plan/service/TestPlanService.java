@@ -105,11 +105,12 @@ public class TestPlanService extends TestPlanBaseUtilsService {
     private TestPlanApiScenarioMapper testPlanApiScenarioMapper;
     @Resource
     private TestPlanReportCaseService testPlanReportCaseService;
-
     @Resource
     private TestPlanReportService testPlanReportService;
     @Resource
     private TestPlanReportMapper testPlanReportMapper;
+    @Resource
+    private ExtTestPlanReportMapper extTestPlanReportMapper;
 
     public void autoUpdateFunctionalCase(String testPlanReportId) {
         TestPlanReport testPlanReport = testPlanReportMapper.selectByPrimaryKey(testPlanReportId);
@@ -150,7 +151,7 @@ public class TestPlanService extends TestPlanBaseUtilsService {
                 testPlanFunctionalCaseMapper.updateByExampleSelective(updateRecord, updateExample);
                 // 报告-功能用例的执行结果同步刷新
                 TestPlanReportFunctionCaseExample caseExample = new TestPlanReportFunctionCaseExample();
-                caseExample.createCriteria().andTestPlanReportIdEqualTo(testPlanReportId).andTestPlanFunctionCaseIdIn(funcCaseIds);
+                caseExample.createCriteria().andTestPlanReportIdEqualTo(testPlanReportId).andFunctionCaseIdIn(funcCaseIds);
                 TestPlanReportFunctionCase reportFunctionCase = new TestPlanReportFunctionCase();
                 reportFunctionCase.setFunctionCaseExecuteResult(result);
                 reportFunctionCase.setFunctionCaseExecuteReportId(null);
@@ -276,7 +277,6 @@ public class TestPlanService extends TestPlanBaseUtilsService {
                 /*
                  * 计划组删除逻辑{第一版需求: 删除组, 组下的子计划Group置为None}:
                  * 1. 查询计划组下的全部子计划并删除(级联删除这些子计划的关联资源)
-                 * 2. 删除所有计划组
                  */
                 TestPlanExample testPlanExample = new TestPlanExample();
                 testPlanExample.createCriteria().andGroupIdIn(deleteGroupIds);
@@ -385,11 +385,11 @@ public class TestPlanService extends TestPlanBaseUtilsService {
                 updateTestPlan.setModuleId(testPlanGroup.getModuleId());
             }
         } else {
-            request.setGroupId(TestPlanConstants.TEST_PLAN_DEFAULT_GROUP_ID);
+            updateTestPlan.setGroupId(TestPlanConstants.TEST_PLAN_DEFAULT_GROUP_ID);
             if (!StringUtils.equalsIgnoreCase(originalTestPlan.getGroupId(), request.getGroupId())) {
                 //移出了测试计划组
                 this.deleteScheduleConfig(request.getId());
-                updateTestPlan.setPos(testPlanGroupService.getNextOrder(request.getGroupId()));
+                updateTestPlan.setPos(testPlanGroupService.getNextOrder(updateTestPlan.getGroupId()));
             }
         }
         //判断有没有模块的变化

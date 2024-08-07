@@ -27,13 +27,14 @@
         v-if="form.selectedAttrsId === 'tags'"
         field="tags"
         :label="t('apiTestManagement.batchUpdate')"
-        :rules="[{ required: true, message: t('apiTestManagement.valueRequired') }]"
+        :rules="[{ required: true, message: t('common.inputPleaseEnterTags') }]"
         asterisk-position="end"
         :validate-trigger="['blur', 'input']"
         class="mb-0"
         required
       >
         <MsTagsInput v-model:modelValue="form.tags" allow-clear></MsTagsInput>
+        <div class="text-[12px] leading-[20px] text-[var(--color-text-4)]">{{ t('ms.tagsInput.tagLimitTip') }}</div>
       </a-form-item>
       <a-form-item
         v-else

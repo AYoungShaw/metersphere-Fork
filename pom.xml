@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.7</version>
+        <version>3.2.8</version>
         <relativePath/>
     </parent>
 
@@ -53,7 +53,7 @@
         <flatten.version>1.6.0</flatten.version>
         <jmeter.version>5.6.3</jmeter.version>
         <codehaus-groovy.version>3.0.20</codehaus-groovy.version>
-        <metersphere-scriptengine.version>1.1.0</metersphere-scriptengine.version>
+        <metersphere-scriptengine.version>1.1.1</metersphere-scriptengine.version>
         <docker-java.version>3.3.4</docker-java.version>
         <commons-beanutils.version>1.9.4</commons-beanutils.version>
         <hessian-lite.version>3.2.13</hessian-lite.version>
@@ -71,7 +71,7 @@
         <!-- frontend -->
         <frontend-maven-plugin.version>1.12.1</frontend-maven-plugin.version>
         <node.version>v20.8.1</node.version>
-        <pnpm.version>9.0.6</pnpm.version>
+        <pnpm.version>8.4.0</pnpm.version>
         <!--        -->
         <skipAntRunForJenkins>false</skipAntRunForJenkins>
         <jacoco.version>0.8.12</jacoco.version>
@@ -85,7 +85,6 @@
         <commons-jexl3.version>3.3</commons-jexl3.version>
         <revision>3.x</revision>
         <monitoring-engine.revision>3.0</monitoring-engine.revision>
-
     </properties>
 
     <modules>
@@ -160,6 +159,7 @@
                         <exclude>io/metersphere/**/dto/**</exclude>
                         <exclude>io/metersphere/**/config/**</exclude>
                         <exclude>io/metersphere/**/constants/**</exclude>
+                        <exclude>io/metersphere/**/utils/**</exclude>
                         <exclude>io/metersphere/*/excel/**</exclude>
                         <exclude>io/metersphere/sdk/**</exclude>
                         <exclude>io/metersphere/provider/**</exclude>
@@ -168,6 +168,7 @@
                         <exclude>io/metersphere/system/notice/**</exclude>
                         <exclude>io/metersphere/system/schedule/**</exclude>
                         <exclude>io/metersphere/system/security/**</exclude>
+                        <exclude>io/metersphere/system/controller/handler/**</exclude>
                     </excludes>
                 </configuration>
                 <executions>

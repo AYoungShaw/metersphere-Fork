@@ -3,7 +3,7 @@
     <div class="mb-4 flex items-center justify-between">
       <div>
         <a-button
-          v-permission.all="['SYSTEM_USER:READ+ADD', 'SYSTEM_USER_ROLE:READ']"
+          v-permission.all="['SYSTEM_USER:READ+ADD']"
           class="mr-3"
           type="primary"
           @click="showUserModal('create')"
@@ -11,19 +11,14 @@
           {{ t('system.user.createUser') }}
         </a-button>
         <a-button
-          v-permission.all="['SYSTEM_USER:READ+INVITE', 'SYSTEM_USER_ROLE:READ']"
+          v-permission.all="['SYSTEM_USER:READ+INVITE']"
           class="mr-3"
           type="outline"
           @click="showEmailInviteModal"
         >
           {{ t('system.user.emailInvite') }}
         </a-button>
-        <a-button
-          v-permission.all="['SYSTEM_USER:READ+IMPORT', 'SYSTEM_USER_ROLE:READ']"
-          class="mr-3"
-          type="outline"
-          @click="showImportModal"
-        >
+        <a-button v-permission.all="['SYSTEM_USER:READ+IMPORT']" class="mr-3" type="outline" @click="showImportModal">
           {{ t('system.user.importUser') }}
         </a-button>
       </div>
@@ -42,6 +37,7 @@
       :action-config="tableBatchActions"
       v-on="propsEvent"
       @batch-action="handleTableBatch"
+      @enable-change="enableChange"
     >
       <template #userGroup="{ record }">
         <MsTagGroup
@@ -76,9 +72,6 @@
       </template>
       <template #action="{ record }">
         <template v-if="!record.enable">
-          <MsButton v-permission="['SYSTEM_USER:READ+UPDATE']" @click="enableUser(record)">
-            {{ t('system.user.enable') }}
-          </MsButton>
           <MsButton v-permission="['SYSTEM_USER:READ+DELETE']" @click="deleteUser(record)">
             {{ t('system.user.delete') }}
           </MsButton>
@@ -350,23 +343,27 @@
       dataIndex: 'email',
       showTooltip: true,
       sortIndex: 0,
+      columnSelectorDisabled: true,
     },
     {
       title: 'system.user.tableColumnName',
       dataIndex: 'name',
       showTooltip: true,
       sortIndex: 1,
+      columnSelectorDisabled: true,
     },
     {
       title: 'system.user.tableColumnEmail',
       dataIndex: 'email',
       showTooltip: true,
       sortIndex: 2,
+      columnSelectorDisabled: true,
     },
     {
       title: 'system.user.tableColumnPhone',
       dataIndex: 'phone',
       showDrag: true,
+      showTooltip: true,
       width: 140,
     },
     {
@@ -380,6 +377,7 @@
       title: 'system.user.tableColumnUserGroup',
       dataIndex: 'userRoleList',
       slotName: 'userGroup',
+      isTag: true,
       showDrag: true,
       width: 300,
     },
@@ -388,6 +386,7 @@
       slotName: 'enable',
       dataIndex: 'enable',
       showDrag: true,
+      permission: ['SYSTEM_USER:READ+UPDATE'],
     },
     {
       title: hasOperationSysUserPermission.value ? 'system.user.tableColumnActions' : '',
@@ -544,6 +543,14 @@
     });
   }
 
+  function enableChange(record: UserListItem, newValue: string | number | boolean) {
+    if (newValue) {
+      enableUser(record);
+    } else {
+      disabledUser(record);
+    }
+  }
+
   /**
    * 删除用户
    */
@@ -588,11 +595,6 @@
     {
       label: 'system.user.resetPassword',
       eventTag: 'resetPassword',
-      permission: ['SYSTEM_USER:READ+UPDATE'],
-    },
-    {
-      label: 'system.user.disable',
-      eventTag: 'disabled',
       permission: ['SYSTEM_USER:READ+UPDATE'],
     },
     {
@@ -706,9 +708,6 @@
       case 'resetPassword':
         resetPassword(record);
         break;
-      case 'disabled':
-        disabledUser(record);
-        break;
       case 'delete':
         deleteUser(record);
         break;
@@ -743,11 +742,9 @@
 
   async function init() {
     try {
-      if (hasAnyPermission(['SYSTEM_USER_ROLE:READ'])) {
-        userGroupOptions.value = await getSystemRoles();
-        if (userGroupOptions.value.length) {
-          userForm.value.userGroup = userGroupOptions.value.filter((e: SystemRole) => e.selected === true);
-        }
+      userGroupOptions.value = await getSystemRoles();
+      if (userGroupOptions.value.length) {
+        userForm.value.userGroup = userGroupOptions.value.filter((e: SystemRole) => e.selected === true);
       }
     } catch (error) {
       // eslint-disable-next-line no-console

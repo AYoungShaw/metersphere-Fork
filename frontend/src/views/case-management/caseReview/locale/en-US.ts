@@ -91,6 +91,7 @@ export default {
   'caseManagement.caseReview.reviewResultTip':
     'When "See only mine" is turned on, you can view my review results on the list',
   'caseManagement.caseReview.disassociate': 'Disassociate',
+  'caseManagement.caseReview.disassociateCase': 'Disassociate case',
   'caseManagement.caseReview.disassociateConfirmTitle': 'Are you sure to disassociate {count} use cases?',
   'caseManagement.caseReview.version': 'Version',
   'caseManagement.caseReview.unReview': 'Unreviewed',
@@ -112,7 +113,7 @@ export default {
   'caseManagement.caseReview.append': 'Append',
   'caseManagement.caseReview.appendTip1': 'Open: Add reviewer',
   'caseManagement.caseReview.appendTip2': 'Close: Update reviewers',
-  'caseManagement.caseReview.myReviewStatus': 'My reviews status',
+  'caseManagement.caseReview.myReviewStatus': 'My review results',
   'caseManagement.caseReview.caseLevel': 'Case level',
   'caseManagement.caseReview.caseVersion': 'Case version',
   'caseManagement.caseReview.caseStatus': 'Case status',
@@ -138,4 +139,7 @@ export default {
     'Submitted successfully! You are not the designated reviewer for the current project. The system will only record your review and will not affect the final review result.',
   'caseManagement.caseReview.reviewFormTip':
     'Add the review results of the operator, and multiple reviewers must pass the review by all reviewers',
+  'caseManagement.caseReview.reviewerTip':
+    "If you need to review use cases, you need to add the user as a reviewer; only the reviewer's review results take effect.",
+  'caseManagement.caseReview.reviewDisabledTip': 'Non-reviewers cannot review, but can review after modification',
 };

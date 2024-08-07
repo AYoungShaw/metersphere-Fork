@@ -14,6 +14,7 @@ import io.metersphere.api.dto.request.http.RestParam;
 import io.metersphere.api.dto.request.http.body.*;
 import io.metersphere.api.dto.schema.JsonSchemaItem;
 import io.metersphere.api.utils.JsonSchemaBuilder;
+import io.metersphere.api.utils.XMLUtil;
 import io.metersphere.plugin.api.spi.AbstractMsTestElement;
 import io.metersphere.project.constants.PropertyConstant;
 import io.metersphere.project.dto.environment.auth.NoAuth;
@@ -33,6 +34,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.json.JSONObject;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 
@@ -217,6 +219,9 @@ public class Swagger3Parser extends ApiImportAbstractParser<ApiDefinitionImport>
                 formDataKV.setParamType(value.getType());
                 formDataKV.setMinLength(value.getMinLength());
                 formDataKV.setMaxLength(value.getMaxLength());
+                if (StringUtils.equals(value.getType(), PropertyConstant.FILE)) {
+                    formDataKV.setFiles(new ArrayList<>());
+                }
                 formDataKVS.add(formDataKV);
             }
         });
@@ -257,6 +262,7 @@ public class Swagger3Parser extends ApiImportAbstractParser<ApiDefinitionImport>
                     body.setBodyType(Body.BodyType.NONE.name());
                 }
                 httpResponse.setBody(body);
+                httpResponse.setId(IDGenerator.nextStr());
                 response.add(httpResponse);
             });
             // 判断  如果是200  默认defaultFlag为true 否则的话  随机挑一个为true
@@ -284,7 +290,8 @@ public class Swagger3Parser extends ApiImportAbstractParser<ApiDefinitionImport>
             case MediaType.APPLICATION_XML_VALUE -> {
                 body.setBodyType(Body.BodyType.XML.name());
                 XmlBody xml = new XmlBody();
-                //xml.setValue(XMLUtils.jsonToXmlStr(jsonValue));
+                String xmlBody = parseXmlBody(value, jsonSchemaItem);
+                xml.setValue(xmlBody);
                 body.setXmlBody(xml);
             }
             case MediaType.MULTIPART_FORM_DATA_VALUE -> {
@@ -296,6 +303,7 @@ public class Swagger3Parser extends ApiImportAbstractParser<ApiDefinitionImport>
             case MediaType.TEXT_PLAIN_VALUE -> {
                 body.setBodyType(Body.BodyType.RAW.name());
                 RawBody rawBody = new RawBody();
+                rawBody.setValue(value.getSchema().getExample().toString());
                 body.setRawBody(rawBody);
             }
             default -> body.setBodyType(Body.BodyType.NONE.name());
@@ -310,7 +318,7 @@ public class Swagger3Parser extends ApiImportAbstractParser<ApiDefinitionImport>
         } else {
             String jsonString = JSON.toJSONString(jsonSchemaItem);
             if (StringUtils.isNotBlank(jsonString)) {
-                jsonBody.setJsonValue(JsonSchemaBuilder.jsonSchemaToJson(jsonString));
+                jsonBody.setJsonValue(JsonSchemaBuilder.jsonSchemaToJson(jsonString, true));
             }
         }
         return jsonBody;
@@ -326,7 +334,8 @@ public class Swagger3Parser extends ApiImportAbstractParser<ApiDefinitionImport>
             case MediaType.APPLICATION_XML_VALUE -> {
                 body.setBodyType(Body.BodyType.XML.name());
                 XmlBody xml = new XmlBody();
-                //xml.setValue(XMLUtils.jsonToXmlStr(jsonValue));
+                String xmlBody = parseXmlBody(value, jsonSchemaItem);
+                xml.setValue(xmlBody);
                 body.setXmlBody(xml);
             }
             case MediaType.APPLICATION_FORM_URLENCODED_VALUE -> {
@@ -343,10 +352,33 @@ public class Swagger3Parser extends ApiImportAbstractParser<ApiDefinitionImport>
             case MediaType.TEXT_PLAIN_VALUE -> {
                 body.setBodyType(Body.BodyType.RAW.name());
                 RawBody rawBody = new RawBody();
+                rawBody.setValue(value.getSchema().getExample().toString());
                 body.setRawBody(rawBody);
             }
             default -> body.setBodyType(Body.BodyType.NONE.name());
         }
+    }
+
+    private String parseXmlBody(io.swagger.v3.oas.models.media.MediaType value, JsonSchemaItem jsonSchemaItem) {
+        Schema schema = value.getSchema();
+        JSONObject object = new JSONObject();
+        if (value.getExample() != null) {
+            return value.getExample().toString();
+        }
+
+        if (jsonSchemaItem != null && MapUtils.isNotEmpty(jsonSchemaItem.getProperties())) {
+            if (StringUtils.isNotBlank(schema.get$ref()) && schema.get$ref().split("/").length > 3) {
+                String ref = schema.get$ref().replace("#/components/schemas/", StringUtils.EMPTY);
+                object.put(ref, jsonSchemaItem.getProperties());
+                return XMLUtil.jsonToPrettyXml(object);
+            }
+        } else {
+            if (schema != null && StringUtils.isNotBlank(schema.getName())) {
+                object.put(schema.getName(), schema.getExample());
+            }
+        }
+
+        return XMLUtil.jsonToPrettyXml(object);
     }
 
     private ApiDefinitionImportDetail buildSwaggerApiDefinition(Operation operation, String path, String
@@ -510,6 +542,9 @@ public class Swagger3Parser extends ApiImportAbstractParser<ApiDefinitionImport>
                                 jsonSchemaProperties.put(key, item);
                             });
                         }
+                        if (StringUtils.isNotBlank(modelByRef.getType())) {
+                            jsonSchemaItem.setType(modelByRef.getType());
+                        }
                         jsonSchemaItem.setProperties(jsonSchemaProperties);
                         yield jsonSchemaItem;
                     }
@@ -663,7 +698,10 @@ public class Swagger3Parser extends ApiImportAbstractParser<ApiDefinitionImport>
         jsonSchemaItem.setFormat(StringUtils.isNotBlank(integerSchema.getFormat()) ? integerSchema.getFormat() : StringUtils.EMPTY);
         jsonSchemaItem.setMaximum(integerSchema.getMaximum());
         jsonSchemaItem.setMinimum(integerSchema.getMinimum());
-        jsonSchemaItem.setEnumValues(integerSchema.getEnum());
+        List<Number> enumValues = integerSchema.getEnum();
+        if (CollectionUtils.isNotEmpty(enumValues)) {
+            jsonSchemaItem.setEnumValues(enumValues.stream().map(item -> item.toString()).toList());
+        }
         return jsonSchemaItem;
     }
 

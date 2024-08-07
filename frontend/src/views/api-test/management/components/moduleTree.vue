@@ -45,9 +45,10 @@
       </div>
       <TreeFolderAll
         v-if="!props.readOnly"
+        ref="treeFolderAllRef"
         v-model:isExpandApi="isExpandApi"
         v-model:isExpandAll="isExpandAll"
-        v-model:selectedProtocols="selectedProtocols"
+        :protocol-key="ProtocolKeyEnum.API_MODULE_TREE_PROTOCOL"
         :folder-name="t('apiTestManagement.allApi')"
         :all-count="allFileCount"
         :active-folder="selectedKeys[0] as string"
@@ -75,7 +76,6 @@
           </popConfirm>
         </template>
       </TreeFolderAll>
-      <a-divider class="my-[8px]" />
     </template>
     <a-input
       v-else
@@ -197,6 +197,7 @@
 
   import { ApiDefinitionGetModuleParams } from '@/models/apiTest/management';
   import { ModuleTreeNode } from '@/models/common';
+  import { ProtocolKeyEnum } from '@/enums/apiEnum';
 
   const props = withDefaults(
     defineProps<{
@@ -231,7 +232,8 @@
   const { openModal } = useModal();
   const { copy, isSupported } = useClipboard({ legacy: true });
 
-  const selectedProtocols = ref<string[]>([]);
+  const treeFolderAllRef = ref<InstanceType<typeof TreeFolderAll>>();
+  const selectedProtocols = computed<string[]>(() => treeFolderAllRef.value?.selectedProtocols ?? []);
   const moduleProtocolOptions = ref<SelectOptionData[]>([]);
   const protocolLoading = ref(false);
 
@@ -452,9 +454,6 @@
             path: e.path,
             fullPath,
           };
-          if (!isSetDefaultKey && e.id === selectedKeys.value[0]) {
-            folderNodeSelect([selectedKeys.value[0]], e);
-          }
           return {
             ...e,
             hideMoreAction: e.id === 'root',

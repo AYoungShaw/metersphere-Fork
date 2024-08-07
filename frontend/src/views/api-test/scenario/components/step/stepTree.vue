@@ -21,11 +21,13 @@
         title-class="step-tree-node-title"
         node-highlight-class="step-tree-node-focus"
         action-on-node-click="expand"
+        :use-map-data="false"
         disabled-title-tooltip
         checkable
         block-node
         draggable
         hide-switcher
+        handle-drop
         @select="(selectedKeys, node) => handleStepSelect(node as ScenarioStepItem)"
         @expand="handleStepExpand"
         @more-actions-close="() => setFocusNodeKey('')"
@@ -457,6 +459,7 @@
   import { cloneDeep } from 'lodash-es';
 
   import MsIcon from '@/components/pure/ms-icon-font/index.vue';
+  import { parseTableDataToJsonSchema } from '@/components/pure/ms-json-schema/utils';
   import { ActionsItem } from '@/components/pure/ms-table-more-action/types';
   import MsTagsInput from '@/components/pure/ms-tags-input/index.vue';
   import MsTree from '@/components/business/ms-tree/index.vue';
@@ -909,7 +912,11 @@
         const { isQuoteScenario } = getStepType(node as ScenarioStepItem);
         if (stepDetail) {
           // 如果复制的步骤还有详情数据，则也复制详情数据
-          stepDetails.value[id] = cloneDeep(stepDetail);
+          stepDetails.value[id] = cloneDeep({
+            ...stepDetail,
+            stepId: id,
+            uniqueId: id,
+          });
         }
         if (stepFileParam) {
           // 如果复制的步骤还有详情数据，则也复制详情数据
@@ -1239,12 +1246,24 @@
         if (_stepType.isQuoteCase && !realStep.isQuoteScenarioStep) {
           realStep.name = request.stepName || request.name;
           stepDetails.value[realStep.id] = request; // 为了设置一次正确的polymorphicName
+          activeStep.value = undefined;
           return;
         }
       }
       if (realStep && !realStep.isQuoteScenarioStep) {
         request.isNew = false;
-        stepDetails.value[realStep.id] = request;
+        stepDetails.value[realStep.id] = {
+          ...request,
+          body: {
+            ...request.body,
+            jsonBody: {
+              ...request.body?.jsonBody,
+              jsonSchema: request.body?.jsonBody?.jsonSchemaTableData
+                ? parseTableDataToJsonSchema(request.body?.jsonBody?.jsonSchemaTableData?.[0])
+                : undefined,
+            },
+          },
+        };
         scenario.value.stepFileParam[realStep?.id] = {
           linkFileIds: request.linkFileIds,
           uploadFileIds: request.uploadFileIds,

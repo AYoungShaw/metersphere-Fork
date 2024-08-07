@@ -23,7 +23,7 @@
                 class="error-6 text-[rgb(var(--danger-6))]"
                 @click="handleDelete"
               >
-                <MsIcon type="icon-icon_delete-trash_outlined" class="text-[rgb(var(--danger-6))]" />
+                <MsIcon type="icon-icon_delete-trash_outlined1" class="text-[rgb(var(--danger-6))]" />
                 {{ t('common.delete') }}
               </a-doption>
             </template>
@@ -66,6 +66,15 @@
           :is-priority-local-exec="isPriorityLocalExec"
           is-case
           @execute="handleExecute"
+          @show-diff="showDiffDrawer"
+        />
+        <DifferentDrawer
+          v-model:visible="showDifferentDrawer"
+          :active-api-case-id="activeApiCaseId"
+          :active-defined-id="activeDefinedId"
+          @close="closeDifferent"
+          @clear-this-change="clearThisChangeHandler"
+          @sync="syncHandler"
         />
       </a-tab-pane>
       <a-tab-pane key="reference" :title="t('apiTestManagement.reference')" class="px-[18px] py-[16px]">
@@ -104,6 +113,7 @@
   import apiMethodName from '@/views/api-test/components/apiMethodName.vue';
   import executeButton from '@/views/api-test/components/executeButton.vue';
   import { RequestParam } from '@/views/api-test/components/requestComposition/index.vue';
+  import DifferentDrawer from '@/views/api-test/management/components/management/case/differentDrawer.vue';
   import TabCaseChangeHistory from '@/views/api-test/management/components/management/case/tabContent/tabCaseChangeHistory.vue';
   import TabCaseDependency from '@/views/api-test/management/components/management/case/tabContent/tabCaseDependency.vue';
   import TabCaseExecuteHistory from '@/views/api-test/management/components/management/case/tabContent/tabCaseExecuteHistory.vue';
@@ -124,9 +134,11 @@
     isDrawer?: boolean; // 抽屉
     detail: RequestParam;
   }>();
+
   const emit = defineEmits<{
     (e: 'updateFollow'): void;
     (e: 'deleteCase', id: string): void;
+    (e: 'loadCase', id: string): void;
   }>();
 
   const appStore = useAppStore();
@@ -313,6 +325,35 @@
     websocket.value?.close();
     caseDetail.value.executeLoading = false;
     executeCase.value = false;
+  }
+
+  // 定义id
+  const activeDefinedId = ref<string>('');
+  // 用例id
+  const activeApiCaseId = ref<string>('');
+
+  const showDifferentDrawer = ref<boolean>(false);
+  // 查看diff对比
+  function showDiffDrawer() {
+    activeApiCaseId.value = caseDetail.value.id as string;
+    activeDefinedId.value = caseDetail.value.apiDefinitionId;
+    showDifferentDrawer.value = true;
+  }
+
+  function closeDifferent() {
+    showDifferentDrawer.value = false;
+    activeApiCaseId.value = '';
+    activeDefinedId.value = '';
+  }
+
+  // 忽略本次变更
+  async function clearThisChangeHandler() {
+    emit('loadCase', props.detail.id as string);
+  }
+
+  function syncHandler(id: string) {
+    // TODO 这里需要调用同步合并后的详情接口回显详情
+    createAndEditCaseDrawerRef.value?.open(id, caseDetail.value, false);
   }
 
   watch(

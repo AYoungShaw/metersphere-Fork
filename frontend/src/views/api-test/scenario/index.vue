@@ -17,7 +17,7 @@
           <a-divider margin="0" />
           <div class="case">
             <div class="flex items-center px-[20px]" :class="getActiveClass('recycle')" @click="redirectRecycle()">
-              <MsIcon type="icon-icon_delete-trash_outlined" class="folder-icon" />
+              <MsIcon type="icon-icon_delete-trash_outlined1" class="folder-icon" />
               <div class="folder-name mx-[4px]">{{ t('apiScenario.tree.recycleBin') }}</div>
               <div class="folder-count">({{ recycleModulesCount || 0 }})</div>
             </div>
@@ -147,7 +147,7 @@
   import { ApiTestRouteEnum } from '@/enums/routeEnum';
 
   import { defaultCsvParamItem, defaultNormalParamItem, defaultScenario } from './components/config';
-  import updateStepStatus, { getScenarioFileParams } from './components/utils';
+  import updateStepStatus, { getScenarioFileParams, getStepDetails } from './components/utils';
   import {
     filterAssertions,
     filterConditionsSqlValidParams,
@@ -261,6 +261,7 @@
           projectId: appStore.currentProjectId,
           scenarioConfig: activeScenarioTab.value.scenarioConfig,
           ...executeParams,
+          stepDetails: getStepDetails(executeParams.steps, executeParams.stepDetails),
           stepFileParam: activeScenarioTab.value.stepFileParam,
           fileParam: {
             ...getScenarioFileParams(activeScenarioTab.value),
@@ -285,6 +286,7 @@
           },
           frontendDebug: executeType === 'localExec',
           ...executeParams,
+          stepDetails: getStepDetails(executeParams.steps, executeParams.stepDetails),
           steps: mapTree(executeParams.steps, (node) => {
             return {
               ...node,
@@ -537,6 +539,7 @@
       if (activeScenarioTab.value.isNew) {
         const res = await addScenario({
           ...activeScenarioTab.value,
+          stepDetails: getStepDetails(activeScenarioTab.value.steps, activeScenarioTab.value.stepDetails),
           steps: mapTree(activeScenarioTab.value.steps, (node) => {
             return {
               ...node,
@@ -606,6 +609,7 @@
       } else {
         await updateScenario({
           ...activeScenarioTab.value,
+          stepDetails: getStepDetails(activeScenarioTab.value.steps, activeScenarioTab.value.stepDetails),
           scenarioConfig: {
             ...activeScenarioTab.value.scenarioConfig,
             assertionConfig: { ...assertionConfig, assertions: filterAssertions(assertionConfig) },

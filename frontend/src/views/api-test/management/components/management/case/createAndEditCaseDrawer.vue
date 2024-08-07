@@ -69,7 +69,16 @@
             <MsTagsInput v-model:model-value="detailForm.tags" :max-tag-count="1" />
           </a-form-item>
         </a-form>
-        <div class="px-[16px] font-medium">{{ t('apiTestManagement.requestParams') }}</div>
+        <div class="flex items-center justify-between">
+          <div class="px-[16px] font-medium">{{ t('apiTestManagement.requestParams') }}</div>
+          <ApiChangeTag
+            :ignore-api-change="detailForm.ignoreApiChange"
+            :ignore-api-diff="detailForm.ignoreApiDiff"
+            :inconsistent-with-api="detailForm.inconsistentWithApi"
+            @show-diff="showDiffDrawer"
+          />
+        </div>
+
         <requestComposition
           ref="requestCompositionRef"
           v-model:request="detailForm"
@@ -102,6 +111,7 @@
   import apiStatus from '@/views/api-test/components/apiStatus.vue';
   import executeButton from '@/views/api-test/components/executeButton.vue';
   import requestComposition, { RequestParam } from '@/views/api-test/components/requestComposition/index.vue';
+  import ApiChangeTag from '@/views/api-test/management/components/management/case/apiChangeTag.vue';
 
   import { localExecuteApiDebug } from '@/api/modules/api-test/common';
   import {
@@ -129,12 +139,16 @@
   }>();
   const emit = defineEmits<{
     (e: 'loadCase', id?: string): void;
+    (e: 'showDiff', apiDetailInfo: ApiCaseDetail): void;
   }>();
 
   const { t } = useI18n();
   const appStore = useAppStore();
 
-  const innerVisible = ref(false);
+  const innerVisible = defineModel<boolean>('visible', {
+    default: false,
+  });
+
   const drawerLoading = ref(false);
 
   const apiDefinitionId = ref('');
@@ -225,6 +239,7 @@
     if (isCopy) {
       detailForm.value = cloneDeep(record as RequestParam);
       detailForm.value.name = `copy_${record?.name}`;
+      detailForm.value.isCopy = true;
       environmentId.value = record?.environmentId;
       if (detailForm.value.name.length > 255) {
         detailForm.value.name = detailForm.value.name.slice(0, 255);
@@ -381,6 +396,11 @@
   function stopDebug() {
     websocket.value?.close();
     detailForm.value.executeLoading = false;
+  }
+
+  // 查看与定义不一致
+  function showDiffDrawer() {
+    emit('showDiff', detailForm.value as unknown as ApiCaseDetail);
   }
 
   defineExpose({

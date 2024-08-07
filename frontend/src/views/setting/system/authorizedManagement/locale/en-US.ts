@@ -6,7 +6,7 @@ export default {
   'system.authorized.authorizedVersion': 'The authorized version',
   'system.authorized.authorizationsCount': 'Number of authorizations',
   'system.authorized.authorizationStatus': 'Authorization status',
-  'system.authorized.authorityChecking': 'Valid License',
+  'system.authorized.authorityChecking': 'Import License',
   'system.authorized.valid': 'valid',
   'system.authorized.invalid': 'invalid',
   'system.authorized.failure': 'failure',
@@ -24,4 +24,6 @@ export default {
   'system.authorized.orgAndProTipContent':
     'The community edition only supports 1 organization, if you want to add more organizations, you can apply',
   'system.authorized.applyTrial': 'Enterprise trial',
+  'system.authorized.resourcePoolTableTip':
+    'The community version only supports 1 resource pool. If you need to add/enable more resource pools, you can apply',
 };

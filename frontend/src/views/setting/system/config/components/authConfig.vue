@@ -17,11 +17,18 @@
       </div>
       <ms-base-table v-bind="propsRes" no-disable v-on="propsEvent">
         <template #name="{ record }">
-          <a-button type="text" class="w-full overflow-hidden px-0" @click="openAuthDetail(record.id)">
+          <a-button
+            type="text"
+            class="max-w-full justify-start overflow-hidden px-0"
+            @click="openAuthDetail(record.id)"
+          >
             <div class="one-line-text">
               {{ record.name }}
             </div>
           </a-button>
+        </template>
+        <template #type="{ record }">
+          <div>{{ record.type === 'OAUTH2' ? 'OAuth 2.0' : record.type }}</div>
         </template>
         <template #action="{ record }">
           <MsButton v-permission="['SYSTEM_PARAMETER_SETTING_AUTH:READ+UPDATE']" @click="editAuth(record)">
@@ -109,7 +116,9 @@
         </a-form-item>
         <a-form-item :label="t('system.config.auth.addResource')" field="type" asterisk-position="end">
           <a-radio-group v-model:model-value="activeAuthForm.type" type="button" :disabled="!!activeAuthForm.id">
-            <a-radio v-for="item of authTypeList" :key="item" :value="item">{{ item }}</a-radio>
+            <a-radio v-for="item of authTypeList" :key="item" :value="item">
+              {{ item === 'OAUTH2' ? 'OAuth 2.0' : item }}
+            </a-radio>
           </a-radio-group>
         </a-form-item>
         <template v-if="activeAuthForm.type === 'CAS'">
@@ -295,7 +304,7 @@
               allow-clear
             ></a-input>
           </a-form-item>
-          <a-form-item :label="t('system.config.auth.loginUrl')" field="configuration.loginUrl" asterisk-position="end">
+          <!--          <a-form-item :label="t('system.config.auth.loginUrl')" field="configuration.loginUrl" asterisk-position="end">
             <a-input
               v-model:model-value="activeAuthForm.configuration.loginUrl"
               :max-length="255"
@@ -303,7 +312,7 @@
               allow-clear
             ></a-input>
             <MsFormItemSub :text="t('system.config.auth.loginUrlTip')" :show-fill-icon="false" />
-          </a-form-item>
+          </a-form-item>-->
         </template>
         <template v-else-if="activeAuthForm.type === 'OAUTH2'">
           <a-form-item
@@ -444,7 +453,7 @@
               allow-clear
             ></a-input>
           </a-form-item>
-          <a-form-item :label="t('system.config.auth.loginUrl')" field="configuration.loginUrl" asterisk-position="end">
+          <!--          <a-form-item :label="t('system.config.auth.loginUrl')" field="configuration.loginUrl" asterisk-position="end">
             <a-input
               v-model:model-value="activeAuthForm.configuration.loginUrl"
               :max-length="255"
@@ -452,7 +461,7 @@
               allow-clear
             ></a-input>
             <MsFormItemSub :text="t('system.config.auth.loginUrlTip')" :show-fill-icon="false" />
-          </a-form-item>
+          </a-form-item>-->
         </template>
         <template v-else-if="activeAuthForm.type === 'LDAP'">
           <a-form-item
@@ -671,6 +680,11 @@
       dataIndex: 'enable',
     },
     {
+      title: 'system.config.auth.type',
+      slotName: 'type',
+      dataIndex: 'type',
+    },
+    {
       title: 'common.desc',
       dataIndex: 'description',
       showTooltip: true,
@@ -678,10 +692,12 @@
     {
       title: 'system.config.auth.createTime',
       dataIndex: 'createTime',
+      width: 180,
     },
     {
       title: 'system.config.auth.updateTime',
       dataIndex: 'updateTime',
+      width: 180,
     },
     {
       title: hasOperationPermission.value ? 'system.config.auth.action' : '',
@@ -696,7 +712,7 @@
   const { propsRes, propsEvent, loadList, setLoadListParams } = useTable(getAuthList, {
     tableKey: TableKeyEnum.SYSTEM_AUTH,
     columns,
-    scroll: { y: 'auto' },
+    scroll: { y: 'auto', x: '100%' },
     selectable: false,
     showSelectAll: false,
   });
@@ -790,6 +806,7 @@
           Message.success(t('system.config.auth.deleteSuccess'));
           loadList();
         } catch (error) {
+          // eslint-disable-next-line no-console
           console.log(error);
         }
       },
@@ -1022,6 +1039,7 @@
           typeof res.configuration === 'string' ? JSON.parse(res.configuration || '{}') : res.configuration,
       };
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.log(error);
     } finally {
       drawerLoading.value = false;
@@ -1194,8 +1212,10 @@
           showDrawer.value = false;
         }
       }
+      authFormRef.value?.resetFields();
       loadList();
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.log(error);
     } finally {
       drawerLoading.value = false;

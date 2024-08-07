@@ -9,8 +9,8 @@ export default {
   'apiTestDebug.pluginData': 'Request data',
   'apiTestDebug.header': 'Header',
   'apiTestDebug.body': 'Body',
-  'apiTestDebug.prefix': 'Precondition',
-  'apiTestDebug.post': 'Postcondition',
+  'apiTestDebug.prefix': 'Pre-operation',
+  'apiTestDebug.post': 'Post-operation',
   'apiTestDebug.assertion': 'Assertion',
   'apiTestDebug.auth': 'Auth',
   'apiTestDebug.setting': 'Setting',
@@ -60,10 +60,10 @@ export default {
   'apiTestDebug.redirect': 'Redirect',
   'apiTestDebug.follow': 'Follow',
   'apiTestDebug.auto': 'Auto',
-  'apiTestDebug.precondition': 'Precondition',
-  'apiTestDebug.openGlobalPrecondition': 'Enable global precondition',
+  'apiTestDebug.precondition': 'Pre-operation',
+  'apiTestDebug.openGlobalPrecondition': 'Enable global Post-operation',
   'apiTestDebug.openGlobalPreconditionTip':
-    'It is enabled by default. If it is disabled, the global precondition will not be executed when running this interface.',
+    'It is enabled by default. If it is disabled, the global Post-operation will not be executed when running this interface.',
   'apiTestDebug.sql': 'SQL',
   'apiTestDebug.sqlScript': 'SQL script',
   'apiTestDebug.waitTime': 'Wait time',
@@ -114,8 +114,8 @@ export default {
   'apiTestDebug.username': 'Username',
   'apiTestDebug.maxConnection': 'Max connections',
   'apiTestDebug.timeout': 'Timeout (ms)',
-  'apiTestDebug.postCondition': 'Postcondition',
-  'apiTestDebug.openGlobalPostCondition': 'Enable global postcondition',
+  'apiTestDebug.postCondition': 'Post-operation',
+  'apiTestDebug.openGlobalPostCondition': 'Enable global Post-operation',
   'apiTestDebug.openGlobalPostConditionTip':
     'It is enabled by default. If it is disabled, the global post-processing will not be executed when running this interface.',
   'apiTestDebug.globalParameter': 'Global parameter',
@@ -213,4 +213,7 @@ export default {
   'apiTestDebug.standardAdditionsTip':
     'Writing format: parameter name, type, required, parameter value; multiple records separated by newlines',
   'apiTestDebug.quickAdditions': 'Quick',
+  'apiTestDebug.first': 'First',
+  'apiTestDebug.retry': 'Retry',
+  'apiTestDebug.autoMakeJsonTip': 'Generate Json data based on rules in Schema advanced settings',
 };

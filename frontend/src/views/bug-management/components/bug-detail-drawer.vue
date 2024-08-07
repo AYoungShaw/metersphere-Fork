@@ -96,7 +96,7 @@
                 class="error-6 text-[rgb(var(--danger-6))]"
                 @click="deleteHandler"
               >
-                <MsIcon type="icon-icon_delete-trash_outlined" class="font-[16px] text-[rgb(var(--danger-6))]" />
+                <MsIcon type="icon-icon_delete-trash_outlined1" class="font-[16px] text-[rgb(var(--danger-6))]" />
                 {{ t('common.delete') }}
               </a-doption>
             </template>
@@ -134,6 +134,7 @@
                 ref="bugDetailTabRef"
                 :allow-edit="hasAnyPermission(['PROJECT_BUG:READ+UPDATE'])"
                 :detail-info="detailInfo"
+                :current-custom-fields="currentCustomFields"
                 :is-platform-default-template="isPlatformDefaultTemplate"
                 :platform-system-fields="platformSystemFields"
                 :current-platform="props.currentPlatform"
@@ -257,6 +258,7 @@
   const rightLoading = ref(false);
   const detailLoading = ref(false);
   const activeTab = ref<string>('detail');
+  const currentDetailId = ref(props.detailId);
 
   const commentInputRef = ref<InstanceType<typeof CommentInput>>();
   const commentInputIsActive = computed(() => commentInputRef.value?.isActive);
@@ -311,6 +313,7 @@
   };
   // TODO:: Record<string, any>
   async function loadedBug(detail: BugEditFormObject) {
+    currentDetailId.value = detail.id;
     // 是否平台默认模板
     isPlatformDefaultTemplate.value = detail.platformDefault;
     // 关闭loading
@@ -350,9 +353,11 @@
         } else if (item.type === 'INT' || item.type === 'FLOAT') {
           tmpObj[item.id] = Number(item.value);
         } else if (item.type === 'CASCADER') {
-          const arr = JSON.parse(item.value);
-          if (arr && arr instanceof Array && arr.length > 0) {
-            tmpObj[item.id] = arr[arr.length - 1];
+          if (item.value !== '') {
+            const arr = JSON.parse(item.value);
+            if (arr && arr instanceof Array && arr.length > 0) {
+              tmpObj[item.id] = arr[arr.length - 1];
+            }
           }
         } else if (SINGLE_TYPE.includes(item.type)) {
           const multipleOptions = getOptionFromTemplate(
@@ -370,6 +375,7 @@
     platformSystemFields.value.forEach((item) => {
       item.defaultValue = tmpObj[item.fieldId];
     });
+
     getFormRules(
       customFieldsRes.customFields.filter((field: Record<string, any>) => !field.platformSystemField),
       tmpObj
@@ -404,7 +410,7 @@
   const editLoading = ref<boolean>(false);
 
   async function getDetail() {
-    const res = await getBugDetail(props.detailId);
+    const res = await getBugDetail(currentDetailId.value);
     loadedBug(res);
   }
 
@@ -476,13 +482,13 @@
     followLoading.value = true;
     try {
       await followBug(detailInfo.value.id, detailInfo.value.followFlag);
-      updateSuccess();
       Message.success(
         detailInfo.value.followFlag
           ? t('caseManagement.featureCase.cancelFollowSuccess')
           : t('caseManagement.featureCase.followSuccess')
       );
       detailInfo.value.followFlag = !detailInfo.value.followFlag;
+      emit('submit');
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
@@ -506,11 +512,11 @@
           };
           await deleteSingleBug(params);
           Message.success(t('common.deleteSuccess'));
-          updateSuccess();
+          emit('submit');
           if (!props.pagination && !props.tableData) {
             showDrawerVisible.value = false;
           } else {
-            detailDrawerRef.value?.openPrevDetail();
+            detailDrawerRef.value?.openNextDetail();
           }
         } catch (error) {
           // eslint-disable-next-line no-console

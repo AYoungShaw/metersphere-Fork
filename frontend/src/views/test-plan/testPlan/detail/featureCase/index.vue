@@ -8,7 +8,6 @@
           :modules-count="modulesCount"
           :selected-keys="selectedKeys"
           @folder-node-select="handleFolderNodeSelect"
-          @init="initModuleTree"
         />
       </div>
     </template>
@@ -22,11 +21,9 @@
         :module-parent-id="moduleParentId"
         :active-module="activeFolderId"
         :offspring-ids="offspringIds"
-        :module-tree="moduleTree"
         :can-edit="props.canEdit"
-        @get-module-count="getModuleCount"
+        @select-parent-node="selectParentNode"
         @refresh="emit('refresh')"
-        @init-modules="initModules"
       ></CaseTable>
     </template>
   </MsSplitBox>
@@ -40,10 +37,9 @@
   import CaseTable from './components/caseTable.vue';
   import CaseTree from './components/caseTree.vue';
 
-  import { getFeatureCaseModuleCount } from '@/api/modules/test-plan/testPlan';
+  import useTestPlanFeatureCaseStore from '@/store/modules/testPlan/testPlanFeatureCase';
 
   import { ModuleTreeNode } from '@/models/common';
-  import type { PlanDetailFeatureCaseListQueryParams } from '@/models/testPlan/testPlan';
 
   const props = defineProps<{
     canEdit: boolean;
@@ -55,17 +51,10 @@
   }>();
 
   const route = useRoute();
+  const testPlanFeatureCaseStore = useTestPlanFeatureCaseStore();
 
   const planId = ref(route.query.id as string);
-  const modulesCount = ref<Record<string, any>>({});
-  async function getModuleCount(params: PlanDetailFeatureCaseListQueryParams) {
-    try {
-      modulesCount.value = await getFeatureCaseModuleCount(params);
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.log(error);
-    }
-  }
+  const modulesCount = computed(() => testPlanFeatureCaseStore.modulesCount);
 
   const caseTableRef = ref<InstanceType<typeof CaseTable>>();
   const activeFolderId = ref<string>('all');
@@ -84,23 +73,19 @@
     caseTableRef.value?.resetSelector();
   }
 
-  const moduleTree = ref<ModuleTreeNode[]>([]);
-  function initModuleTree(tree: ModuleTreeNode[]) {
-    moduleTree.value = unref(tree);
-  }
-
   const caseTreeRef = ref<InstanceType<typeof CaseTree>>();
-  function initModules() {
-    caseTreeRef.value?.initModules();
+
+  function selectParentNode(folderTree: ModuleTreeNode[]) {
+    caseTreeRef.value?.selectParentNode(folderTree);
   }
 
   function getCaseTableList() {
-    nextTick(() => {
-      initModules();
+    nextTick(async () => {
+      await caseTreeRef.value?.initModules();
       if (activeFolderId.value !== 'all') {
         caseTreeRef.value?.setActiveFolder('all');
       } else {
-        caseTableRef.value?.loadCaseList();
+        caseTableRef.value?.handleTreeTypeChange();
       }
     });
   }

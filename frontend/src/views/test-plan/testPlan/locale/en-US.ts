@@ -81,12 +81,17 @@ export default {
   'testPlan.planForm.testPlanGroupRequired': 'Plan group cannot be empty',
   'testPlan.planForm.planStartAndEndTime': 'Planned start and end time',
   'testPlan.planForm.associateRepeatCase': 'Allow associated duplicate cases',
+  'testPlan.planForm.allowUpdateStatus': 'Allows automatic status updates',
   'testPlan.planForm.passThreshold': 'Pass threshold',
   'testPlan.planForm.passThresholdRequired': 'Pass threshold cannot be empty',
   'testPlan.planForm.createTo': 'Create to',
   'testPlan.planForm.selectPlanGroup': 'Select plan group',
   'testPlan.planForm.repeatCaseTip1': 'Enable: Repeatedly associate the same case',
   'testPlan.planForm.repeatCaseTip2': 'Close: Cannot be associated with the same case repeatedly',
+  'testPlan.planForm.enableAutomaticStatusTip':
+    'Enable: function case execution successful cases associated interface, function of the use case status automatically updated to success',
+  'testPlan.planForm.closeAutomaticStatusTip':
+    'Close: The result of execution of a functional use case is not affected by the interface',
   'testPlan.planForm.passThresholdTip': 'If the pass rate reaches the specified pass threshold, the result is passed',
   'testPlan.planForm.pickCases': 'Select cases',
   'testPlan.testPlanDetail.executed': 'Executed',
@@ -136,7 +141,7 @@ export default {
   'testPlan.testPlanGroup.planGroupDeleteContent':
     'It is recommended to select the archive, and the use case information and execution results will be retained;The data will not be restored if continue to delete,',
   'testPlan.testPlanGroup.selectTestPlanGroupPlaceHolder': 'Please select the Plan group',
-  'testPlan.testPlanGroup.batchArchivedGroup': 'Confirm archive: {count} test plan groups',
+  'testPlan.testPlanGroup.batchArchivedGroup': 'Confirm archive: {count} test plan groups?',
   'testPlan.testPlanGroup.confirmBatchDeletePlanGroup': 'Are you sure to delete {count} test plan groups?',
   'testPlan.testPlanGroup.deleteScheduleTaskSuccess': 'Delete the scheduled task successfully',
   'testPlan.testPlanGroup.enableScheduleTaskSuccess': 'Start the scheduled task successfully',

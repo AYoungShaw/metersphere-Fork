@@ -246,6 +246,9 @@
               :file-save-as-source-id="props.fileSaveAsSourceId"
               :file-save-as-api="props.fileSaveAsApi"
               :file-module-options-api="props.fileModuleOptionsApi"
+              :is-debug="requestVModel.mode === 'debug'"
+              :hide-json-schema="props.hideJsonSchema"
+              :is-case="props.isCase"
               @change="handleActiveDebugChange"
             />
             <httpQuery
@@ -479,6 +482,7 @@
   import { AddApiCaseParams } from '@/models/apiTest/management';
   import { ModuleTreeNode, TransferFileParams } from '@/models/common';
   import {
+    ProtocolKeyEnum,
     RequestAuthType,
     RequestBodyFormat,
     RequestCaseStatus,
@@ -536,6 +540,7 @@
 
   const props = defineProps<{
     request: RequestParam; // 请求参数集合
+    protocolKey?: ProtocolKeyEnum; // 用于记住协议下拉值
     moduleTree?: ModuleTreeNode[]; // 模块树
     isCase?: boolean; // 是否是用例引用的组件,只显示请求参数和响应内容,响应内容默认为空且折叠
     apiDetail?: RequestParam; // 用例引用的时候需要接口定义的数据
@@ -543,6 +548,7 @@
     isDefinition?: boolean; // 是否是接口定义模式
     hideResponseLayoutSwitch?: boolean; // 是否隐藏响应体的布局切换
     otherParams?: Record<string, any>; // 保存请求时的其他参数
+    hideJsonSchema?: boolean; // 是否隐藏json schema
     executeApi?: (params: ExecuteRequestParams) => Promise<any>; // 执行接口
     localExecuteApi?: (url: string, params: ExecuteRequestParams) => Promise<any>; // 本地执行接口
     createApi?: (...args: any) => Promise<any>; // 创建接口
@@ -868,7 +874,9 @@
         requestVModel.value.method = RequestMethods.GET;
       }
     }
-    localStorage.setItem('currentProtocol', requestVModel.value.protocol);
+    if (props.protocolKey) {
+      localStorage.setItem(props.protocolKey, requestVModel.value.protocol);
+    }
     handleActiveDebugChange();
   }
 

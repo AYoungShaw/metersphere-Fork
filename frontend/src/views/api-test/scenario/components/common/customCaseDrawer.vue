@@ -52,7 +52,7 @@
             @replace="handleReplace"
           />
           <MsButton class="mr-4" type="icon" status="secondary" @click="handleDelete">
-            <MsIcon type="icon-icon_delete-trash_outlined" />
+            <MsIcon type="icon-icon_delete-trash_outlined1" />
             {{ t('common.delete') }}
           </MsButton>
         </div>
@@ -161,6 +161,7 @@
                 :file-save-as-source-id="activeStep?.id"
                 :file-save-as-api="stepTransferFile"
                 :file-module-options-api="getTransferOptions"
+                is-case
                 @change="handleActiveDebugChange"
               />
               <httpQuery

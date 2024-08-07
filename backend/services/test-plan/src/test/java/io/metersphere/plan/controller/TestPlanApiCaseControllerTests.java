@@ -280,7 +280,7 @@ public class TestPlanApiCaseControllerTests extends BaseTest {
         collectionAssociates1.put(AssociateCaseType.API_CASE, baseCollectionAssociateRequests1);
         testPlanApiCaseService.associateCollection("wxxx_1", collectionAssociates1, user);
 
-        baseCollectionAssociateRequest1.setModules(buildModules(AssociateCaseType.API));
+        baseCollectionAssociateRequest1.setModules(buildModules(AssociateCaseType.API_CASE));
         testPlanApiCaseService.associateCollection("wxxx_1", collectionAssociates1, user);
 
         apiTestCase = initApiData();
@@ -303,18 +303,17 @@ public class TestPlanApiCaseControllerTests extends BaseTest {
         associateDTO.setAssociateType(type);
         associateDTO.setProjectId("wxx_1234");
         associateDTO.setModuleMaps(buildModuleMap());
+        associateDTO.setProtocols(List.of("HTTP"));
         return associateDTO;
     }
 
-    private List<Map<String, ModuleSelectDTO>> buildModuleMap() {
-        List<Map<String, ModuleSelectDTO>> moduleMaps = new ArrayList<>();
+    private Map<String, ModuleSelectDTO> buildModuleMap() {
         Map<String, ModuleSelectDTO> moduleMap = new HashMap<>();
         ModuleSelectDTO moduleSelectDTO = new ModuleSelectDTO();
         moduleSelectDTO.setSelectAll(false);
         moduleSelectDTO.setSelectIds(List.of("wxxx_api_1"));
         moduleMap.put("123", moduleSelectDTO);
-        moduleMaps.add(moduleMap);
-        return moduleMaps;
+        return moduleMap;
     }
 
     private TestPlanCollectionAssociateDTO buildModulesAll(String type) {
@@ -322,6 +321,14 @@ public class TestPlanApiCaseControllerTests extends BaseTest {
         associateDTO.setSelectAllModule(true);
         associateDTO.setAssociateType(type);
         associateDTO.setProjectId("wxx_1234");
+        associateDTO.setProtocols(List.of("HTTP"));
+
+        Map<String, ModuleSelectDTO> moduleMap = new HashMap<>();
+        ModuleSelectDTO moduleSelectDTO = new ModuleSelectDTO();
+        moduleSelectDTO.setSelectAll(true);
+        moduleSelectDTO.setSelectIds(new ArrayList<>());
+        moduleMap.put("123", moduleSelectDTO);
+        associateDTO.setModuleMaps(moduleMap);
         return associateDTO;
     }
 

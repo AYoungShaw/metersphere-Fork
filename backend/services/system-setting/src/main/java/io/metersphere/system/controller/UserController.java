@@ -128,7 +128,7 @@ public class UserController {
 
     @GetMapping("/get/global/system/role")
     @Operation(summary = "系统设置-系统-用户-查找系统级用户组")
-    @RequiresPermissions(PermissionConstants.SYSTEM_USER_ROLE_READ)
+    @RequiresPermissions(PermissionConstants.SYSTEM_USER_READ)
     public List<UserSelectOption> getGlobalSystemRole() {
         return globalUserRoleService.getGlobalSystemRoleList();
     }

@@ -6,7 +6,7 @@ export default {
   'system.authorized.authorizedVersion': '授权版本',
   'system.authorized.authorizationsCount': '授权数量',
   'system.authorized.authorizationStatus': '授权状态',
-  'system.authorized.authorityChecking': '授权验证',
+  'system.authorized.authorityChecking': '导入License',
   'system.authorized.valid': '有效',
   'system.authorized.invalid': '无效',
   'system.authorized.failure': '失败',
@@ -21,4 +21,5 @@ export default {
   'system.authorized.resourcePoolTipContent': '社区版仅支持 1 个资源池，如需添加更多资源池，可申请',
   'system.authorized.orgAndProTipContent': '社区版仅支持 1 个组织，如需添加更多组织，可申请',
   'system.authorized.applyTrial': '企业版试用',
+  'system.authorized.resourcePoolTableTip': '社区版仅支持 1 个资源池，如需添加/启用更多资源池，可申请',
 };

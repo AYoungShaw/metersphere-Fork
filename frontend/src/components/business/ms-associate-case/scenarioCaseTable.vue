@@ -7,8 +7,12 @@
       baseAction: [],
       moreAction: [],
     }"
+    always-show-selected-count
     v-on="propsEvent"
     @filter-change="getModuleCount"
+    @row-select-change="rowSelectChange"
+    @select-all-change="selectAllChange"
+    @clear-selector="clearSelector"
   >
     <template #num="{ record }">
       <MsButton type="text" @click="toDetail(record)">{{ record.num }}</MsButton>
@@ -34,6 +38,9 @@
         <div class="one-line-text">{{ record.createUserName }}</div>
       </a-tooltip>
     </template>
+    <template #count>
+      <slot></slot>
+    </template>
   </MsBaseTable>
 </template>
 
@@ -45,6 +52,7 @@
   import { MsTableColumn } from '@/components/pure/ms-table/type';
   import useTable from '@/components/pure/ms-table/useTable';
   import CaseLevel from '@/components/business/ms-case-associate/caseLevel.vue';
+  import type { MsTreeNodeData } from '@/components/business/ms-tree/types';
   import ExecutionStatus from '@/views/api-test/report/component/reportStatus.vue';
 
   import { useI18n } from '@/hooks/useI18n';
@@ -61,6 +69,8 @@
   import { SpecialColumnEnum, TableKeyEnum } from '@/enums/tableEnum';
   import { FilterRemoteMethodsEnum, FilterSlotNameEnum } from '@/enums/tableFilterEnum';
 
+  import type { moduleKeysType } from './types';
+  import useModuleSelection from './useModuleSelection';
   import { getPublicLinkCaseListMap } from './utils/page';
   import { casePriorityOptions } from '@/views/api-test/components/config';
 
@@ -77,6 +87,8 @@
     keyword: string;
     getPageApiType: keyof typeof CasePageApiTypeEnum; // 获取未关联分页Api
     extraTableParams?: TableQueryParams; // 查询表格的额外参数
+    moduleTree: MsTreeNodeData[];
+    modulesCount: Record<string, any>;
   }>();
 
   const emit = defineEmits<{
@@ -88,6 +100,10 @@
 
   const appStore = useAppStore();
   const tableStore = useTableStore();
+
+  const innerSelectedModulesMaps = defineModel<Record<string, moduleKeysType>>('selectedModulesMaps', {
+    required: true,
+  });
 
   const statusList = computed(() => {
     return Object.keys(ReportStatus).map((key) => {
@@ -191,8 +207,10 @@
   const getPageList = computed(() => {
     return getPublicLinkCaseListMap[props.getPageApiType][props.activeSourceType];
   });
-  const { propsRes, propsEvent, loadList, setLoadListParams, resetSelector, resetFilterParams, setTableSelected } =
-    useTable(getPageList.value, {
+
+  const { propsRes, propsEvent, loadList, setLoadListParams, resetFilterParams, setTableSelected } = useTable(
+    getPageList.value,
+    {
       tableKey: TableKeyEnum.ASSOCIATE_CASE_API_SCENARIO,
       showSetting: true,
       isSimpleSetting: true,
@@ -201,7 +219,8 @@
       showSelectAll: true,
       heightUsed: 310,
       showSelectorAll: false,
-    });
+    }
+  );
 
   async function getTableParams() {
     const { excludeKeys } = propsRes.value;
@@ -265,6 +284,40 @@
     };
   }
 
+  const tableSelectedProps = ref({
+    modulesTree: props.moduleTree,
+    moduleCount: props.modulesCount,
+  });
+  const { rowSelectChange, selectAllChange, clearSelector } = useModuleSelection(
+    innerSelectedModulesMaps.value,
+    propsRes.value,
+    tableSelectedProps.value
+  );
+
+  watch(
+    () => props.moduleTree,
+    (val) => {
+      if (val) {
+        tableSelectedProps.value.modulesTree = val;
+      }
+    },
+    {
+      immediate: true,
+    }
+  );
+
+  watch(
+    () => props.modulesCount,
+    (val) => {
+      if (val) {
+        tableSelectedProps.value.moduleCount = val;
+      }
+    },
+    {
+      immediate: true,
+    }
+  );
+
   // 去接口场景详情页面
   function toDetail(record: ApiCaseDetail) {
     openNewPage(ApiTestRouteEnum.API_TEST_SCENARIO, {
@@ -273,7 +326,6 @@
     });
   }
   watch([() => props.currentProject, () => props.activeModule], () => {
-    resetSelector();
     resetFilterParams();
     loadScenarioList();
   });

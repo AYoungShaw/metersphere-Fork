@@ -139,9 +139,15 @@ public class TestPlanFunctionalCaseService extends TestPlanResourceService {
     private TestPlanApiScenarioMapper testPlanApiScenarioMapper;
 
     @Override
-    public List<TestPlanResourceExecResultDTO> selectDistinctExecResult(String projectId) {
+    public List<TestPlanResourceExecResultDTO> selectDistinctExecResultByProjectId(String projectId) {
         return extTestPlanFunctionalCaseMapper.selectDistinctExecResult(projectId);
     }
+
+    @Override
+    public List<TestPlanResourceExecResultDTO> selectDistinctExecResultByTestPlanIds(List<String> testPlanIds) {
+        return extTestPlanFunctionalCaseMapper.selectDistinctExecResultByTestPlanIds(testPlanIds);
+    }
+
     @Override
     public long copyResource(String originalTestPlanId, String newTestPlanId, Map<String, String> oldCollectionIdToNewCollectionId, String operator, long operatorTime) {
         List<TestPlanFunctionalCase> copyList = new ArrayList<>();
@@ -417,7 +423,9 @@ public class TestPlanFunctionalCaseService extends TestPlanResourceService {
         request.setModuleIds(null);
         List<FunctionalCaseModuleCountDTO> projectModuleCountDTOList = extTestPlanFunctionalCaseMapper.countModuleIdByRequest(request, false);
         Map<String, List<FunctionalCaseModuleCountDTO>> projectCountMap = projectModuleCountDTOList.stream().collect(Collectors.groupingBy(FunctionalCaseModuleCountDTO::getProjectId));
-        Map<String, Long> projectModuleCountMap = projectModuleCountDTOList.stream().collect(Collectors.groupingBy(FunctionalCaseModuleCountDTO::getModuleId, Collectors.summingLong(FunctionalCaseModuleCountDTO::getDataCount)));
+        Map<String, Long> projectModuleCountMap = projectModuleCountDTOList.stream()
+                .filter(item -> StringUtils.equals(item.getModuleId(), item.getProjectId() + "_" + ModuleConstants.DEFAULT_NODE_ID))
+                .collect(Collectors.groupingBy(FunctionalCaseModuleCountDTO::getModuleId, Collectors.summingLong(FunctionalCaseModuleCountDTO::getDataCount)));
         projectCountMap.forEach((projectId, moduleCountDTOList) -> {
             List<ModuleCountDTO> moduleCountDTOS = new ArrayList<>();
             for (FunctionalCaseModuleCountDTO functionalCaseModuleCountDTO : moduleCountDTOList) {
@@ -623,14 +631,16 @@ public class TestPlanFunctionalCaseService extends TestPlanResourceService {
         List<TestPlanFunctionalCase> functionalCases = testPlanFunctionalCaseMapper.selectByExample(example);
         List<String> caseIds = functionalCases.stream().map(TestPlanFunctionalCase::getFunctionalCaseId).collect(Collectors.toList());
         Map<String, String> idsMap = functionalCases.stream().collect(Collectors.toMap(TestPlanFunctionalCase::getId, TestPlanFunctionalCase::getFunctionalCaseId));
-        List<TestPlanCaseExecuteHistory> historyList = getExecHistory(ids, request, logInsertModule, idsMap);
+        List<FunctionalCase> list = extFunctionalCaseMapper.getProjectIdByIds(caseIds);
+        Map<String, String> projectMap = list.stream().collect(Collectors.toMap(FunctionalCase::getId, FunctionalCase::getProjectId));
+        List<TestPlanCaseExecuteHistory> historyList = getExecHistory(ids, request, logInsertModule, idsMap, projectMap);
         testPlanCaseExecuteHistoryMapper.batchInsert(historyList);
 
         updateFunctionalCaseStatus(caseIds, request.getLastExecResult());
 
     }
 
-    private List<TestPlanCaseExecuteHistory> getExecHistory(List<String> ids, TestPlanCaseBatchRunRequest request, LogInsertModule logInsertModule, Map<String, String> idsMap) {
+    private List<TestPlanCaseExecuteHistory> getExecHistory(List<String> ids, TestPlanCaseBatchRunRequest request, LogInsertModule logInsertModule, Map<String, String> idsMap, Map<String, String> projectMap) {
 
         List<TestPlanCaseExecuteHistory> historyList = new ArrayList<>();
         ids.forEach(id -> {
@@ -646,8 +656,8 @@ public class TestPlanFunctionalCaseService extends TestPlanResourceService {
             executeHistory.setCreateUser(logInsertModule.getOperator());
             executeHistory.setCreateTime(System.currentTimeMillis());
             historyList.add(executeHistory);
-
-            handleFileAndNotice(idsMap.get(id), request.getProjectId(), request.getPlanCommentFileIds(), logInsertModule.getOperator(), CaseFileSourceType.PLAN_COMMENT.toString(), request.getNotifier(), request.getTestPlanId(), request.getLastExecResult());
+            String caseId = idsMap.get(id);
+            handleFileAndNotice(caseId, projectMap.get(caseId), request.getPlanCommentFileIds(), logInsertModule.getOperator(), CaseFileSourceType.PLAN_COMMENT.toString(), request.getNotifier(), request.getTestPlanId(), request.getLastExecResult());
 
 
         });
@@ -797,18 +807,40 @@ public class TestPlanFunctionalCaseService extends TestPlanResourceService {
     private void buildTestPlanFunctionalCase(TestPlan testPlan, BaseCollectionAssociateRequest functional, SessionUser user, List<TestPlanFunctionalCase> testPlanFunctionalCaseList, boolean isRepeat) {
         super.checkCollection(testPlan.getId(), functional.getCollectionId(), CaseType.FUNCTIONAL_CASE.getKey());
         boolean selectAllModule = functional.getModules().isSelectAllModule();
-        List<Map<String, ModuleSelectDTO>> moduleMaps = functional.getModules().getModuleMaps();
-
+        Map<String, ModuleSelectDTO> moduleMaps = functional.getModules().getModuleMaps();
+        moduleMaps.remove(MODULE_ALL);
         if (selectAllModule) {
             // 选择了全部模块
             List<FunctionalCase> functionalCaseList = extFunctionalCaseMapper.selectAllFunctionalCase(isRepeat, functional.getModules().getProjectId(), testPlan.getId());
             buildTestPlanFunctionalCaseDTO(functional, functionalCaseList, testPlan, user, testPlanFunctionalCaseList);
-            handleSyncCase(functionalCaseList, functional, testPlan, user);
+            handleSyncCase(isRepeat, functionalCaseList, functional, testPlan, user);
         } else {
             AssociateCaseDTO dto = super.getCaseIds(moduleMaps);
-            List<FunctionalCase> functionalCaseList = extFunctionalCaseMapper.selectCaseByModules(isRepeat, functional.getModules().getProjectId(), dto, testPlan.getId());
-            buildTestPlanFunctionalCaseDTO(functional, functionalCaseList, testPlan, user, testPlanFunctionalCaseList);
-            handleSyncCase(functionalCaseList, functional, testPlan, user);
+            List<FunctionalCase> functionalCaseList = new ArrayList<>();
+            //获取全选的模块数据
+            if (CollectionUtils.isNotEmpty(dto.getModuleIds())) {
+                functionalCaseList = extFunctionalCaseMapper.getListBySelectModules(isRepeat, functional.getModules().getProjectId(), dto.getModuleIds(), testPlan.getId());
+            }
+
+            if (CollectionUtils.isNotEmpty(dto.getSelectIds())) {
+                CollectionUtils.removeAll(dto.getSelectIds(), functionalCaseList.stream().map(FunctionalCase::getId).toList());
+                //获取选中的ids数据
+                List<FunctionalCase> selectIdList = extFunctionalCaseMapper.getListBySelectIds(functional.getModules().getProjectId(), dto.getSelectIds(), testPlan.getId());
+                functionalCaseList.addAll(selectIdList);
+            }
+
+            if (CollectionUtils.isNotEmpty(dto.getExcludeIds())) {
+                //排除的ids
+                List<String> excludeIds = dto.getExcludeIds();
+                functionalCaseList = functionalCaseList.stream().filter(item -> !excludeIds.contains(item.getId())).toList();
+            }
+
+            if (CollectionUtils.isNotEmpty(functionalCaseList)) {
+                List<FunctionalCase> list = functionalCaseList.stream().sorted(Comparator.comparing(FunctionalCase::getPos)).toList();
+                buildTestPlanFunctionalCaseDTO(functional, list, testPlan, user, testPlanFunctionalCaseList);
+                handleSyncCase(isRepeat, functionalCaseList, functional, testPlan, user);
+            }
+
         }
     }
 
@@ -816,32 +848,34 @@ public class TestPlanFunctionalCaseService extends TestPlanResourceService {
     /**
      * 处理同步添加功能用例关联的用例
      *
+     * @param isRepeat
      * @param functionalCaseList
      * @param functional
      * @param testPlan
      * @param user
      */
-    private void handleSyncCase(List<FunctionalCase> functionalCaseList, BaseCollectionAssociateRequest functional, TestPlan testPlan, SessionUser user) {
+    private void handleSyncCase(boolean isRepeat, List<FunctionalCase> functionalCaseList, BaseCollectionAssociateRequest functional, TestPlan testPlan, SessionUser user) {
         if (BooleanUtils.isTrue(functional.getModules().isSyncCase())) {
-            handleApiCaseData(functionalCaseList, functional, testPlan, user);
-            handleApiScenarioData(functionalCaseList, functional, testPlan, user);
+            handleApiCaseData(isRepeat, functionalCaseList, functional, testPlan, user);
+            handleApiScenarioData(isRepeat, functionalCaseList, functional, testPlan, user);
         }
     }
 
     /**
      * 处理场景用例数据
      *
+     * @param isRepeat
      * @param functionalCaseList
      * @param functional
      * @param testPlan
      * @param user
      */
-    private void handleApiScenarioData(List<FunctionalCase> functionalCaseList, BaseCollectionAssociateRequest functional, TestPlan testPlan, SessionUser user) {
+    private void handleApiScenarioData(boolean isRepeat, List<FunctionalCase> functionalCaseList, BaseCollectionAssociateRequest functional, TestPlan testPlan, SessionUser user) {
         if (StringUtils.isNotBlank(functional.getModules().getApiScenarioCollectionId()) && checkApiCollection(testPlan, functional.getModules().getApiScenarioCollectionId(), CaseType.SCENARIO_CASE.getKey())) {
             List<String> caseIds = functionalCaseList.stream().map(FunctionalCase::getId).toList();
-            List<ApiScenario> scenarioList = extFunctionalCaseTestMapper.selectApiScenarioByCaseIds(caseIds);
+            List<ApiScenario> scenarioList = extFunctionalCaseTestMapper.selectApiScenarioByCaseIds(isRepeat, caseIds, testPlan.getId());
             List<TestPlanApiScenario> testPlanApiScenarioList = new ArrayList<>();
-            testPlanApiScenarioService.buildTestPlanApiScenarioDTO(functional, scenarioList, testPlan, user, testPlanApiScenarioList);
+            testPlanApiScenarioService.buildTestPlanApiScenarioDTO(functional.getModules().getApiScenarioCollectionId(), scenarioList, testPlan, user, testPlanApiScenarioList);
             if (CollectionUtils.isNotEmpty(testPlanApiScenarioList)) {
                 testPlanApiScenarioMapper.batchInsert(testPlanApiScenarioList);
             }
@@ -856,12 +890,12 @@ public class TestPlanFunctionalCaseService extends TestPlanResourceService {
      * @param testPlan
      * @param user
      */
-    private void handleApiCaseData(List<FunctionalCase> functionalCaseList, BaseCollectionAssociateRequest functional, TestPlan testPlan, SessionUser user) {
+    private void handleApiCaseData(boolean isRepeat, List<FunctionalCase> functionalCaseList, BaseCollectionAssociateRequest functional, TestPlan testPlan, SessionUser user) {
         if (StringUtils.isNotBlank(functional.getModules().getApiCaseCollectionId()) && checkApiCollection(testPlan, functional.getModules().getApiCaseCollectionId(), CaseType.API_CASE.getKey())) {
             List<String> caseIds = functionalCaseList.stream().map(FunctionalCase::getId).toList();
-            List<ApiTestCase> apiTestCaseList = extFunctionalCaseTestMapper.selectApiCaseByCaseIds(caseIds);
+            List<ApiTestCase> apiTestCaseList = extFunctionalCaseTestMapper.selectApiCaseByCaseIds(isRepeat, caseIds, testPlan.getId());
             List<TestPlanApiCase> testPlanApiCaseList = new ArrayList<>();
-            testPlanApiCaseService.buildTestPlanApiCaseDTO(functional, apiTestCaseList, testPlan, user, testPlanApiCaseList);
+            testPlanApiCaseService.buildTestPlanApiCaseDTO(functional.getModules().getApiCaseCollectionId(), apiTestCaseList, testPlan, user, testPlanApiCaseList);
             if (CollectionUtils.isNotEmpty(testPlanApiCaseList)) {
                 testPlanApiCaseMapper.batchInsert(testPlanApiCaseList);
             }

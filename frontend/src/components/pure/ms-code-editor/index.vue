@@ -1,10 +1,5 @@
 <template>
-  <div
-    ref="fullRef"
-    :class="`${
-      !isAdaptive ? 'h-full' : ''
-    } flex flex-col rounded-[var(--border-radius-small)] border border-[var(--color-text-n8)] p-[12px]`"
-  >
+  <div ref="fullRef" :class="`${!isAdaptive ? 'h-full' : ''} ms-code-editor-container`">
     <div v-if="showTitleLine" class="mb-[8px] flex items-center justify-between">
       <div class="flex flex-wrap gap-[4px]">
         <a-select
@@ -41,12 +36,12 @@
           v-if="showCodeFormat"
           type="outline"
           class="arco-btn-outline--secondary p-[0_8px]"
-          size="mini"
+          size="small"
           @click="format"
         >
           <div class="flex items-center gap-[4px]">
             <icon-code-square class="text-[var(--color-text-4)]" />
-            <div class="text-[var(--color-text-1)]">{{ t('msCodeEditor.format') }}</div>
+            <div class="text-[12px] text-[var(--color-text-1)]">{{ t('msCodeEditor.format') }}</div>
           </div>
         </a-button>
         <div
@@ -61,7 +56,7 @@
       </div>
     </div>
     <!-- 这里的 32px 是顶部标题的 32px -->
-    <div class="flex w-full flex-1 flex-row rounded-[var(--border-radius-small)]">
+    <div class="flex w-full flex-1 flex-row overflow-hidden rounded-[var(--border-radius-small)]">
       <div
         ref="codeContainerRef"
         :class="['ms-code-editor', isFullScreen ? 'ms-code-editor-full-screen' : '', currentTheme]"
@@ -93,6 +88,8 @@
       const { t } = useI18n();
       // 编辑器实例，每次调用组件都会创建独立的实例
       let editor: monaco.editor.IStandaloneCodeEditor;
+      // 编辑器diffEditor实例 开启diffMode则会初始化
+      let diffEditor: monaco.editor.IStandaloneDiffEditor;
       const codeContainerRef = ref();
 
       // 用于全屏的容器 ref
@@ -266,16 +263,17 @@
           codeheight.value = props.height;
           return;
         }
-        const editorElement = editor.getDomNode();
-
-        if (!editorElement) {
-          return;
+        if (editor) {
+          const editorElement = editor.getDomNode();
+          if (!editorElement) {
+            return;
+          }
         }
 
         // 获取代码编辑器文本行高
-        const lineHeight = editor.getOption(monaco.editor.EditorOption.lineHeight);
+        const lineHeight = editor?.getOption(monaco.editor.EditorOption.lineHeight);
         // 获取代码的行数
-        const lineCount = editor.getModel()?.getLineCount() || 10;
+        const lineCount = editor?.getModel()?.getLineCount() || 10;
         // 计算高度 @desc 原本行数差3行完全展示文本 24为上下的边距为12px
         const height = (lineCount + 3) * lineHeight;
         codeheight.value = height > 300 ? `${height + 24}px` : '300px';
@@ -306,6 +304,7 @@
           lineNumbersMinChars: 3,
           lineDecorationsWidth: 0,
           tabSize: 2,
+          scrollBeyondLastLine: false, // 内容超出初始化后的最后一行才显示滚动条
         });
 
         editor.getModel()?.setEOL(monaco.editor.EndOfLineSequence.LF); // 设置换行符
@@ -342,11 +341,50 @@
         { deep: true }
       );
 
+      // 初始化diffEditor
+      const initDiffEditor = (originalValue: string, modifiedValue: string) => {
+        diffEditor = monaco.editor.createDiffEditor(codeContainerRef.value, {
+          automaticLayout: true,
+          padding: {
+            top: 12,
+            bottom: 12,
+          },
+          minimap: {
+            enabled: false,
+          },
+          contextmenu: !props.readOnly,
+          ...props,
+          theme: currentTheme.value,
+          lineNumbersMinChars: 3,
+          lineDecorationsWidth: 0,
+          scrollBeyondLastLine: false,
+        });
+
+        const originalModel = monaco.editor.createModel(originalValue, props.language.toLowerCase());
+        const modifiedModel = monaco.editor.createModel(modifiedValue, props.language.toLowerCase());
+
+        diffEditor.setModel({
+          original: originalModel,
+          modified: modifiedModel,
+        });
+
+        handleEditorMount();
+      };
+
       watch(
         () => props.language,
         (newValue) => {
           currentLanguage.value = newValue;
           monaco.editor.setModelLanguage(editor.getModel()!, newValue.toLowerCase()); // 设置语言，语言 ENUM 是大写的，但是 monaco 需要小写
+          // 设置对比初始和修改值
+          if (diffEditor) {
+            const originalModel = diffEditor.getModel()?.original;
+            const modifiedModel = diffEditor.getModel()?.modified;
+            if (originalModel && modifiedModel) {
+              monaco.editor.setModelLanguage(originalModel, newValue.toLowerCase());
+              monaco.editor.setModelLanguage(modifiedModel, newValue.toLowerCase());
+            }
+          }
         }
       );
 
@@ -354,15 +392,28 @@
         () => props.readOnly,
         (val) => {
           editor.updateOptions({ readOnly: val });
+          if (diffEditor) {
+            diffEditor.updateOptions({ readOnly: val });
+          }
         }
       );
 
       onBeforeUnmount(() => {
-        editor.dispose();
+        if (editor) {
+          editor.dispose();
+        }
+
+        if (diffEditor) {
+          diffEditor.dispose();
+        }
       });
 
       onMounted(() => {
-        init();
+        if (props.diffMode) {
+          initDiffEditor(props.originalValue, props.modelValue);
+        } else {
+          init();
+        }
         setEditBoxBg();
         if (props.readOnly) {
           format();
@@ -406,21 +457,28 @@
 </script>
 
 <style lang="less" scoped>
-  .ms-code-editor {
-    width: v-bind(width);
-    height: v-bind(codeheight);
-    @apply z-10;
+  .ms-code-editor-container {
+    @apply flex flex-col;
 
-    // &.MS-text[data-mode-id='plaintext'] {
-    //   :deep(.mtk1) {
-    //     color: rgb(var(--primary-5));
-    //   }
-    // }
-    :deep(.overflowingContentWidgets) {
-      z-index: 9999;
+    padding: 12px;
+    border: 1px solid var(--color-text-n8);
+    border-radius: var(--border-radius-small);
+    .ms-code-editor {
+      width: v-bind(width);
+      height: v-bind(codeheight);
+      @apply z-10;
+
+      // &.MS-text[data-mode-id='plaintext'] {
+      //   :deep(.mtk1) {
+      //     color: rgb(var(--primary-5));
+      //   }
+      // }
+      :deep(.overflowingContentWidgets) {
+        z-index: 9999;
+      }
     }
-  }
-  .ms-code-editor-full-screen {
-    height: calc(100vh - 66px);
+    .ms-code-editor-full-screen {
+      height: calc(100vh - 66px);
+    }
   }
 </style>

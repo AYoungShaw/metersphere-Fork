@@ -1,6 +1,7 @@
-import type { MinderNodePosition } from '@/store/modules/components/minder-editor/types';
+import type { MinderJsonNode, MinderJsonNodeData } from '@/components/pure/ms-minder-editor/props';
 
-import type { MinderJsonNode } from '../../props';
+import type { MinderNodePosition } from '@/store/modules/components/minder-editor/types';
+import { getGenerateId, mapTree } from '@/utils';
 
 export function isDisableNode(minder: any) {
   let node: MinderJsonNode;
@@ -120,20 +121,25 @@ export function setCustomPriorityView(valueMap: Record<any, string>) {
 }
 
 /**
- * 将节点及其子节点id置为null，changed 标记为true
+ * 重置节点为新节点
  * @param node
  */
 export function resetNodes(nodes: MinderJsonNode[]) {
-  if (nodes) {
-    nodes.forEach((item: any) => {
-      if (item.data) {
-        item.data.id = null;
-        item.data.contextChanged = true;
-        item.data.changed = true;
-        resetNodes(item.children);
-      }
-    });
-  }
+  return mapTree(nodes, (node) => {
+    if (node.data && node.data?.id !== 'fakeNode' && node.data?.type !== 'tmp') {
+      node.data = {
+        ...node.data,
+        isNew: true,
+        id: getGenerateId(),
+        count:
+          node.children?.filter((e: MinderJsonNode) => e.data?.id !== 'fakeNode' && e.data?.type !== 'tmp').length || 0,
+        type: 'ADD',
+        changed: false,
+      };
+      return node;
+    }
+    return null;
+  });
 }
 
 export function isDisableForNode(node: MinderJsonNode) {
@@ -156,4 +162,81 @@ export function isNodeInMinderView(node?: MinderJsonNode, nodePosition?: MinderN
     return nodePosition.x >= 0 && nodePosition.x + (offsetX || 0) <= containerWidth;
   }
   return false;
+}
+
+/**
+ * 渲染其子节点
+ * @param node 对应节点
+ * @param renderNode 需要渲染的子节点
+ */
+export function handleRenderNode(node: MinderJsonNode, renderNode: MinderJsonNode) {
+  if (!node.data) return;
+  window.minder.renderNodeBatch(renderNode);
+  node.layout();
+  node.data.isLoaded = true;
+}
+
+/**
+ * 展开节点和其全部子节点
+ * @param node 对应节点
+ */
+export function expendNodeAndChildren(node: MinderJsonNode) {
+  if (node.children?.length) {
+    node.expand();
+    node.renderTree();
+    node.layout();
+    node.children?.forEach((child) => expendNodeAndChildren(child));
+  }
+}
+
+/**
+ * 移除占位的虚拟节点
+ * @param node 对应节点
+ * @param fakeNodeName 虚拟节点名称
+ */
+export function removeFakeNode(node: MinderJsonNode, fakeNodeName: string) {
+  const fakeNode = node.children?.find((e: MinderJsonNode) => e.data?.id === fakeNodeName);
+  if (fakeNode) {
+    window.minder.removeNode(fakeNode);
+  }
+}
+
+/**
+ * 创建节点
+ * @param data 节点数据
+ * @param parentNode 父节点
+ */
+export function createNode(data?: MinderJsonNodeData, parentNode?: MinderJsonNode) {
+  return window.minder.createNode(
+    {
+      ...data,
+      expandState: 'collapse',
+      disabled: true,
+    },
+    parentNode
+  );
+}
+
+/**
+ * 递归渲染子节点及其子节点
+ * @param parentNode - 父节点
+ * @param children - 子节点数组
+ */
+export function renderSubNodes(parentNode: MinderJsonNode, children?: MinderJsonNode[]) {
+  return (
+    children?.map((item: MinderJsonNode) => {
+      const grandChild = createNode(item.data, parentNode);
+      const greatGrandChildren = renderSubNodes(grandChild, item.children);
+      window.minder.renderNodeBatch(greatGrandChildren);
+      return grandChild;
+    }) || []
+  );
+}
+
+// 清空选中状态
+export function clearSelectedNodes() {
+  const currentSelectedNodes: MinderJsonNode[] = window.minder.getSelectedNodes();
+  if (currentSelectedNodes && currentSelectedNodes.length > 0) {
+    window.minder.toggleSelect(currentSelectedNodes);
+  }
 }

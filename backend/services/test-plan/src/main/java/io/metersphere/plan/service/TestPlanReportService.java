@@ -12,10 +12,8 @@ import io.metersphere.plan.dto.response.TestPlanReportPageResponse;
 import io.metersphere.plan.enums.TestPlanReportAttachmentSourceType;
 import io.metersphere.plan.mapper.*;
 import io.metersphere.plan.utils.CountUtils;
-import io.metersphere.plan.utils.ModuleTreeUtils;
 import io.metersphere.plan.utils.RateCalculateUtils;
 import io.metersphere.plugin.platform.dto.SelectOption;
-import io.metersphere.project.service.FileService;
 import io.metersphere.sdk.constants.*;
 import io.metersphere.sdk.exception.MSException;
 import io.metersphere.sdk.file.FileCenter;
@@ -28,6 +26,8 @@ import io.metersphere.system.dto.sdk.OptionDTO;
 import io.metersphere.system.mapper.BaseUserMapper;
 import io.metersphere.system.mapper.UserMapper;
 import io.metersphere.system.notice.constants.NoticeConstants;
+import io.metersphere.system.service.CommonFileService;
+import io.metersphere.system.service.FileService;
 import io.metersphere.system.service.SimpleUserService;
 import io.metersphere.system.uid.IDGenerator;
 import io.metersphere.system.utils.ServiceUtils;
@@ -104,6 +104,8 @@ public class TestPlanReportService {
     private ExtTestPlanCaseExecuteHistoryMapper extTestPlanCaseExecuteHistoryMapper;
     @Resource
     private TestPlanReportComponentMapper componentMapper;
+    @Resource
+    private CommonFileService commonFileService;
 
     /**
      * 分页查询报告列表
@@ -184,19 +186,33 @@ public class TestPlanReportService {
     }
 
     /**
-     * 删除测试计划报告（包括summary
+     * 删除测试计划报告（包括汇总, 明细)
      */
     public void deleteByTestPlanIds(List<String> testPlanIds) {
         if (CollectionUtils.isNotEmpty(testPlanIds)) {
-            List<String> reportIdList = extTestPlanReportMapper.selectReportIdTestPlanIds(testPlanIds);
-
-            SubListUtils.dealForSubList(reportIdList, SubListUtils.DEFAULT_BATCH_SIZE, subList -> {
-                TestPlanReportExample example = new TestPlanReportExample();
-                example.createCriteria().andIdIn(subList);
-                testPlanReportMapper.deleteByExample(example);
-
-                this.deleteTestPlanReportBlobs(subList);
-            });
+            TestPlanReportExample reportExample = new TestPlanReportExample();
+            reportExample.createCriteria().andTestPlanIdIn(testPlanIds);
+            List<TestPlanReport> testPlanReports = testPlanReportMapper.selectByExample(reportExample);
+            if (CollectionUtils.isNotEmpty(testPlanReports)) {
+                Map<String, TestPlanReport> reportMap = testPlanReports.stream().collect(Collectors.toMap(TestPlanReport::getId, r -> r));
+                List<String> reportIdList = testPlanReports.stream().map(TestPlanReport::getId).toList();
+                reportIdList.forEach(reportId -> {
+                    /**
+                     * 独立计划直接删除; 子计划的报告删除时, 保留报告记录
+                     */
+                    TestPlanReport report = reportMap.get(reportId);
+                    if (StringUtils.isNotBlank(report.getParentId()) && !report.getIntegrated() && !report.getDeleted()) {
+                        TestPlanReport record = new TestPlanReport();
+                        record.setId(reportId);
+                        record.setDeleted(true);
+                        testPlanReportMapper.updateByPrimaryKeySelective(record);
+                    } else {
+                        extTestPlanReportMapper.deleteGroupReport(reportId);
+                    }
+                });
+                // 清除汇总, 明细数据
+                this.deleteTestPlanReportBlobs(reportIdList);
+            }
         }
     }
 
@@ -234,7 +250,7 @@ public class TestPlanReportService {
          * 2. 保存报告布局组件 (只对当前生成的计划/组有效, 不会对下面的子计划报告生效)
          * 3. 处理富文本图片
          */
-        Map<String, String> reportMap = genReport(IDGenerator.nextStr(), request, true, currentUser);
+        Map<String, String> reportMap = genReport(IDGenerator.nextStr(), request, true, currentUser, request.getReportName());
         String genReportId = reportMap.get(request.getTestPlanId());
         List<TestPlanReportComponentSaveRequest> components = request.getComponents();
         if (CollectionUtils.isNotEmpty(components)) {
@@ -256,7 +272,6 @@ public class TestPlanReportService {
         TestPlanReport record = new TestPlanReport();
         record.setId(genReportId);
         record.setDefaultLayout(false);
-        record.setName(request.getReportName());
         testPlanReportMapper.updateByPrimaryKeySelective(record);
         // 处理富文本文件
         transferRichTextTmpFile(genReportId, request.getProjectId(), request.getRichTextTmpFileIds(), currentUser, TestPlanReportAttachmentSourceType.RICH_TEXT.name());
@@ -269,7 +284,7 @@ public class TestPlanReportService {
      * @param currentUser 当前用户
      */
     public String genReportByAuto(TestPlanReportGenRequest request, String currentUser) {
-        Map<String, String> reportMap = genReport(IDGenerator.nextStr(), request, true, currentUser);
+        Map<String, String> reportMap = genReport(IDGenerator.nextStr(), request, true, currentUser, null);
         return reportMap.get(request.getTestPlanId());
     }
 
@@ -282,16 +297,15 @@ public class TestPlanReportService {
      */
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRES_NEW)
     public Map<String, String> genReportByExecution(String prepareReportId, TestPlanReportGenRequest request, String currentUser) {
-        return genReport(prepareReportId, request, false, currentUser);
+        return genReport(prepareReportId, request, false, currentUser, null);
     }
 
-    public Map<String, String> genReport(String prepareReportId, TestPlanReportGenRequest request, boolean manual, String currentUser) {
+    public Map<String, String> genReport(String prepareReportId, TestPlanReportGenRequest request, boolean manual, String currentUser, String manualReportName) {
         Map<String, String> preReportMap = new HashMap<>();
+        TestPlanReportManualParam reportManualParam = TestPlanReportManualParam.builder().manualName(manualReportName).targetId(request.getTestPlanId()).build();
         try {
             // 所有计划
             List<TestPlan> plans = getPlans(request.getTestPlanId());
-            // 模块参数
-            TestPlanReportModuleParam moduleParam = getModuleParam(request.getProjectId());
 
             /*
              * 1. 准备报告生成参数
@@ -312,7 +326,7 @@ public class TestPlanReportService {
                 genPreParam.setUseManual(manual);
                 //如果是测试计划的独立报告，使用参数中的预生成的报告id。否则只有测试计划组报告使用该id
                 String prepareItemReportId = isGroupReports ? IDGenerator.nextStr() : prepareReportId;
-                TestPlanReport preReport = preGenReport(prepareItemReportId, genPreParam, currentUser, moduleParam, childPlanIds);
+                TestPlanReport preReport = preGenReport(prepareItemReportId, genPreParam, currentUser, childPlanIds, reportManualParam);
                 if (manual) {
                     // 汇总
                     if (genPreParam.getIntegrated()) {
@@ -343,7 +357,8 @@ public class TestPlanReportService {
      *
      * @return 报告
      */
-    public TestPlanReport preGenReport(String prepareId, TestPlanReportGenPreParam genParam, String currentUser, TestPlanReportModuleParam moduleParam, List<String> childPlanIds) {
+    public TestPlanReport preGenReport(String prepareId, TestPlanReportGenPreParam genParam, String currentUser, List<String> childPlanIds,
+                                       TestPlanReportManualParam reportManualParam) {
         // 计划配置
         TestPlanConfig config = testPlanConfigMapper.selectByPrimaryKey(genParam.getTestPlanId());
 
@@ -355,7 +370,8 @@ public class TestPlanReportService {
         TestPlanReport report = new TestPlanReport();
         BeanUtils.copyBean(report, genParam);
         report.setId(genParam.getIntegrated() ? genParam.getGroupReportId() : prepareId);
-        report.setName(genParam.getTestPlanName() + "-" + DateUtils.getTimeStr(System.currentTimeMillis()));
+        report.setName((StringUtils.equals(genParam.getTestPlanId(), reportManualParam.getTargetId()) && StringUtils.isNotBlank(reportManualParam.getManualName())) ?
+                reportManualParam.getManualName() : genParam.getTestPlanName() + "-" + DateUtils.getTimeStr(System.currentTimeMillis()));
         report.setCreateUser(currentUser);
         report.setCreateTime(System.currentTimeMillis());
         report.setDeleted(false);
@@ -367,7 +383,7 @@ public class TestPlanReportService {
         TestPlanReportDetailCaseDTO reportCaseDetail;
         if (!genParam.getIntegrated()) {
             // 生成独立报告的关联数据
-            reportCaseDetail = genReportDetail(genParam, moduleParam, report);
+            reportCaseDetail = genReportDetail(genParam, report);
         } else {
             // 计划组报告暂不统计各用例类型, 汇总时再入库
             reportCaseDetail = TestPlanReportDetailCaseDTO.builder().build();
@@ -392,10 +408,9 @@ public class TestPlanReportService {
      * 生成独立报告的关联数据
      *
      * @param genParam    报告生成的参数
-     * @param moduleParam 模块参数
      * @param report      报告
      */
-    private TestPlanReportDetailCaseDTO genReportDetail(TestPlanReportGenPreParam genParam, TestPlanReportModuleParam moduleParam, TestPlanReport report) {
+    private TestPlanReportDetailCaseDTO genReportDetail(TestPlanReportGenPreParam genParam, TestPlanReport report) {
         SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
         // 功能用例
         List<TestPlanReportFunctionCase> reportFunctionCases = extTestPlanReportFunctionalCaseMapper.getPlanExecuteCases(genParam.getTestPlanId());
@@ -404,6 +419,13 @@ public class TestPlanReportService {
             List<String> ids = reportFunctionCases.stream().map(TestPlanReportFunctionCase::getFunctionCaseId).distinct().toList();
             List<SelectOption> options = extTestPlanReportFunctionalCaseMapper.getCasePriorityByIds(ids);
             Map<String, String> casePriorityMap = options.stream().collect(Collectors.toMap(SelectOption::getValue, SelectOption::getText));
+            // 用例模块
+            List<String> moduleIds = reportFunctionCases.stream().map(TestPlanReportFunctionCase::getFunctionCaseModule).filter(Objects::nonNull).toList();
+            Map<String, String> moduleMap = new HashMap<>();
+            if (CollectionUtils.isNotEmpty(moduleIds)) {
+                List<TestPlanBaseModule> modules = extTestPlanReportFunctionalCaseMapper.getPlanExecuteCaseModules(moduleIds);
+                moduleMap = modules.stream().collect(Collectors.toMap(TestPlanBaseModule::getId, TestPlanBaseModule::getName));
+            }
             // 关联的功能用例最新一次执行历史
             List<String> relateIds = reportFunctionCases.stream().map(TestPlanReportFunctionCase::getTestPlanFunctionCaseId).toList();
             TestPlanCaseExecuteHistoryExample example = new TestPlanCaseExecuteHistoryExample();
@@ -411,13 +433,11 @@ public class TestPlanReportService {
             List<TestPlanCaseExecuteHistory> functionalExecHisList = testPlanCaseExecuteHistoryMapper.selectByExample(example);
             Map<String, List<TestPlanCaseExecuteHistory>> functionalExecMap = functionalExecHisList.stream().collect(Collectors.groupingBy(TestPlanCaseExecuteHistory::getTestPlanCaseId));
 
-
-            reportFunctionCases.forEach(reportFunctionalCase -> {
+            for (TestPlanReportFunctionCase reportFunctionalCase : reportFunctionCases) {
                 reportFunctionalCase.setId(IDGenerator.nextStr());
                 reportFunctionalCase.setTestPlanReportId(report.getId());
                 reportFunctionalCase.setTestPlanName(genParam.getTestPlanName());
-                reportFunctionalCase.setFunctionCaseModule(moduleParam.getFunctionalModuleMap().getOrDefault(reportFunctionalCase.getFunctionCaseModule(),
-                        ModuleTreeUtils.MODULE_PATH_PREFIX + reportFunctionalCase.getFunctionCaseModule()));
+                reportFunctionalCase.setFunctionCaseModule(moduleMap.getOrDefault(reportFunctionalCase.getFunctionCaseModule(), reportFunctionalCase.getFunctionCaseModule()));
                 reportFunctionalCase.setFunctionCasePriority(casePriorityMap.get(reportFunctionalCase.getFunctionCaseId()));
                 List<TestPlanCaseExecuteHistory> hisList = functionalExecMap.get(reportFunctionalCase.getTestPlanFunctionCaseId());
                 if (CollectionUtils.isNotEmpty(hisList)) {
@@ -426,7 +446,8 @@ public class TestPlanReportService {
                 } else {
                     reportFunctionalCase.setFunctionCaseExecuteReportId(null);
                 }
-            });
+            }
+
             // 插入计划功能用例关联数据 -> 报告内容
             TestPlanReportFunctionCaseMapper batchMapper = sqlSession.getMapper(TestPlanReportFunctionCaseMapper.class);
             batchMapper.batchInsert(reportFunctionCases);
@@ -435,12 +456,19 @@ public class TestPlanReportService {
         // 接口用例
         List<TestPlanReportApiCase> reportApiCases = extTestPlanReportApiCaseMapper.getPlanExecuteCases(genParam.getTestPlanId());
         if (CollectionUtils.isNotEmpty(reportApiCases)) {
-            reportApiCases.forEach(reportApiCase -> {
+            // 用例模块
+            List<String> moduleIds = reportApiCases.stream().map(TestPlanReportApiCase::getApiCaseModule).filter(Objects::nonNull).toList();
+            Map<String, String> moduleMap = new HashMap<>();
+            if (CollectionUtils.isNotEmpty(moduleIds)) {
+                List<TestPlanBaseModule> modules = extTestPlanReportApiCaseMapper.getPlanExecuteCaseModules(moduleIds);
+                moduleMap = modules.stream().collect(Collectors.toMap(TestPlanBaseModule::getId, TestPlanBaseModule::getName));
+            }
+
+            for (TestPlanReportApiCase reportApiCase : reportApiCases) {
                 reportApiCase.setId(IDGenerator.nextStr());
                 reportApiCase.setTestPlanReportId(report.getId());
                 reportApiCase.setTestPlanName(genParam.getTestPlanName());
-                reportApiCase.setApiCaseModule(moduleParam.getApiModuleMap().getOrDefault(reportApiCase.getApiCaseModule(),
-                        ModuleTreeUtils.MODULE_PATH_PREFIX + reportApiCase.getApiCaseModule()));
+                reportApiCase.setApiCaseModule(moduleMap.getOrDefault(reportApiCase.getApiCaseModule(), reportApiCase.getApiCaseModule()));
                 //根据不超过数据库字段最大长度压缩模块名
                 reportApiCase.setApiCaseModule(ServiceUtils.compressName(reportApiCase.getApiCaseModule(), 450));
                 if (!genParam.getUseManual()) {
@@ -449,7 +477,7 @@ public class TestPlanReportService {
                     reportApiCase.setApiCaseExecuteUser(null);
                     reportApiCase.setApiCaseExecuteReportId(IDGenerator.nextStr());
                 }
-            });
+            }
             // 插入计划接口用例关联数据 -> 报告内容
             TestPlanReportApiCaseMapper batchMapper = sqlSession.getMapper(TestPlanReportApiCaseMapper.class);
             batchMapper.batchInsert(reportApiCases);
@@ -458,12 +486,19 @@ public class TestPlanReportService {
         // 场景用例
         List<TestPlanReportApiScenario> reportApiScenarios = extTestPlanReportApiScenarioMapper.getPlanExecuteCases(genParam.getTestPlanId());
         if (CollectionUtils.isNotEmpty(reportApiScenarios)) {
-            reportApiScenarios.forEach(reportApiScenario -> {
+            // 用例模块
+            List<String> moduleIds = reportApiScenarios.stream().map(TestPlanReportApiScenario::getApiScenarioModule).filter(Objects::nonNull).toList();
+            Map<String, String> moduleMap = new HashMap<>();
+            if (CollectionUtils.isNotEmpty(moduleIds)) {
+                List<TestPlanBaseModule> modules = extTestPlanReportApiScenarioMapper.getPlanExecuteCaseModules(moduleIds);
+                moduleMap = modules.stream().collect(Collectors.toMap(TestPlanBaseModule::getId, TestPlanBaseModule::getName));
+            }
+
+            for (TestPlanReportApiScenario reportApiScenario : reportApiScenarios) {
                 reportApiScenario.setId(IDGenerator.nextStr());
                 reportApiScenario.setTestPlanReportId(report.getId());
                 reportApiScenario.setTestPlanName(genParam.getTestPlanName());
-                reportApiScenario.setApiScenarioModule(moduleParam.getScenarioModuleMap().getOrDefault(reportApiScenario.getApiScenarioModule(),
-                        ModuleTreeUtils.MODULE_PATH_PREFIX + reportApiScenario.getApiScenarioModule()));
+                reportApiScenario.setApiScenarioModule(moduleMap.getOrDefault(reportApiScenario.getApiScenarioModule(), reportApiScenario.getApiScenarioModule()));
                 //根据不超过数据库字段最大长度压缩模块名
                 reportApiScenario.setApiScenarioModule(ServiceUtils.compressName(reportApiScenario.getApiScenarioModule(), 450));
                 if (!genParam.getUseManual()) {
@@ -472,7 +507,7 @@ public class TestPlanReportService {
                     reportApiScenario.setApiScenarioExecuteUser(null);
                     reportApiScenario.setApiScenarioExecuteReportId(IDGenerator.nextStr());
                 }
-            });
+            }
             // 插入计划场景用例关联数据 -> 报告内容
             TestPlanReportApiScenarioMapper batchMapper = sqlSession.getMapper(TestPlanReportApiScenarioMapper.class);
             batchMapper.batchInsert(reportApiScenarios);
@@ -904,7 +939,7 @@ public class TestPlanReportService {
         String systemTempDir = DefaultRepositoryDir.getSystemTempDir();
         // 添加文件与测试计划报告的关联关系
         Map<String, String> addFileMap = new HashMap<>(fileIds.size());
-        LogUtils.info("开始上传副文本里的附件");
+        LogUtils.info("开始上传富文本里的附件");
         List<TestPlanReportAttachment> attachments = fileIds.stream().map(fileId -> {
             TestPlanReportAttachment attachment = new TestPlanReportAttachment();
             String fileName = getTempFileNameByFileId(fileId);
@@ -982,7 +1017,7 @@ public class TestPlanReportService {
                 fileCopyRequest.setFileName(fileName);
                 defaultRepository.delete(fileCopyRequest);
             } catch (Exception e) {
-                LogUtils.error("上传副文本文件失败：{}", e);
+                LogUtils.error("上传富文本文件失败：{}", e);
                 throw new MSException(Translator.get("file_upload_fail"));
             }
         }
@@ -1047,26 +1082,6 @@ public class TestPlanReportService {
     }
 
     /**
-     * 获取项目下的模块参数
-     *
-     * @param projectId 项目ID
-     * @return 模块参数
-     */
-    private TestPlanReportModuleParam getModuleParam(String projectId) {
-        // 模块树 {功能, 接口, 场景}
-        List<TestPlanBaseModule> functionalModules = extTestPlanReportFunctionalCaseMapper.getPlanExecuteCaseModules(projectId);
-        Map<String, String> functionalModuleMap = new HashMap<>(functionalModules.size());
-        ModuleTreeUtils.genPathMap(functionalModules, functionalModuleMap, new ArrayList<>());
-        List<TestPlanBaseModule> apiModules = extTestPlanReportApiCaseMapper.getPlanExecuteCaseModules(projectId);
-        Map<String, String> apiModuleMap = new HashMap<>(apiModules.size());
-        ModuleTreeUtils.genPathMap(apiModules, apiModuleMap, new ArrayList<>());
-        List<TestPlanBaseModule> scenarioModules = extTestPlanReportApiScenarioMapper.getPlanExecuteCaseModules(projectId);
-        Map<String, String> scenarioModuleMap = new HashMap<>(apiModules.size());
-        ModuleTreeUtils.genPathMap(scenarioModules, scenarioModuleMap, new ArrayList<>());
-        return TestPlanReportModuleParam.builder().functionalModuleMap(functionalModuleMap).apiModuleMap(apiModuleMap).scenarioModuleMap(scenarioModuleMap).build();
-    }
-
-    /**
      * 获取用户集合
      *
      * @param userIds 用户ID集合
@@ -1093,7 +1108,7 @@ public class TestPlanReportService {
         if (CollectionUtils.isEmpty(reportAttachments)) {
             //在临时文件获取
             fileName = getTempFileNameByFileId(fileId);
-            bytes = getPreviewImg(fileName, fileId, compressed);
+            bytes = commonFileService.downloadTempImg(fileId, fileName, compressed);
         } else {
             //在正式目录获取
             TestPlanReportAttachment attachment = reportAttachments.getFirst();
@@ -1130,52 +1145,5 @@ public class TestPlanReportService {
         fileRequest.setFileName(StringUtils.isEmpty(fileName) ? null : fileName);
         fileRequest.setStorage(StorageType.MINIO.name());
         return fileRequest;
-    }
-
-    public byte[] getPreviewImg(String fileName, String fileId, boolean isCompressed) {
-        String systemTempDir;
-        if (isCompressed) {
-            systemTempDir = DefaultRepositoryDir.getSystemTempCompressDir();
-        } else {
-            systemTempDir = DefaultRepositoryDir.getSystemTempDir();
-        }
-        FileRequest previewRequest = new FileRequest();
-        previewRequest.setFileName(fileName);
-        previewRequest.setStorage(StorageType.MINIO.name());
-        previewRequest.setFolder(systemTempDir + "/" + fileId);
-        byte[] previewImg = null;
-        try {
-            previewImg = fileService.download(previewRequest);
-        } catch (Exception e) {
-            LogUtils.error("获取预览图失败：{}", e);
-        }
-
-        if (previewImg == null || previewImg.length == 0) {
-            try {
-                if (isCompressed) {
-                    previewImg = this.compressPicWithFileMetadata(fileName, fileId);
-                    previewRequest.setFolder(DefaultRepositoryDir.getSystemTempCompressDir() + "/" + fileId);
-                    fileService.upload(previewImg, previewRequest);
-                }
-                return previewImg;
-            } catch (Exception e) {
-                LogUtils.error("获取预览图失败：{}", e);
-            }
-        }
-        return previewImg;
-    }
-
-    //获取文件并压缩的方法需要上锁，防止并发超过一定数量时内存溢出
-    private synchronized byte[] compressPicWithFileMetadata(String fileName, String fileId) throws Exception {
-        byte[] fileBytes = this.getFile(fileName, fileId);
-        return TempFileUtils.compressPic(fileBytes);
-    }
-
-    public byte[] getFile(String fileName, String fileId) throws Exception {
-        FileRequest fileRequest = new FileRequest();
-        fileRequest.setFileName(fileName);
-        fileRequest.setFolder(DefaultRepositoryDir.getSystemTempDir() + "/" + fileId);
-        fileRequest.setStorage(StorageType.MINIO.name());
-        return fileService.download(fileRequest);
     }
 }

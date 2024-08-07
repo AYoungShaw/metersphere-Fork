@@ -1,8 +1,8 @@
 import type {
-  InsertMenuItem,
   MinderEvent,
   MinderJsonNode,
   MinderJsonNodeData,
+  MinderMenuItem,
 } from '@/components/pure/ms-minder-editor/props';
 
 import { useI18n } from '@/hooks/useI18n';
@@ -13,7 +13,7 @@ import { getGenerateId } from '@/utils';
  * 封装用例脑图基础功能，包含菜单显隐判断、节点插入、节点替换、节点拖拽等
  * @returns API 集合
  */
-export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermission: boolean }) {
+export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermission?: boolean }) {
   const { t } = useI18n();
   const minderStore = useMinderStore();
 
@@ -50,8 +50,8 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
     return true;
   }
 
-  const insertSiblingMenus = ref<InsertMenuItem[]>([]);
-  const insertSonMenus = ref<InsertMenuItem[]>([]);
+  const insertSiblingMenus = ref<MinderMenuItem[]>([]);
+  const insertSonMenus = ref<MinderMenuItem[]>([]);
 
   /**
    * 检测节点可展示的菜单项
@@ -163,7 +163,7 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
         insertSonMenus.value = insertSonMenus.value.filter((e) => e.value !== stepTag && e.value !== textDescTag);
       }
       if (node.children?.some((child) => child.data?.resource?.includes(prerequisiteTag))) {
-        // 用例节点下有前置条件节点，不可插入前置条件节点
+        // 用例节点下有前置操作节点，不可插入前置操作节点
         insertSonMenus.value = insertSonMenus.value.filter((e) => e.value !== prerequisiteTag);
       }
       if (node.children?.some((child) => child.data?.resource?.includes(remarkTag))) {
@@ -186,7 +186,7 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
         );
       }
       if (node.parent?.children?.some((child) => child.data?.resource?.includes(prerequisiteTag))) {
-        // 用例节点下有前置条件节点，不可插入前置条件节点
+        // 用例节点下有前置操作节点，不可插入前置操作节点
         insertSiblingMenus.value = insertSiblingMenus.value.filter((e) => e.value !== prerequisiteTag);
       }
       if (node.parent?.children?.some((child) => child.data?.resource?.includes(remarkTag))) {
@@ -236,9 +236,9 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
       return false;
     }
     if (window.minder) {
-      const node: MinderJsonNode = window.minder.getSelectedNode();
+      const nodes: MinderJsonNode[] = window.minder.getSelectedNodes();
       // 选中节点是用例节点时，可展示优先级菜单
-      return !!node?.data?.resource?.includes(caseTag);
+      return nodes.every((node) => !!node.data?.resource?.includes(caseTag));
     }
     return false;
   }
@@ -395,7 +395,7 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
         } else if (node.data?.resource?.includes(caseTag)) {
           // 给用例插入子节点
           if (!node.children || node.children.length === 0) {
-            // 当前用例还没有子节点，默认添加一个前置条件
+            // 当前用例还没有子节点，默认添加一个前置操作
             insertSpecifyNode('AppendChildNode', prerequisiteTag);
           } else if (node.children.length > 0) {
             // 当前用例有子节点
@@ -413,7 +413,7 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
               }
             }
             if (!hasPreCondition) {
-              // 没有前置条件，则默认添加一个前置条件
+              // 没有前置操作，则默认添加一个前置操作
               insertSpecifyNode('AppendChildNode', prerequisiteTag);
             } else if (!hasRemark) {
               // 没有备注，则默认添加一个备注
@@ -430,9 +430,12 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
           // 当前节点是步骤描述或文本描述，且没有子节点，则默认添加一个预期结果
           insertSpecifyNode('AppendChildNode', value || stepExpectTag);
         } else if (node.data?.resource?.includes(prerequisiteTag) && (!node.children || node.children.length === 0)) {
-          // 当前节点是前置条件，则默认添加一个文本节点
+          // 当前节点是前置操作，则默认添加一个文本节点
           execInert('AppendChildNode');
-        } else {
+        } else if (
+          (!node.data?.resource || node.data?.resource?.length === 0) &&
+          (!node.parent?.data?.resource || node.parent?.data?.resource?.length === 0)
+        ) {
           // 文本节点下可添加文本节点
           execInert('AppendChildNode');
         }
@@ -458,7 +461,7 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
             }
           }
           if (!hasPreCondition) {
-            // 没有前置条件，则默认添加一个前置条件
+            // 没有前置操作，则默认添加一个前置操作
             insertSpecifyNode('AppendSiblingNode', prerequisiteTag);
           } else if (!hasRemark) {
             // 没有备注，则默认添加一个备注
@@ -597,7 +600,7 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
               node.children?.every((child) => !child.data?.resource?.includes(prerequisiteTag)) &&
               nodes[0].data?.resource?.includes(prerequisiteTag)
             ) {
-              // 用例下无前置条件且粘贴的节点是前置条件
+              // 用例下无前置操作且粘贴的节点是前置操作
               return false;
             }
             if (

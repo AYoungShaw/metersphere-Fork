@@ -47,9 +47,25 @@
         </div>
       </template>
       <template #num="{ record }">
-        <MsButton type="text" @click="isApi ? openCaseDetailDrawer(record.id) : openCaseTab(record)">
-          {{ record.num }}
-        </MsButton>
+        <div class="flex items-center">
+          <MsButton type="text" @click="isApi ? openCaseDetailDrawer(record.id) : openCaseTab(record)">
+            {{ record.num }}
+          </MsButton>
+          <a-tooltip v-if="record.apiChange" class="ms-tooltip-white">
+            <!-- 接口参数发生变更提示 -->
+            <MsIcon type="icon-icon_warning_colorful" size="16" />
+            <template #content>
+              <div class="flex flex-row">
+                <span class="text-[var(--color-text-1)]">
+                  {{ t('case.apiParamsHasChange') }}
+                </span>
+                <MsButton class="ml-[8px]" @click="showDifferences(record)">
+                  {{ t('case.changeDifferences') }}
+                </MsButton>
+              </div>
+            </template>
+          </a-tooltip>
+        </div>
       </template>
       <template #protocol="{ record }">
         <apiMethodName :method="record.protocol" />
@@ -196,7 +212,7 @@
         field="values"
         :label="t('apiTestManagement.batchUpdate')"
         :validate-trigger="['blur', 'input']"
-        :rules="[{ required: true, message: t('apiTestManagement.valueRequired') }]"
+        :rules="[{ required: true, message: t('common.inputPleaseEnterTags') }]"
         asterisk-position="end"
         class="mb-0"
         required
@@ -208,6 +224,7 @@
           unique-value
           retain-input-value
         />
+        <div class="text-[12px] leading-[20px] text-[var(--color-text-4)]">{{ t('ms.tagsInput.tagLimitTip') }}</div>
       </a-form-item>
       <a-form-item
         v-else
@@ -258,9 +275,12 @@
   </a-modal>
   <createAndEditCaseDrawer
     ref="createAndEditCaseDrawerRef"
+    v-model:visible="showCaseVisible"
     :api-detail="apiDetail"
     @load-case="loadCaseListAndResetSelector()"
+    @show-diff="showDifferences"
   />
+  <!-- TODO 之后要去掉 使用页面代替抽屉 -->
   <caseDetailDrawer
     v-model:visible="caseDetailDrawerVisible"
     v-model:execute-case="caseExecute"
@@ -280,9 +300,27 @@
   />
   <!-- 执行结果抽屉 -->
   <caseAndScenarioReportDrawer v-model:visible="showExecuteResult" :report-id="activeReportId" />
+  <!-- 同步抽屉 -->
+  <SyncModal
+    ref="syncModalRef"
+    v-model:visible="showSyncModal"
+    :loading="syncLoading"
+    :batch-params="batchParams"
+    @batch-sync="handleBatchSync"
+  />
+  <!-- diff对比抽屉 -->
+  <DifferentDrawer
+    v-model:visible="showDifferentDrawer"
+    :active-api-case-id="activeApiCaseId"
+    :active-defined-id="activeDefinedId"
+    @close="closeDifferent"
+    @clear-this-change="handleClearThisChange"
+    @sync="syncHandler"
+  />
 </template>
 
 <script setup lang="ts">
+  import { useRoute, useRouter } from 'vue-router';
   import { FormInstance, Message } from '@arco-design/web-vue';
   import { cloneDeep } from 'lodash-es';
 
@@ -298,6 +336,8 @@
   import type { CaseLevel } from '@/components/business/ms-case-associate/types';
   import caseDetailDrawer from './caseDetailDrawer.vue';
   import createAndEditCaseDrawer from './createAndEditCaseDrawer.vue';
+  import DifferentDrawer from './differentDrawer.vue';
+  import SyncModal from './syncModal.vue';
   import apiMethodName from '@/views/api-test/components/apiMethodName.vue';
   import apiStatus from '@/views/api-test/components/apiStatus.vue';
   import BatchRunModal from '@/views/api-test/components/batchRunModal.vue';
@@ -308,6 +348,7 @@
     batchDeleteCase,
     batchEditCase,
     batchExecuteCase,
+    caseTableBatchSync,
     deleteCase,
     dragSort,
     getCaseDetail,
@@ -322,10 +363,12 @@
   import { characterLimit, operationWidth } from '@/utils';
   import { hasAnyPermission } from '@/utils/permission';
 
+  import type { batchSyncForm } from '@/models/apiTest/management';
   import { ApiCaseDetail } from '@/models/apiTest/management';
   import { DragSortParams } from '@/models/common';
   import { RequestCaseStatus } from '@/enums/apiEnum';
   import { ReportEnum, ReportStatus } from '@/enums/reportEnum';
+  import { ApiTestRouteEnum } from '@/enums/routeEnum';
   import { TableKeyEnum } from '@/enums/tableEnum';
   import { FilterRemoteMethodsEnum, FilterSlotNameEnum } from '@/enums/tableFilterEnum';
 
@@ -351,6 +394,8 @@
   const { t } = useI18n();
   const tableStore = useTableStore();
   const { openModal } = useModal();
+  const route = useRoute();
+  const router = useRouter();
 
   const keyword = ref('');
 
@@ -389,8 +434,7 @@
         sorter: true,
       },
       fixed: 'left',
-      width: 130,
-      showTooltip: true,
+      width: 150,
       columnSelectorDisabled: true,
     },
     {
@@ -566,6 +610,11 @@
         label: 'system.log.operateType.execute',
         eventTag: 'execute',
         permission: ['PROJECT_API_DEFINITION_CASE:READ+EXECUTE'],
+      },
+      {
+        label: 'case.apiSyncChange',
+        eventTag: 'sync',
+        permission: ['PROJECT_API_DEFINITION_CASE:READ+UPDATE'],
       },
       {
         label: 'common.delete',
@@ -819,8 +868,12 @@
       }
     });
   }
-
   const batchConditionParams = ref<any>();
+
+  const showSyncModal = ref<boolean>(false);
+  function syncParams() {
+    showSyncModal.value = true;
+  }
 
   // 处理表格选中后批量操作
   function handleTableBatch(event: BatchActionParams, params: BatchActionQueryParams) {
@@ -838,6 +891,9 @@
           batchConditionParams.value = data;
           showBatchExecute.value = true;
         });
+        break;
+      case 'sync':
+        syncParams();
         break;
       default:
         break;
@@ -882,7 +938,13 @@
   async function openCaseDetailDrawer(id: string) {
     await getCaseDetailInfo(id);
     caseExecute.value = false;
-    caseDetailDrawerVisible.value = true;
+    router.push({
+      name: ApiTestRouteEnum.API_TEST_MANAGEMENT_CASE_DETAIL,
+      query: {
+        ...route.query,
+        id,
+      },
+    });
   }
 
   async function openCaseDetailDrawerAndExecute(id: string) {
@@ -919,6 +981,63 @@
     showExecuteResult.value = true;
   }
 
+  const activeApiCaseId = ref<string>('');
+  const activeDefinedId = ref<string>('');
+  const showDifferentDrawer = ref<boolean>(false);
+
+  async function showDifferences(record: ApiCaseDetail) {
+    activeApiCaseId.value = record.id;
+    activeDefinedId.value = record.apiDefinitionId;
+    showDifferentDrawer.value = true;
+  }
+  function closeDifferent() {
+    showDifferentDrawer.value = false;
+    activeApiCaseId.value = '';
+    activeDefinedId.value = '';
+  }
+
+  const syncLoading = ref<boolean>(false);
+  const syncModalRef = ref<InstanceType<typeof SyncModal>>();
+  // 批量同步
+  async function handleBatchSync(syncForm: batchSyncForm) {
+    try {
+      syncLoading.value = true;
+      const selectModules = await getModuleIds();
+      const params = await genBatchConditionParams();
+      await caseTableBatchSync({
+        selectIds: batchParams.value?.selectedIds || [],
+        selectAll: !!batchParams.value?.selectAll,
+        excludeIds: batchParams.value?.excludeIds || [],
+        ...params,
+        ...syncForm,
+        moduleIds: selectModules,
+      });
+      Message.success(t('bugManagement.syncSuccess'));
+      syncModalRef.value?.resetForm();
+      resetSelector();
+      loadCaseListAndResetSelector();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    } finally {
+      syncLoading.value = false;
+    }
+  }
+  const showCaseVisible = ref(false);
+  // 清除本次变更
+  async function handleClearThisChange() {
+    await loadCaseList();
+    await getCaseDetailInfo(activeApiCaseId.value);
+    if (showCaseVisible.value) {
+      createAndEditCaseDrawerRef.value?.open(caseDetail.value.apiDefinitionId, caseDetail.value as RequestParam, false);
+    }
+  }
+
+  // 对比抽屉同步成功打开编辑
+  function syncHandler(definedId: string) {
+    // TODO 这里调用同步后的最新的合并后的详情，打开编辑抽屉用户手动保存更新即可生效
+    createAndEditCaseDrawerRef.value?.open(definedId, caseDetail.value as RequestParam, false);
+  }
   defineExpose({
     loadCaseList,
   });

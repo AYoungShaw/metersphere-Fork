@@ -32,10 +32,7 @@ import io.metersphere.sdk.exception.MSException;
 import io.metersphere.sdk.file.FileCenter;
 import io.metersphere.sdk.file.FileCopyRequest;
 import io.metersphere.sdk.file.FileRepository;
-import io.metersphere.sdk.util.BeanUtils;
-import io.metersphere.sdk.util.JSON;
-import io.metersphere.sdk.util.LogUtils;
-import io.metersphere.sdk.util.Translator;
+import io.metersphere.sdk.util.*;
 import io.metersphere.system.domain.CustomFieldOption;
 import io.metersphere.system.domain.OperationHistoryExample;
 import io.metersphere.system.domain.User;
@@ -63,7 +60,6 @@ import org.apache.ibatis.session.ExecutorType;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionUtils;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -193,7 +189,7 @@ public class FunctionalCaseService {
         //上传文件
         List<String> uploadFileIds = functionalCaseAttachmentService.uploadFile(request.getProjectId(), caseId, files, true, userId);
 
-        //上传副文本里的文件
+        //上传富文本里的文件
         functionalCaseAttachmentService.uploadMinioFile(caseId, request.getProjectId(), request.getCaseDetailFileIds(), userId, CaseFileSourceType.CASE_DETAIL.toString());
 
         //关联附件
@@ -425,21 +421,21 @@ public class FunctionalCaseService {
         }
 
         //获取评论总数量数量
-        List<OptionDTO>commentList = new ArrayList<>();
+        List<OptionDTO> commentList = new ArrayList<>();
         FunctionalCaseCommentExample functionalCaseCommentExample = new FunctionalCaseCommentExample();
         functionalCaseCommentExample.createCriteria().andCaseIdEqualTo(functionalCaseDetailDTO.getId());
         long caseComment = functionalCaseCommentMapper.countByExample(functionalCaseCommentExample);
         OptionDTO caseOption = new OptionDTO();
         caseOption.setId("caseComment");
         caseOption.setName(String.valueOf(caseComment));
-        commentList.add(0,caseOption);
+        commentList.add(0, caseOption);
         CaseReviewHistoryExample caseReviewHistoryExample = new CaseReviewHistoryExample();
         caseReviewHistoryExample.createCriteria().andCaseIdEqualTo(functionalCaseDetailDTO.getId());
         long reviewComment = caseReviewHistoryMapper.countByExample(caseReviewHistoryExample);
         OptionDTO reviewOption = new OptionDTO();
         reviewOption.setId("reviewComment");
         reviewOption.setName(String.valueOf(reviewComment));
-        commentList.add(1,reviewOption);
+        commentList.add(1, reviewOption);
         //获取关联测试计划的执行评论数量
         TestPlanCaseExecuteHistoryExample testPlanCaseExecuteHistoryExample = new TestPlanCaseExecuteHistoryExample();
         testPlanCaseExecuteHistoryExample.createCriteria().andCaseIdEqualTo(functionalCaseDetailDTO.getId());
@@ -447,7 +443,7 @@ public class FunctionalCaseService {
         OptionDTO executeOption = new OptionDTO();
         executeOption.setId("executiveComment");
         executeOption.setName(String.valueOf(testPlanExecuteComment));
-        commentList.add(2,executeOption);
+        commentList.add(2, executeOption);
         functionalCaseDetailDTO.setCommentList(commentList);
         long commentCount = caseComment + reviewComment + testPlanExecuteComment;
         functionalCaseDetailDTO.setCommentCount((int) commentCount);
@@ -503,7 +499,7 @@ public class FunctionalCaseService {
                 if (StringUtils.equalsAnyIgnoreCase(item.getType(), CustomFieldType.MEMBER.name(), CustomFieldType.MULTIPLE_MEMBER.name())) {
                     item.setOptions(memberCustomOption);
                 }
-                FunctionalCaseCustomField caseCustomField =  customFieldMap.get(item.getFieldId());
+                FunctionalCaseCustomField caseCustomField = customFieldMap.get(item.getFieldId());
                 Optional.ofNullable(caseCustomField).ifPresentOrElse(customField -> {
                     item.setDefaultValue(customField.getValue());
                     if (Translator.get("custom_field.functional_priority").equals(item.getFieldName())) {
@@ -566,7 +562,7 @@ public class FunctionalCaseService {
         //上传新文件
         functionalCaseAttachmentService.uploadFile(request.getProjectId(), request.getId(), files, true, userId);
 
-        //上传副文本文件
+        //上传富文本文件
         functionalCaseAttachmentService.uploadMinioFile(request.getId(), request.getProjectId(), request.getCaseDetailFileIds(), userId, CaseFileSourceType.CASE_DETAIL.toString());
 
         //关联新附件
@@ -607,23 +603,23 @@ public class FunctionalCaseService {
         functionalCaseBlob.setId(request.getId());
         boolean hasUpdate = false;
         if (request.getSteps() != null) {
-            hasUpdate=true;
+            hasUpdate = true;
             functionalCaseBlob.setSteps(StringUtils.defaultIfEmpty(request.getSteps(), StringUtils.EMPTY).getBytes(StandardCharsets.UTF_8));
         }
-        if (request.getTextDescription()!=null) {
-            hasUpdate=true;
+        if (request.getTextDescription() != null) {
+            hasUpdate = true;
             functionalCaseBlob.setTextDescription(StringUtils.defaultIfEmpty(request.getTextDescription(), StringUtils.EMPTY).getBytes(StandardCharsets.UTF_8));
         }
-        if (request.getExpectedResult()!=null) {
-            hasUpdate=true;
+        if (request.getExpectedResult() != null) {
+            hasUpdate = true;
             functionalCaseBlob.setExpectedResult(StringUtils.defaultIfEmpty(request.getExpectedResult(), StringUtils.EMPTY).getBytes(StandardCharsets.UTF_8));
         }
-        if (request.getPrerequisite()!=null) {
-            hasUpdate=true;
+        if (request.getPrerequisite() != null) {
+            hasUpdate = true;
             functionalCaseBlob.setPrerequisite(StringUtils.defaultIfEmpty(request.getPrerequisite(), StringUtils.EMPTY).getBytes(StandardCharsets.UTF_8));
         }
-        if (request.getDescription()!=null) {
-            hasUpdate=true;
+        if (request.getDescription() != null) {
+            hasUpdate = true;
             functionalCaseBlob.setDescription(StringUtils.defaultIfEmpty(request.getDescription(), StringUtils.EMPTY).getBytes(StandardCharsets.UTF_8));
         }
         if (hasUpdate) {
@@ -823,7 +819,6 @@ public class FunctionalCaseService {
      * @param request request
      * @param userId  userId
      */
-    @Async
     public void batchCopyFunctionalCase(FunctionalCaseBatchMoveRequest request, String userId, String organizationId) {
         List<String> ids = doSelectIds(request, request.getProjectId());
         if (CollectionUtils.isNotEmpty(ids)) {
@@ -839,6 +834,13 @@ public class FunctionalCaseService {
             Map<String, List<FunctionalCaseCustomField>> customFieldMap = functionalCaseCustomFieldService.getCustomFieldMapByCaseIds(ids);
 
             AtomicReference<Long> nextOrder = new AtomicReference<>(getNextOrder(request.getProjectId()));
+
+            List<FunctionalCase> addList = new ArrayList<>();
+            List<FunctionalCaseBlob> addBlobList = new ArrayList<>();
+            List<FunctionalCaseAttachment> addAttachMentList = new ArrayList<>();
+            List<FunctionalCaseCustomField> addCustomFieldList = new ArrayList<>();
+            Map<String, List<String>> addFileAssociationMap = new HashMap<>();
+            Map<FunctionalCase, FunctionalCaseHistoryLogDTO> addLogMap = new HashMap<>();
 
             for (String s : ids) {
                 String id = IDGenerator.nextStr();
@@ -862,10 +864,10 @@ public class FunctionalCaseService {
                     functional.setUpdateUser(userId);
                     functional.setCreateTime(System.currentTimeMillis());
                     functional.setUpdateTime(System.currentTimeMillis());
-                    functionalCaseMapper.insert(functional);
+                    addList.add(functional);
 
                     functionalCaseBlob.setId(id);
-                    functionalCaseBlobMapper.insert(functionalCaseBlob);
+                    addBlobList.add(functionalCaseBlob);
                     nextOrder.updateAndGet(v -> v + ServiceUtils.POS_STEP);
                 });
 
@@ -875,20 +877,20 @@ public class FunctionalCaseService {
                         attachment.setCaseId(id);
                         attachment.setCreateUser(userId);
                         attachment.setCreateTime(System.currentTimeMillis());
+                        addAttachMentList.add(attachment);
                     });
-                    functionalCaseAttachmentService.batchSaveAttachment(caseAttachments);
                 }
 
                 if (CollectionUtils.isNotEmpty(customFields)) {
                     customFields.forEach(customField -> {
                         customField.setCaseId(id);
+                        addCustomFieldList.add(customField);
                     });
-                    functionalCaseCustomFieldService.batchSaveCustomField(customFields);
                 }
 
                 if (CollectionUtils.isNotEmpty(fileAssociationList)) {
                     List<String> fileIds = fileAssociationList.stream().map(FileAssociation::getFileId).collect(Collectors.toList());
-                    functionalCaseAttachmentService.association(fileIds, id, userId, FUNCTIONAL_CASE_BATCH_COPY_FILE_LOG_URL, request.getProjectId());
+                    addFileAssociationMap.put(id, fileIds);
                 }
 
                 //日志
@@ -898,8 +900,27 @@ public class FunctionalCaseService {
                 historyLogDTO.setCustomFields(customFields);
                 historyLogDTO.setCaseAttachments(caseAttachments);
                 historyLogDTO.setFileAssociationList(fileAssociationList);
-                saveAddDataLog(functionalCase, new FunctionalCaseHistoryLogDTO(), historyLogDTO, userId, organizationId, OperationLogType.ADD.name(), OperationLogModule.FUNCTIONAL_CASE);
+                addLogMap.put(functionalCase, historyLogDTO);
             }
+            SubListUtils.dealForSubList(addList, 500, subList -> {
+                functionalCaseMapper.batchInsert(subList);
+            });
+            SubListUtils.dealForSubList(addBlobList, 500, subList -> {
+                functionalCaseBlobMapper.batchInsert(addBlobList);
+            });
+            SubListUtils.dealForSubList(addAttachMentList, 500, subList -> {
+                functionalCaseAttachmentService.batchSaveAttachment(addAttachMentList);
+            });
+            SubListUtils.dealForSubList(addCustomFieldList, 500, subList -> {
+                functionalCaseCustomFieldService.batchSaveCustomField(addCustomFieldList);
+            });
+            addFileAssociationMap.entrySet().forEach(entry -> {
+                functionalCaseAttachmentService.association(entry.getValue(), entry.getKey(), userId, FUNCTIONAL_CASE_BATCH_COPY_FILE_LOG_URL, request.getProjectId());
+            });
+            addLogMap.entrySet().forEach(entry -> {
+                saveAddDataLog(entry.getKey(), new FunctionalCaseHistoryLogDTO(), entry.getValue(), userId, organizationId, OperationLogType.ADD.name(), OperationLogModule.FUNCTIONAL_CASE);
+            });
+
             User user = userMapper.selectByPrimaryKey(userId);
             functionalCaseNoticeService.batchSendNotice(request.getProjectId(), ids, user, NoticeConstants.Event.CREATE);
 
@@ -1137,7 +1158,7 @@ public class FunctionalCaseService {
     private void noticeModule(List<FunctionalCaseDTO> noticeList, FunctionalCaseExcelData functionalCaseExcelData, FunctionalCaseImportRequest request, String userId, Map<String, TemplateCustomFieldDTO> customFieldsMap) {
         FunctionalCaseDTO functionalCaseDTO = new FunctionalCaseDTO();
         functionalCaseDTO.setTriggerMode(Translator.get("log.test_plan.functional_case"));
-        functionalCaseDTO.setName(functionalCaseExcelData.getName());
+        functionalCaseDTO.setName(functionalCaseExcelData.getName().toString());
         functionalCaseDTO.setProjectId(request.getProjectId());
         functionalCaseDTO.setCaseEditType(functionalCaseExcelData.getCaseEditType());
         functionalCaseDTO.setCreateUser(userId);
@@ -1166,7 +1187,7 @@ public class FunctionalCaseService {
         functionalCase.setModuleId(caseModulePathMap.get(functionalCaseExcelData.getModule()));
         functionalCase.setProjectId(request.getProjectId());
         functionalCase.setTemplateId(defaultTemplateDTO.getId());
-        functionalCase.setName(functionalCaseExcelData.getName());
+        functionalCase.setName(functionalCaseExcelData.getName().toString());
         functionalCase.setReviewStatus(FunctionalCaseReviewStatus.UN_REVIEWED.name());
         functionalCase.setTags(handleImportTags(functionalCaseExcelData.getTags()));
         functionalCase.setCaseEditType(StringUtils.defaultIfBlank(functionalCaseExcelData.getCaseEditType(), FunctionalCaseTypeConstants.CaseEditType.TEXT.name()));
@@ -1363,7 +1384,7 @@ public class FunctionalCaseService {
         //用例表
         FunctionalCase functionalCase = collect.get(functionalCaseExcelData.getNum()).getFirst();
 
-        functionalCase.setName(functionalCaseExcelData.getName());
+        functionalCase.setName(functionalCaseExcelData.getName().toString());
         functionalCase.setModuleId(caseModulePathMap.get(functionalCaseExcelData.getModule()));
         functionalCase.setTags(handleImportTags(functionalCaseExcelData.getTags()));
         functionalCase.setCaseEditType(StringUtils.defaultIfBlank(functionalCaseExcelData.getCaseEditType(), FunctionalCaseTypeConstants.CaseEditType.TEXT.name()));
@@ -1396,7 +1417,7 @@ public class FunctionalCaseService {
         FunctionalCase functionalCase = collect.get(functionalCaseExcelData.getNum()).getFirst();
         if (CollectionUtils.isNotEmpty(projectApplications) && Boolean.valueOf(projectApplications.getFirst().getTypeValue())) {
             FunctionalCaseBlob blob = blobsCollect.get(functionalCaseExcelData.getNum()).getFirst();
-            if (!StringUtils.equals(functionalCase.getName(), functionalCaseExcelData.getName())
+            if (!StringUtils.equals(functionalCase.getName(), functionalCaseExcelData.getName().toString())
                     || !StringUtils.equals(new String(blob.getSteps(), StandardCharsets.UTF_8), StringUtils.defaultIfBlank(functionalCaseExcelData.getSteps(), StringUtils.EMPTY))
                     || !StringUtils.equals(new String(blob.getTextDescription(), StandardCharsets.UTF_8), StringUtils.defaultIfBlank(functionalCaseExcelData.getTextDescription(), StringUtils.EMPTY))
                     || !StringUtils.equals(new String(blob.getExpectedResult(), StandardCharsets.UTF_8), StringUtils.defaultIfBlank(functionalCaseExcelData.getExpectedResult(), StringUtils.EMPTY))) {

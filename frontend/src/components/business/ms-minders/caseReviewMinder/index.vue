@@ -5,16 +5,17 @@
       v-model:extra-visible="extraVisible"
       v-model:loading="loading"
       v-model:import-json="importJson"
+      :minder-key="MinderKeyEnum.CASE_REVIEW_MINDER"
       :extract-content-tab-list="extractContentTabList"
       :can-show-float-menu="canShowFloatMenu"
       :can-show-priority-menu="false"
-      :can-show-more-menu="canShowFloatMenu"
+      :can-show-more-menu="canShowMoreMenu"
       :can-show-enter-node="canShowEnterNode"
       :can-show-more-menu-node-operation="false"
       :more-menu-other-operation-list="canShowFloatMenu ? moreMenuOtherOperationList : []"
       disabled
       @node-select="handleNodeSelect"
-      @before-exec-command="handleBeforeExecCommand"
+      @node-unselect="handleNodeUnselect"
     >
       <template #extractMenu>
         <!-- 评审 查看详情 -->
@@ -74,36 +75,16 @@
           v-else-if="activeExtraKey === 'attachment'"
           v-model:model-value="fileList"
           not-show-add-button
+          disabled
           :active-case="activeCaseInfo"
         />
-        <div v-else class="pl-[16px]">
+        <div v-show="activeExtraKey === 'history'" class="pl-[16px]">
           <div v-if="props.reviewPassRule === 'MULTIPLE'" class="mb-[8px] flex items-center justify-between">
             <div class="text-[12px]">
               <span class="text-[var(--color-text-4)]">{{ t('caseManagement.caseReview.progress') }}</span>
               {{ props.reviewProgress }}
             </div>
-            <a-trigger v-model:popup-visible="statusVisible" trigger="click" position="br" :popup-translate="[0, 4]">
-              <div
-                :class="`flex cursor-pointer items-center rounded p-[4px] hover:bg-[var(--color-text-n9)] 
-                ${statusVisible ? 'bg-[var(--color-text-n9)]' : ''} `"
-              >
-                <ReviewResult :status="activeCaseInfo.reviewStatus" class="text-[12px]" :icon-size="12" />
-                <MsIcon type="icon-icon_expand-down_filled" size="12" class="ml-[4px] text-[var(--color-text-4)]" />
-              </div>
-              <template #content>
-                <div
-                  class="trigger-content w-[150px] rounded-[var(--border-radius-medium)] bg-white p-[6px] shadow-[0_-1px_4px_rgba(2,2,2,0.1)]"
-                >
-                  <div v-for="item in reviewUserStatusList" :key="item.id" class="my-[4px] flex justify-between">
-                    <div class="one-line-text max-w-[80px]">
-                      {{ item.userName }}
-                    </div>
-                    <ReviewResult :status="item.status" class="text-[12px]" :icon-size="12" />
-                  </div>
-                  <MsEmpty v-if="!reviewUserStatusList.length" />
-                </div>
-              </template>
-            </a-trigger>
+            <ReviewStatusTrigger ref="reviewStatusTriggerRef" :size="12" />
           </div>
           <ReviewCommentList
             :review-comment-list="reviewHistoryList"
@@ -118,19 +99,24 @@
 
 <script setup lang="ts">
   import { useRoute } from 'vue-router';
-  import dayjs from 'dayjs';
 
   import MsButton from '@/components/pure/ms-button/index.vue';
   import MsDescription, { Description } from '@/components/pure/ms-description/index.vue';
-  import MsEmpty from '@/components/pure/ms-empty/index.vue';
   import MsMinderEditor from '@/components/pure/ms-minder-editor/minderEditor.vue';
   import type { MinderJson, MinderJsonNode, MinderJsonNodeData } from '@/components/pure/ms-minder-editor/props';
-  import { MinderEvent } from '@/components/pure/ms-minder-editor/props';
-  import { setPriorityView } from '@/components/pure/ms-minder-editor/script/tool/utils';
+  import {
+    clearSelectedNodes,
+    createNode,
+    expendNodeAndChildren,
+    handleRenderNode,
+    removeFakeNode,
+    renderSubNodes,
+    setPriorityView,
+  } from '@/components/pure/ms-minder-editor/script/tool/utils';
   import { MsFileItem } from '@/components/pure/ms-upload/types';
   import Attachment from '@/components/business/ms-minders/featureCaseMinder/attachment.vue';
+  import ReviewStatusTrigger from './components/reviewStatusTrigger.vue';
   import ReviewCommentList from '@/views/case-management/caseManagementFeature/components/tabContent/tabComment/reviewCommentList.vue';
-  import ReviewResult from '@/views/case-management/caseReview/components/reviewResult.vue';
   import ReviewSubmit from '@/views/case-management/caseReview/components/reviewSubmit.vue';
 
   import {
@@ -153,7 +139,8 @@
     ReviewPassRule,
   } from '@/models/caseManagement/caseReview';
   import { ModuleTreeNode } from '@/models/common';
-  import { MinderEventName } from '@/enums/minderEnum';
+  import { StartReviewStatus } from '@/enums/caseEnum';
+  import { MinderEventName, MinderKeyEnum } from '@/enums/minderEnum';
 
   import { convertToFile, getCustomField } from '@/views/case-management/caseManagementFeature/components/utils';
 
@@ -188,7 +175,6 @@
   const moduleTag = t('common.module');
   const importJson = ref<MinderJson>({
     root: {} as MinderJsonNode,
-    template: 'default',
     treePath: [],
   });
   const loading = ref(false);
@@ -227,12 +213,14 @@
       children: tree,
       data: {
         id: 'NONE',
-        text: t('ms.minders.allModule'),
+        text: t('caseManagement.caseReview.allCases'),
         resource: [moduleTag],
         disabled: true,
+        count: modulesCount.value.all,
       },
     };
     importJson.value.treePath = [];
+    clearSelectedNodes();
     window.minder.importJson(importJson.value);
     if (props.moduleId !== 'all') {
       // 携带具体的模块 ID 加载时，进入该模块内
@@ -263,62 +251,6 @@
   watch([() => props.moduleId, () => props.viewStatusFlag], () => {
     initCaseTree();
   });
-
-  /**
-   * 移除占位的虚拟节点
-   * @param node 对应节点
-   * @param fakeNodeName 虚拟节点名称
-   */
-  function removeFakeNode(node: MinderJsonNode, fakeNodeName: string) {
-    const fakeNode = node.children?.find((e: MinderJsonNode) => e.data?.id === fakeNodeName);
-    if (fakeNode) {
-      window.minder.removeNode(fakeNode);
-    }
-  }
-
-  /**
-   * 渲染其子节点
-   * @param node 对应节点
-   * @param renderNode 需要渲染的子节点
-   */
-  function handleRenderNode(node: MinderJsonNode, renderNode: MinderJsonNode) {
-    if (!node.data) return;
-    window.minder.renderNodeBatch(renderNode);
-    node.layout();
-    node.data.isLoaded = true;
-  }
-
-  /**
-   * 创建节点
-   * @param data 节点数据
-   * @param parentNode 父节点
-   */
-  function createNode(data?: MinderJsonNodeData, parentNode?: MinderJsonNode) {
-    return window.minder.createNode(
-      {
-        ...data,
-        expandState: 'collapse',
-        disabled: true,
-      },
-      parentNode
-    );
-  }
-
-  /**
-   * 递归渲染子节点及其子节点
-   * @param parentNode - 父节点
-   * @param children - 子节点数组
-   */
-  function renderSubNodes(parentNode: MinderJsonNode, children?: MinderJsonNode[]) {
-    return (
-      children?.map((item: MinderJsonNode) => {
-        const grandChild = createNode(item.data, parentNode);
-        const greatGrandChildren = renderSubNodes(grandChild, item.children);
-        window.minder.renderNodeBatch(greatGrandChildren);
-        return grandChild;
-      }) || []
-    );
-  }
 
   /**
    * 加载模块节点下的用例节点
@@ -433,8 +365,13 @@
       // 基本信息
       descriptions.value = [
         {
-          label: t('caseManagement.caseReview.belongModule'),
-          value: res.moduleName || t('common.root'),
+          label: t('caseManagement.caseReview.caseName'),
+          value: res.name,
+        },
+        {
+          label: t('common.tag'),
+          value: res.tags,
+          isTag: true,
         },
         // 解析用例模板的自定义字段
         ...res.customFields.map((e: Record<string, any>) => {
@@ -450,15 +387,7 @@
             };
           }
         }),
-        {
-          label: t('caseManagement.caseReview.creator'),
-          value: res.createUserName || '',
-        },
-        {
-          label: t('caseManagement.caseReview.createTime'),
-          value: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-        },
-      ];
+      ].map((item) => ({ ...item, tooltipPosition: 'tr' }));
       // 附件文件
       if (activeCaseInfo.value.attachments) {
         fileList.value = activeCaseInfo.value.attachments
@@ -480,22 +409,11 @@
     }
   }
 
-  // 加载评审历史列表
-  const reviewHistoryList = ref<ReviewHistoryItem[]>([]);
-  const reviewUserStatusList = ref<ReviewHistoryItem[]>([]); // 每个评审人最后一次评审结果
-  const statusVisible = ref(false);
+  const reviewHistoryList = ref<ReviewHistoryItem[]>([]); // 加载评审历史列表
   async function initReviewHistoryList(data: MinderJsonNodeData) {
     try {
       const res = await getCaseReviewHistoryList(route.query.id as string, data?.caseId || activeCaseInfo.value.caseId);
       reviewHistoryList.value = res;
-      reviewUserStatusList.value = [];
-      const userNamesSet = new Set();
-      reviewHistoryList.value.forEach((reviewItem) => {
-        if (!userNamesSet.has(reviewItem.userName)) {
-          reviewUserStatusList.value.push(reviewItem);
-          userNamesSet.add(reviewItem.userName);
-        }
-      });
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
@@ -505,6 +423,7 @@
   /**
    * 切换用例详情显示
    */
+  const reviewStatusTriggerRef = ref<InstanceType<typeof ReviewStatusTrigger>>();
   async function toggleDetail(val?: boolean) {
     extraVisible.value = val !== undefined ? val : !extraVisible.value;
     const node: MinderJsonNode = window.minder.getSelectedNode();
@@ -513,10 +432,16 @@
       activeExtraKey.value = 'history';
       initCaseDetail(data);
       initReviewHistoryList(data);
+      reviewStatusTriggerRef.value?.initReviewerAndStatus(
+        route.query.id as string,
+        data?.caseId || activeCaseInfo.value.caseId
+      );
     }
   }
 
+  const hasOperationPermission = hasAnyPermission(['CASE_REVIEW:READ+UPDATE', 'CASE_REVIEW:READ+RELEVANCE']);
   const canShowFloatMenu = ref(false); // 是否展示浮动菜单
+  const canShowMoreMenu = ref(false); // 更多
   const isReviewer = ref(false); // 是否是此用例的评审人
   const caseReviewerList = ref<CaseReviewFunctionalCaseUserItem[]>([]);
   const canShowEnterNode = ref(false);
@@ -542,7 +467,7 @@
       },
       {
         value: 'disassociate',
-        label: t('caseManagement.caseReview.disassociate'),
+        label: t('caseManagement.caseReview.disassociateCase'),
         permission: ['CASE_REVIEW:READ+RELEVANCE'],
         onClick: () => {
           emit('operation', 'disassociate', node);
@@ -553,9 +478,38 @@
 
   const selectNode = ref();
   const reviewVisible = ref(false);
-  function handleReviewDone() {
+  function handleReviewDone(status: StartReviewStatus) {
     reviewVisible.value = false;
+    if (
+      props.reviewPassRule !== 'MULTIPLE' &&
+      status !== StartReviewStatus.UNDER_REVIEWED &&
+      selectNode.value.data?.resource?.includes(caseTag)
+    ) {
+      window.minder.execCommand('resource', [statusTagMap[status], caseTag]);
+    } else {
+      initCaseTree();
+    }
     emit('handleReviewDone');
+  }
+
+  // 递归更新子节点的用例标签
+  function updateChildResources(status: string, node?: MinderJsonNode) {
+    node?.children?.forEach((child: MinderJsonNode) => {
+      if (child.data?.resource?.includes(caseTag)) {
+        child.setData('resource', [statusTagMap[status], caseTag]).render();
+      } else if (child.data?.resource?.includes(moduleTag)) {
+        updateChildResources(status, child);
+      }
+    });
+  }
+
+  // 更新状态标签
+  function updateResource(status: string) {
+    if (selectNode.value.data?.resource?.includes(moduleTag)) {
+      updateChildResources(status, selectNode.value);
+    } else if (selectNode.value.data?.resource?.includes(caseTag)) {
+      window.minder.execCommand('resource', [statusTagMap[status], caseTag]);
+    }
   }
 
   /**
@@ -582,15 +536,26 @@
     }
     selectNode.value = node;
 
-    // 展示浮动菜单: 模块节点有子节点、用例节点
+    // 展示浮动菜单: 模块节点且有子节点且不是没权限的根结点、用例节点
     if (
       node.data?.resource?.includes(caseTag) ||
-      (node.data?.resource?.includes(moduleTag) && (node.children || []).length > 0)
+      (node.data?.resource?.includes(moduleTag) &&
+        (node.children || []).length > 0 &&
+        !(!hasOperationPermission && node.type === 'root'))
     ) {
       canShowFloatMenu.value = true;
       setMoreMenuOtherOperationList(node);
     } else {
       canShowFloatMenu.value = false;
+    }
+
+    reviewVisible.value = false;
+
+    // 不展示更多：没操作权限的用例
+    if (node.data?.resource?.includes(caseTag) && !hasOperationPermission) {
+      canShowMoreMenu.value = false;
+    } else {
+      canShowMoreMenu.value = true;
     }
 
     // 展示进入节点菜单: 模块节点
@@ -612,6 +577,8 @@
       if (extraVisible.value) {
         toggleDetail(true);
       }
+      // 用例下面所有节点都展开
+      expendNodeAndChildren(node);
     } else if (data?.resource?.includes(moduleTag) && data.count > 0 && data.isLoaded !== true) {
       // 模块节点且有用例且未加载过用例数据
       await initNodeCases(node);
@@ -626,28 +593,18 @@
     setPriorityView(true, 'P');
   }
 
-  /**
-   * 脑图命令执行前拦截
-   * @param event 命令执行事件
-   */
-  function handleBeforeExecCommand(event: MinderEvent) {
-    if (['movetoparent', 'arrange'].includes(event.commandName)) {
-      event.stopPropagation();
-    }
+  function handleNodeUnselect() {
+    extraVisible.value = false;
   }
 
   defineExpose({
     initCaseTree,
+    updateResource,
   });
 </script>
 
 <style lang="less" scoped>
   :deep(.comment-list-item-name) {
     max-width: 200px;
-  }
-  .trigger-content {
-    max-height: 192px;
-    @apply overflow-y-auto overflow-x-hidden;
-    .ms-scroll-bar();
   }
 </style>

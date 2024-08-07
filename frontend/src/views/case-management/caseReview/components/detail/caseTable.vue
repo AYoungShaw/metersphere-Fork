@@ -11,7 +11,7 @@
         :search-placeholder="t('caseManagement.caseReview.searchPlaceholder')"
         @keyword-search="(val, filter) => searchCase(filter)"
         @adv-search="searchCase"
-        @refresh="refresh()"
+        @refresh="handleRefreshAndInitModules"
       >
         <template v-if="showType !== 'list'" #nameRight>
           <div v-if="reviewPassRule === 'MULTIPLE'" class="ml-[16px]">
@@ -58,6 +58,20 @@
         <template #[FilterSlotNameEnum.CASE_MANAGEMENT_CASE_LEVEL]="{ filterContent }">
           <caseLevel :case-level="filterContent.text" />
         </template>
+        <template #reviewerTitle="{ columnConfig }">
+          <div class="flex items-center gap-[4px]">
+            <div class="text-[var(--color-text-3)]">{{ t(columnConfig.title as string) }}</div>
+            <a-tooltip
+              v-model:popupVisible="reviewerTitlePopupVisible"
+              :content="t('caseManagement.caseReview.reviewerTip')"
+            >
+              <icon-question-circle
+                class="text-[var(--color-text-brand)] hover:text-[rgb(var(--primary-5))]"
+                size="16"
+              />
+            </a-tooltip>
+          </div>
+        </template>
         <template #num="{ record }">
           <a-tooltip :content="record.num">
             <a-button type="text" class="px-0 !text-[14px] !leading-[22px]" @click="review(record)">
@@ -88,7 +102,14 @@
             allow-search
             :multiple="true"
             :placeholder="t('project.messageManagement.receiverPlaceholder')"
-            @change="() => changeReviewer(record)"
+            :at-least-one="true"
+            :fallback-option="
+              (val) => ({
+                label: reviewersOptions.find((e) => e.value === val)?.label || (val as string),
+                value: val,
+              })
+            "
+            @popup-visible-change="(value) => selectChangeReviewer(value, record)"
           >
           </MsSelect>
         </template>
@@ -104,10 +125,22 @@
           </div>
         </template>
         <template #action="{ record }">
-          <MsButton v-permission="['CASE_REVIEW:READ+REVIEW']" type="text" class="!mr-0" @click="review(record)">
-            {{ t('caseManagement.caseReview.review') }}
-          </MsButton>
-          <a-divider direction="vertical" :margin="8"></a-divider>
+          <a-tooltip :content="t('caseManagement.caseReview.reviewDisabledTip')" :disabled="userIsReviewer(record)">
+            <MsButton
+              v-permission="['CASE_REVIEW:READ+REVIEW']"
+              :disabled="!userIsReviewer(record)"
+              type="text"
+              class="!mr-0"
+              @click="review(record)"
+            >
+              {{ t('caseManagement.caseReview.review') }}
+            </MsButton>
+          </a-tooltip>
+          <a-divider
+            v-permission.all="['CASE_REVIEW:READ+REVIEW', 'CASE_REVIEW:READ+RELEVANCE']"
+            direction="vertical"
+            :margin="8"
+          ></a-divider>
           <MsPopconfirm
             :title="t('caseManagement.caseReview.disassociateTip')"
             :sub-title-tip="t('caseManagement.caseReview.disassociateTipContent')"
@@ -142,7 +175,7 @@
         :review-progress="props.reviewProgress"
         :review-pass-rule="props.reviewPassRule"
         @operation="handleMinderOperation"
-        @handle-review-done="handleReviewDone"
+        @handle-review-done="emit('refresh')"
       />
     </div>
     <a-modal
@@ -212,6 +245,7 @@
             <MsRichText
               v-model:raw="dialogForm.reason"
               v-model:commentIds="dialogForm.commentIds"
+              v-model:filed-ids="reviewCommentFileIds"
               :upload-image="handleUploadImage"
               :auto-height="false"
               :preview-url="PreviewEditorImageUrl"
@@ -338,6 +372,7 @@
 
   import { ReviewCaseItem, ReviewItem, ReviewPassRule, ReviewResult } from '@/models/caseManagement/caseReview';
   import { BatchApiParams, TableQueryParams } from '@/models/common';
+  import { StartReviewStatus } from '@/enums/caseEnum';
   import { CaseManagementRouteEnum } from '@/enums/routeEnum';
   import { TableKeyEnum } from '@/enums/tableEnum';
   import { FilterSlotNameEnum } from '@/enums/tableFilterEnum';
@@ -420,25 +455,26 @@
         sorter: true,
       },
       showTooltip: true,
-      width: 200,
+      width: 150,
     },
     {
       title: 'caseManagement.featureCase.tableColumnLevel',
       slotName: 'caseLevel',
       dataIndex: 'caseLevel',
       showInTable: true,
-      width: 200,
       showDrag: true,
       filterConfig: {
         options: caseLevelList.value,
         filterSlotName: FilterSlotNameEnum.CASE_MANAGEMENT_CASE_LEVEL,
       },
+      width: 100,
     },
     {
       title: 'caseManagement.caseReview.reviewer',
       dataIndex: 'reviewNames',
       slotName: 'reviewNames',
       showInTable: true,
+      titleSlotName: 'reviewerTitle',
       width: 150,
     },
     {
@@ -517,6 +553,10 @@
     ],
   };
 
+  function userIsReviewer(record: ReviewCaseItem) {
+    return record.reviewers.some((e) => e === userStore.id);
+  }
+
   const modulesCount = computed(() => caseReviewStore.modulesCount);
   async function getModuleCount() {
     let params: TableQueryParams;
@@ -557,8 +597,12 @@
     getModuleCount();
   }
 
+  const reviewerTitlePopupVisible = ref(true);
   onBeforeMount(() => {
     searchCase();
+    setTimeout(() => {
+      reviewerTitlePopupVisible.value = false;
+    }, 5000);
   });
 
   /**
@@ -579,6 +623,11 @@
       }
       msCaseReviewMinderRef.value?.initCaseTree();
     }
+  }
+
+  async function handleRefreshAndInitModules() {
+    await initModules();
+    refresh();
   }
 
   watch(
@@ -702,9 +751,11 @@
   // 批量解除关联用例拦截
   function batchDisassociate() {
     const batchDisassociateTitle =
-      showType.value === 'list'
-        ? t('caseManagement.caseReview.disassociateConfirmTitle', { count: batchParams.value.currentSelectCount })
-        : t('testPlan.featureCase.disassociateTip', { name: characterLimit(minderSelectData.value?.text) });
+      showType.value !== 'list' && minderSelectData.value?.resource?.includes(t('common.case'))
+        ? t('testPlan.featureCase.disassociateTip', { name: characterLimit(minderSelectData.value?.text) })
+        : t('caseManagement.caseReview.disassociateConfirmTitle', {
+            count: showType.value !== 'list' ? minderSelectData.value?.count : batchParams.value.currentSelectCount,
+          });
     openModal({
       type: 'warning',
       title: batchDisassociateTitle,
@@ -759,7 +810,7 @@
           slotName: 'caseLevel',
           dataIndex: 'caseLevel',
           showInTable: true,
-          width: 200,
+          width: 100,
           showDrag: true,
           filterConfig: {
             options: cloneDeep(caseLevelFields.value.options),
@@ -792,7 +843,12 @@
       });
       Message.success(t('common.updateSuccess'));
       dialogVisible.value = false;
-      refresh(false);
+      if (showType.value === 'list') {
+        resetSelector();
+        loadList();
+      } else {
+        msCaseReviewMinderRef.value?.updateResource('RE_REVIEWED');
+      }
       emit('refresh');
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -836,7 +892,12 @@
       }
     });
   }
-
+  function selectChangeReviewer(val: boolean, record?: any) {
+    if (!val) {
+      changeReviewer(record);
+    }
+  }
+  const reviewCommentFileIds = ref<string[]>([]);
   // 提交评审结果
   function commitResult() {
     dialogFormRef.value?.validate(async (errors) => {
@@ -847,12 +908,13 @@
             reviewId: route.query.id as string,
             userId: props.onlyMine ? userStore.id || '' : '',
             reviewPassRule: props.reviewPassRule,
-            status: dialogForm.value.result as ReviewResult,
+            status: dialogForm.value.result as StartReviewStatus,
             content: dialogForm.value.reason,
             notifier: dialogForm.value.commentIds.join(';'),
             moduleIds: props.activeFolder === 'all' ? [] : [props.activeFolder, ...props.offspringIds],
             ...batchParams.value,
             ...tableParams.value,
+            reviewCommentFileIds: reviewCommentFileIds.value,
           });
           Message.success(t('caseManagement.caseReview.reviewSuccess'));
           dialogVisible.value = false;
@@ -926,11 +988,6 @@
     minderSelectData.value = node.data;
     minderParams.value = getMinderOperationParams(node);
     handleOperation(type);
-  }
-
-  function handleReviewDone() {
-    refresh(false);
-    emit('refresh');
   }
 
   /**

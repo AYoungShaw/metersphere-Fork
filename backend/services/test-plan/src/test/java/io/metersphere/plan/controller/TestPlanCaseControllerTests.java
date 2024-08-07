@@ -395,15 +395,13 @@ public class TestPlanCaseControllerTests extends BaseTest {
         return associateDTO;
     }
 
-    private List<Map<String, ModuleSelectDTO>> buildModuleMap() {
-        List<Map<String, ModuleSelectDTO>> moduleMaps = new ArrayList<>();
+    private Map<String, ModuleSelectDTO> buildModuleMap() {
         Map<String, ModuleSelectDTO> moduleMap = new HashMap<>();
         ModuleSelectDTO moduleSelectDTO = new ModuleSelectDTO();
         moduleSelectDTO.setSelectAll(false);
         moduleSelectDTO.setSelectIds(List.of("fc_1"));
         moduleMap.put("100001", moduleSelectDTO);
-        moduleMaps.add(moduleMap);
-        return moduleMaps;
+        return moduleMap;
     }
 
     private TestPlanCollectionAssociateDTO buildModulesAll() {
@@ -411,6 +409,13 @@ public class TestPlanCaseControllerTests extends BaseTest {
         associateDTO.setSelectAllModule(true);
         associateDTO.setAssociateType(AssociateCaseType.FUNCTIONAL);
         associateDTO.setProjectId("123");
+
+        Map<String, ModuleSelectDTO> moduleMap = new HashMap<>();
+        ModuleSelectDTO moduleSelectDTO = new ModuleSelectDTO();
+        moduleSelectDTO.setSelectAll(true);
+        moduleSelectDTO.setSelectIds(new ArrayList<>());
+        moduleMap.put("100001", moduleSelectDTO);
+        associateDTO.setModuleMaps(moduleMap);
         return associateDTO;
     }
 

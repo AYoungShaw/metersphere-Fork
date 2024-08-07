@@ -33,12 +33,8 @@
         <MsIcon type="icon-icon_edit_outlined" class="mr-[8px]" />
         {{ t('common.edit') }}
       </MsButton>
-      <MsTableMoreAction :list="reportMoreAction" @select="handleMoreReportSelect">
-        <MsButton
-          v-if="hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE']) && detail.status !== 'ARCHIVED'"
-          type="button"
-          status="default"
-        >
+      <MsTableMoreAction v-if="detail.status !== 'ARCHIVED'" :list="reportMoreAction" @select="handleMoreReportSelect">
+        <MsButton v-if="hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])" type="button" status="default">
           <MsIcon type="icon-icon_generate_report" class="mr-[8px]" />
           {{ t('testPlan.testPlanDetail.generateReport') }}
         </MsButton>
@@ -61,7 +57,7 @@
         {{ t(detail.followFlag ? 'common.forked' : 'common.fork') }}
       </MsButton>
       <MsButton v-if="detail.status === 'ARCHIVED'" status="danger" type="button" @click="deleteHandler">
-        <MsIcon type="icon-icon_delete-trash_outlined" class="mr-[8px] text-[rgb(var(--danger-6))]" />
+        <MsIcon type="icon-icon_delete-trash_outlined1" class="mr-[8px] text-[rgb(var(--danger-6))]" />
         <span class="text-[rgb(var(--danger-6))]"> {{ t('common.delete') }}</span>
       </MsButton>
       <MsTableMoreAction v-else :list="moreAction" @select="handleMoreSelect">
@@ -90,7 +86,12 @@
             </span>
           </div>
         </div>
-        <StatusProgress :status-detail="countDetail" height="8px" radius="var(--border-radius-mini)" />
+        <StatusProgress
+          :type="testPlanTypeEnum.TEST_PLAN"
+          :status-detail="countDetail"
+          height="8px"
+          radius="var(--border-radius-mini)"
+        />
       </div>
     </template>
     <MsTab
@@ -509,7 +510,7 @@
     }
   }
 
-  function changeTabInterceptor(newVal: string, oldVal: string, done: () => void) {
+  function changeTabInterceptor(newVal: string | number, oldVal: string | number, done: () => void) {
     if (oldVal === 'plan' && minderStore.minderUnsaved) {
       openModal({
         type: 'warning',
@@ -530,7 +531,7 @@
     done();
   }
 
-  // 复制 TODO:待联调
+  // 复制
   const copyLoading = ref<boolean>(false);
   async function copyHandler() {
     copyLoading.value = true;
@@ -539,9 +540,8 @@
       Message.success(t('common.copySuccess'));
       router.push({
         name: TestPlanRouteEnum.TEST_PLAN_INDEX_DETAIL,
-        // TODO 后台需要补id
         query: {
-          id: res.id,
+          id: res.operationId,
         },
       });
       initDetail();

@@ -7,7 +7,11 @@
       baseAction: [],
       moreAction: [],
     }"
+    always-show-selected-count
     v-on="propsEvent"
+    @row-select-change="rowSelectChange"
+    @select-all-change="selectAllChange"
+    @clear-selector="clearSelector"
   >
     <template #num="{ record }">
       <MsButton type="text" @click="toDetail(record)">{{ record.num }}</MsButton>
@@ -41,6 +45,9 @@
     <template #[FilterSlotNameEnum.API_TEST_CASE_API_LAST_EXECUTE_STATUS]="{ filterContent }">
       <ExecutionStatus :module-type="ReportEnum.API_REPORT" :status="filterContent.value" />
     </template>
+    <template #count>
+      <slot></slot>
+    </template>
   </MsBaseTable>
 </template>
 
@@ -54,6 +61,7 @@
   import useTable from '@/components/pure/ms-table/useTable';
   import CaseLevel from '@/components/business/ms-case-associate/caseLevel.vue';
   import ExecuteResult from '@/components/business/ms-case-associate/executeResult.vue';
+  import type { MsTreeNodeData } from '@/components/business/ms-tree/types';
   import ExecutionStatus from '@/views/api-test/report/component/reportStatus.vue';
 
   import useOpenNewPage from '@/hooks/useOpenNewPage';
@@ -69,6 +77,8 @@
   import { SpecialColumnEnum, TableKeyEnum } from '@/enums/tableEnum';
   import { FilterSlotNameEnum } from '@/enums/tableFilterEnum';
 
+  import type { moduleKeysType } from './types';
+  import useModuleSelection from './useModuleSelection';
   import { getPublicLinkCaseListMap } from './utils/page';
   import { casePriorityOptions } from '@/views/api-test/components/config';
 
@@ -87,6 +97,8 @@
     getPageApiType: keyof typeof CasePageApiTypeEnum; // 获取未关联分页Api
     extraTableParams?: TableQueryParams; // 查询表格的额外参数
     protocols: string[];
+    moduleTree: MsTreeNodeData[];
+    modulesCount: Record<string, any>;
   }>();
 
   const emit = defineEmits<{
@@ -95,6 +107,10 @@
     (e: 'initModules'): void;
     (e: 'update:selectedIds'): void;
   }>();
+
+  const innerSelectedModulesMaps = defineModel<Record<string, moduleKeysType>>('selectedModulesMaps', {
+    required: true,
+  });
 
   const tableStore = useTableStore();
 
@@ -154,6 +170,13 @@
       },
       showInTable: false,
       width: 150,
+      showDrag: true,
+    },
+    {
+      title: 'apiTestManagement.path',
+      dataIndex: 'path',
+      showTooltip: true,
+      width: 200,
       showDrag: true,
     },
     {
@@ -264,30 +287,27 @@
     const tableParams = await getTableParams();
     setLoadListParams(tableParams);
     loadList();
+
+    emit('getModuleCount', {
+      ...tableParams,
+      current: propsRes.value.msPagination?.current,
+      pageSize: propsRes.value.msPagination?.pageSize,
+    });
   }
 
   const tableRef = ref<InstanceType<typeof MsBaseTable>>();
 
   watch(
-    () => props.showType,
-    (val) => {
-      if (val === 'API_CASE') {
-        resetSelector();
-        resetFilterParams();
-        loadCaseList();
-      }
-    }
-  );
-
-  watch(
-    () => () => props.currentProject,
+    [() => props.currentProject, () => props.protocols],
     () => {
       setPagination({
         current: 1,
       });
-      resetSelector();
       resetFilterParams();
       loadCaseList();
+    },
+    {
+      deep: true,
     }
   );
   const innerSelectedIds = defineModel<string[]>('selectedIds', { required: true });
@@ -331,6 +351,44 @@
       pId: record.projectId,
     });
   }
+
+  const tableSelectedProps = ref({
+    modulesTree: props.moduleTree,
+    moduleCount: props.modulesCount,
+  });
+  const { rowSelectChange, selectAllChange, clearSelector } = useModuleSelection(
+    innerSelectedModulesMaps.value,
+    propsRes.value,
+    tableSelectedProps.value
+  );
+
+  watch(
+    () => props.moduleTree,
+    (val) => {
+      if (val) {
+        tableSelectedProps.value.modulesTree = val;
+      }
+    },
+    {
+      immediate: true,
+    }
+  );
+
+  watch(
+    () => props.modulesCount,
+    (val) => {
+      if (val) {
+        tableSelectedProps.value.moduleCount = val;
+      }
+    },
+    {
+      immediate: true,
+    }
+  );
+
+  onMounted(() => {
+    loadCaseList();
+  });
 
   defineExpose({
     getApiCaseSaveParams,

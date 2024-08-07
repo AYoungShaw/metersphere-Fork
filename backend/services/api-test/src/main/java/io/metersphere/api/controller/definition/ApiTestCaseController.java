@@ -4,6 +4,7 @@ import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import io.metersphere.api.constants.ApiConstants;
 import io.metersphere.api.domain.ApiTestCase;
+import io.metersphere.api.dto.ApiCaseCompareData;
 import io.metersphere.api.dto.ReferenceDTO;
 import io.metersphere.api.dto.ReferenceRequest;
 import io.metersphere.api.dto.definition.*;
@@ -197,6 +198,14 @@ public class ApiTestCaseController {
         apiTestCaseRecoverService.batchRecover(request, SessionUtils.getUserId());
     }
 
+    @PostMapping("/batch/api-change/sync")
+    @Operation(summary = "接口测试-接口管理-接口用例-批量编辑")
+    @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_CASE_UPDATE)
+    @CheckOwner(resourceId = "#request.getSelectIds()", resourceType = "api_test_case")
+    public void batchSyncApiChange(@Validated @RequestBody ApiCaseBatchSyncRequest request) {
+        apiTestCaseService.batchSyncApiChange(request, SessionUtils.getUserId());
+    }
+
     @PostMapping(value = "/trash/page")
     @Operation(summary = "接口测试-接口管理-接口用例-回收站-分页查询")
     @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_CASE_READ)
@@ -299,5 +308,29 @@ public class ApiTestCaseController {
         Page<Object> page = PageHelper.startPage(request.getCurrent(), request.getPageSize(),
                 StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "id desc");
         return PageUtils.setPageInfo(page, apiTestCaseService.getReference(request));
+    }
+
+    @GetMapping("/api-change/clear/{id}")
+    @Operation(summary = "清除接口参数变更标识")
+    @RequiresPermissions(logical = Logical.OR, value = {PermissionConstants.PROJECT_API_DEFINITION_CASE_ADD, PermissionConstants.PROJECT_API_DEFINITION_CASE_UPDATE})
+    @CheckOwner(resourceId = "#id", resourceType = "api_test_case")
+    public void clearApiChange(@PathVariable String id) {
+        apiTestCaseService.clearApiChange(id);
+    }
+
+    @GetMapping("/api-change/ignore/{id}")
+    @Operation(summary = "忽略接口变更提示")
+    @RequiresPermissions(logical = Logical.OR, value = {PermissionConstants.PROJECT_API_DEFINITION_CASE_ADD, PermissionConstants.PROJECT_API_DEFINITION_CASE_UPDATE})
+    @CheckOwner(resourceId = "#id", resourceType = "api_test_case")
+    public void ignoreApiChange(@PathVariable String id, @RequestParam(name = "ignore") boolean ignore) {
+        apiTestCaseService.ignoreApiChange(id, ignore);
+    }
+
+    @GetMapping("/api/compare/{id}")
+    @Operation(summary = "与接口定义对比")
+    @RequiresPermissions(value = PermissionConstants.PROJECT_API_DEFINITION_CASE_READ)
+    @CheckOwner(resourceId = "#id", resourceType = "api_test_case")
+    public ApiCaseCompareData getApiCompareData(@PathVariable String id) {
+        return apiTestCaseService.getApiCompareData(id);
     }
 }

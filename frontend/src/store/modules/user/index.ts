@@ -182,6 +182,9 @@ const useUserStore = defineStore('user', {
     async isLogin(forceSet = false) {
       try {
         const res = await userIsLogin();
+        if (!res) {
+          return false;
+        }
         const appStore = useAppStore();
         setToken(res.sessionId, res.csrfToken);
         this.setInfo(res);
@@ -252,6 +255,12 @@ const useUserStore = defineStore('user', {
             });
             return;
           }
+          const routeName = router.currentRoute.value.name as string;
+          if (routeName?.includes('setting')) {
+            // 访问系统设置下的页面，不需要获取项目信息，会在切换到非系统设置页面时获取(ms-menu组件内初始化会获取)
+            appStore.setCurrentMenuConfig([]);
+            return;
+          }
           const res = await getProjectInfo(appStore.currentProjectId);
           if (!res) {
             // 如果项目被删除或者被禁用，跳转到无项目页面
@@ -268,6 +277,12 @@ const useUserStore = defineStore('user', {
           // eslint-disable-next-line no-console
           console.log(err);
         }
+      } else if (isLogin && appStore.currentProjectId === 'no_such_project') {
+        // 切换组织后，可能存在组织无项目情况，此时需要跳转到无项目权限页面
+        router.push({
+          name: NO_PROJECT_ROUTE_NAME,
+        });
+        throw new Error('no project');
       }
       if (isLoginPage() && isLogin) {
         // 当前页面为登录页面，且已经登录，跳转到首页

@@ -282,7 +282,7 @@
   import { useI18n } from '@/hooks/useI18n';
   import useModal from '@/hooks/useModal';
   import useAppStore from '@/store/modules/app';
-  import { downloadByteFile, getGenerateId, sleep } from '@/utils';
+  import { characterLimit, downloadByteFile, getGenerateId, sleep } from '@/utils';
   import { scrollIntoView } from '@/utils/dom';
 
   import type { AssociatedList, DetailCase, StepList } from '@/models/caseManagement/featureCase';
@@ -358,7 +358,7 @@
       : [];
   }
 
-  // 编辑前置条件
+  // 编辑前置操作
   function prepositionEdit() {
     isEditPreposition.value = !isEditPreposition.value;
   }
@@ -427,7 +427,7 @@
     );
   });
 
-  // 前置条件附件id
+  // 前置操作附件id
   const prerequisiteFileIds = ref<string[]>([]);
   // 文本描述附件id
   const textDescriptionFileIds = ref<string[]>([]);
@@ -527,7 +527,7 @@
     } else {
       openModal({
         type: 'error',
-        title: t('caseManagement.featureCase.deleteFile', { name: item?.name }),
+        title: t('caseManagement.featureCase.deleteFile', { name: characterLimit(item?.name) }),
         content: t('caseManagement.featureCase.deleteFileTip'),
         okText: t('common.confirmDelete'),
         cancelText: t('common.cancel'),

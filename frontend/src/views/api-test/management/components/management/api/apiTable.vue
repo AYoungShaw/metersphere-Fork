@@ -146,7 +146,7 @@
         field="values"
         :label="t('apiTestManagement.batchUpdate')"
         :validate-trigger="['blur', 'input']"
-        :rules="[{ required: true, message: t('apiTestManagement.valueRequired') }]"
+        :rules="[{ required: true, message: t('common.inputPleaseEnterTags') }]"
         asterisk-position="end"
         class="mb-0"
         required
@@ -158,6 +158,7 @@
           unique-value
           retain-input-value
         />
+        <div class="text-[12px] leading-[20px] text-[var(--color-text-4)]">{{ t('ms.tagsInput.tagLimitTip') }}</div>
       </a-form-item>
       <a-form-item
         v-else
@@ -281,6 +282,7 @@
     sortDefinition,
     updateDefinition,
   } from '@/api/modules/api-test/management';
+  import { getProjectInfo } from '@/api/modules/project-management/basicInfo';
   import { useI18n } from '@/hooks/useI18n';
   import useModal from '@/hooks/useModal';
   import useTableStore from '@/hooks/useTableStore';
@@ -565,6 +567,7 @@
             eventTag: 'exportSwagger',
           },
         ],
+        permission: ['PROJECT_API_DEFINITION:READ+EXPORT'],
       },
       {
         label: 'common.edit',
@@ -932,7 +935,8 @@
       },
       type
     );
-    downloadByteFile(new Blob([JSON.stringify(result)]), 'Swagger_Api_Case.json');
+    const res = await getProjectInfo(appStore.currentProjectId);
+    downloadByteFile(new Blob([JSON.stringify(result)]), `Swagger_Api_${res.name}.json`);
   }
 
   /**
@@ -998,7 +1002,6 @@
     () => requestMethodsOptions.value,
     () => {
       initFilterColumn();
-      apiTableRef.value.initColumn(columns);
     }
   );
 </script>

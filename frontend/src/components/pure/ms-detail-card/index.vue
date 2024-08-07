@@ -2,6 +2,7 @@
   <div class="ms-detail-card">
     <div class="ms-detail-card-title">
       <div class="flex flex-1 items-center gap-[8px]">
+        <slot name="titlePrefix"></slot>
         <a-tooltip :content="t(props.title)">
           <div class="one-line-text max-w-[300px] font-medium text-[var(--color-text-1)]">
             {{ t(props.title) }}
@@ -100,9 +101,7 @@
   .ms-detail-card {
     @apply relative flex flex-col;
 
-    padding: 16px;
     border-radius: var(--border-radius-small);
-    background-color: var(--color-text-n9);
     gap: 8px;
     .ms-detail-card-title {
       @apply flex items-center justify-between overflow-hidden;

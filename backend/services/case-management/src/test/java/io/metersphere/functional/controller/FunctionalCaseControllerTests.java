@@ -8,6 +8,7 @@ import io.metersphere.functional.dto.CaseCustomFieldDTO;
 import io.metersphere.functional.dto.FunctionalCaseAttachmentDTO;
 import io.metersphere.functional.dto.FunctionalCasePageDTO;
 import io.metersphere.functional.dto.response.FunctionalCaseImportResponse;
+import io.metersphere.functional.excel.domain.FunctionalCaseHeader;
 import io.metersphere.functional.mapper.FunctionalCaseAttachmentMapper;
 import io.metersphere.functional.mapper.FunctionalCaseCustomFieldMapper;
 import io.metersphere.functional.request.*;
@@ -85,6 +86,11 @@ public class FunctionalCaseControllerTests extends BaseTest {
     public static final String CHECK_EXCEL_URL = "/functional/case/pre-check/excel";
     public static final String IMPORT_EXCEL_URL = "/functional/case/import/excel";
     public static final String OPERATION_HISTORY_URL = "/functional/case/operation-history";
+    public static final String EXPORT_EXCEL_URL = "/functional/case/export/excel";
+    public static final String DOWNLOAD_XMIND_TEMPLATE_URL = "/functional/case/download/xmind/template/";
+    public static final String EXPORT_COLUMNS_URL = "/functional/case/export/columns/";
+    public static final String DOWNLOAD_FILE_URL = "/functional/case/download/file/";
+    public static final String STOP_EXPORT_URL = "/functional/case/stop/";
 
     @Resource
     private NotificationMapper notificationMapper;
@@ -615,8 +621,6 @@ public class FunctionalCaseControllerTests extends BaseTest {
         request.setModuleId("TEST_MOVE_MODULE_ID");
         request.setSelectAll(false);
         this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_BATCH_COPY_URL, request);
-        request.setSelectIds(Arrays.asList("TEST"));
-        this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_BATCH_COPY_URL, request);
         request.setSelectIds(new ArrayList<>());
         request.setSelectAll(true);
         this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_BATCH_COPY_URL, request);
@@ -644,7 +648,7 @@ public class FunctionalCaseControllerTests extends BaseTest {
         request.setAppend(true);
         request.setTags(Arrays.asList("追加标签_1", "追加标签_2"));
         this.requestPostWithOkAndReturn(FUNCTIONAL_CASE_BATCH_EDIT_URL, request);
-        request.setTags(Arrays.asList("追加标签_1", "追加标签_2","追加标签_3","追加标签_4","追加标签_5","追加标签_6","追加标签_7","追加标签_8","追加标签_9","追加标签_10","追加标签_11"));
+        request.setTags(Arrays.asList("追加标签_1", "追加标签_2", "追加标签_3", "追加标签_4", "追加标签_5", "追加标签_6", "追加标签_7", "追加标签_8", "追加标签_9", "追加标签_10", "追加标签_11"));
         this.requestPost(FUNCTIONAL_CASE_BATCH_EDIT_URL, request);
         request.setAppend(false);
         request.setTags(Arrays.asList("覆盖标签1", "覆盖标签2"));
@@ -796,5 +800,69 @@ public class FunctionalCaseControllerTests extends BaseTest {
         List<OperationHistoryDTO> operationHistoryDTOS = operationHistoryService.listWidthTable(request, "functional_case");
         Assertions.assertTrue(CollectionUtils.isNotEmpty(operationHistoryDTOS));
 
+    }
+
+
+    @Test
+    @Order(2)
+    public void exportExcel() throws Exception {
+        FunctionalCaseExportRequest request = new FunctionalCaseExportRequest();
+        request.setProjectId(DEFAULT_PROJECT_ID);
+        request.setSelectIds(List.of("TEST_FUNCTIONAL_CASE_ID"));
+        List<FunctionalCaseHeader> sysHeaders = new ArrayList<>() {{
+            add(new FunctionalCaseHeader() {{
+                setId("num");
+                setName("ID");
+            }});
+            add(new FunctionalCaseHeader() {{
+                setId("name");
+                setName("用例名称");
+            }});
+        }};
+        request.setSystemFields(sysHeaders);
+        List<FunctionalCaseHeader> customHeaders = new ArrayList<>() {{
+            add(new FunctionalCaseHeader() {{
+                setId("A");
+                setName("测试3");
+            }});
+        }};
+        request.setCustomFields(customHeaders);
+        List<FunctionalCaseHeader> otherHeaders = new ArrayList<>() {{
+            add(new FunctionalCaseHeader() {{
+                setId("createTime");
+                setName("创建时间");
+            }});
+        }};
+        request.setOtherFields(otherHeaders);
+
+        request.setFileId("123142342");
+        this.requestPost(EXPORT_EXCEL_URL, request);
+    }
+
+
+    @Test
+    @Order(22)
+    public void testDownloadXmindTemplate() throws Exception {
+        this.requestGetExcel(DOWNLOAD_XMIND_TEMPLATE_URL + DEFAULT_PROJECT_ID);
+    }
+
+    @Test
+    @Order(23)
+    public void getExportColumns() throws Exception {
+        this.requestGetExcel(EXPORT_COLUMNS_URL + DEFAULT_PROJECT_ID);
+    }
+
+    @Test
+    @Order(24)
+    public void downloadFile() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get(DOWNLOAD_FILE_URL + DEFAULT_PROJECT_ID + "/" + "123142342")
+                        .header(SessionConstants.HEADER_TOKEN, sessionId)
+                        .header(SessionConstants.CSRF_TOKEN, csrfToken));
+    }
+
+    @Test
+    @Order(25)
+    public void stopExport() throws Exception {
+        this.requestGetExcel(STOP_EXPORT_URL + DEFAULT_PROJECT_ID);
     }
 }

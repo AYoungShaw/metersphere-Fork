@@ -23,6 +23,7 @@
               :readonly="!hasAnyPermission(['PROJECT_API_DEBUG:READ+ADD'])"
               at-least-one
               @add="addDebugTab"
+              @close="handleDebugTabClose"
             >
               <template #label="{ tab }">
                 <apiMethodName :method="tab.protocol === 'HTTP' ? tab.method : tab.protocol" class="mr-[4px]" />
@@ -35,10 +36,11 @@
             </MsEditableTab>
           </div>
           <div class="flex-1 overflow-hidden">
-            <debug
+            <requestComposition
               v-model:detail-loading="loading"
               v-model:request="activeDebug"
               :module-tree="folderTree"
+              :protocol-key="ProtocolKeyEnum.API_DEBUG_NEW_PROTOCOL"
               :create-api="addDebug"
               :update-api="updateDebug"
               :execute-api="executeDebug"
@@ -47,6 +49,7 @@
               :file-save-as-source-id="activeDebug.id"
               :file-save-as-api="transferFile"
               :file-module-options-api="getTransferOptions"
+              hide-json-schema
               :permission-map="{
                 execute: 'PROJECT_API_DEBUG:READ+EXECUTE',
                 update: 'PROJECT_API_DEBUG:READ+UPDATE',
@@ -110,7 +113,7 @@
   import MsSplitBox from '@/components/pure/ms-split-box/index.vue';
   import moduleTree from './components/moduleTree.vue';
   import apiMethodName from '@/views/api-test/components/apiMethodName.vue';
-  import debug, { RequestParam } from '@/views/api-test/components/requestComposition/index.vue';
+  import requestComposition, { RequestParam } from '@/views/api-test/components/requestComposition/index.vue';
 
   import { localExecuteApiDebug } from '@/api/modules/api-test/common';
   import {
@@ -124,11 +127,13 @@
   } from '@/api/modules/api-test/debug';
   import { useI18n } from '@/hooks/useI18n';
   import useLeaveTabUnSaveCheck from '@/hooks/useLeaveTabUnSaveCheck';
+  import useRequestCompositionStore from '@/store/modules/api/requestComposition';
   import { parseCurlScript } from '@/utils';
   import { hasAnyPermission } from '@/utils/permission';
 
   import { ModuleTreeNode } from '@/models/common';
   import {
+    ProtocolKeyEnum,
     RequestAuthType,
     RequestComposition,
     RequestContentTypeEnum,
@@ -142,6 +147,7 @@
 
   const route = useRoute();
   const { t } = useI18n();
+  const requestCompositionStore = useRequestCompositionStore();
 
   const moduleTreeRef = ref<InstanceType<typeof moduleTree>>();
   const folderTree = ref<ModuleTreeNode[]>([]);
@@ -155,7 +161,7 @@
   }
 
   const initDefaultId = `debug-${Date.now()}`;
-  const localProtocol = localStorage.getItem('currentProtocol');
+  const localProtocol = localStorage.getItem(ProtocolKeyEnum.API_DEBUG_NEW_PROTOCOL);
   const defaultDebugParams: RequestParam = {
     type: 'api',
     id: initDefaultId,
@@ -230,7 +236,7 @@
 
   function addDebugTab(defaultProps?: Partial<TabItem>) {
     const id = `debug-${Date.now()}`;
-    const protocol = localStorage.getItem('currentProtocol');
+    const protocol = localStorage.getItem(ProtocolKeyEnum.API_DEBUG_NEW_PROTOCOL);
     debugTabs.value.push({
       ...cloneDeep(defaultDebugParams),
       id,
@@ -358,23 +364,14 @@
     }
   }
 
-  /**
-  async function openSaveAsApiModal(node: MsTreeNodeData) {
-    try {
-      const [modules] = await getModuleTreeOnlyModules({
-        keyword: '',
-        protocol: '',
-        projectId: appStore.currentProjectId,
-        moduleIds: [],
-      });
-      apiModules.value = modules;
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.log(error);
-    } finally {
+  function handleDebugTabClose(item: TabItem) {
+    requestCompositionStore.removePluginFormMapItem(item.id);
+    const closingIndex = debugTabs.value.findIndex((e) => e.id === item.id);
+    if (closingIndex > -1) {
+      debugTabs.value.splice(closingIndex, 1);
     }
   }
-  */
+
   onMounted(() => {
     if (route.query.id) {
       openApiTab(route.query.id as string);

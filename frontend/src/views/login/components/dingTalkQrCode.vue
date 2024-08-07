@@ -13,7 +13,7 @@
   import { NO_PROJECT_ROUTE_NAME, NO_RESOURCE_ROUTE_NAME } from '@/router/constants';
   import { useAppStore, useUserStore } from '@/store';
   import useLicenseStore from '@/store/modules/setting/license';
-  import { setLoginExpires } from '@/utils/auth';
+  import { setLoginExpires, setLongType } from '@/utils/auth';
   import { getFirstRouteNameByPermission, routerNameHasPermission } from '@/utils/permission';
 
   const { t } = useI18n();
@@ -44,9 +44,10 @@
         prompt: 'consent',
       },
       async (loginResult) => {
-        const { redirectUrl, authCode, state } = loginResult;
+        const { authCode } = loginResult;
         const dingCallback = getDingCallback(authCode);
         userStore.qrCodeLogin(await dingCallback);
+        setLongType('DING_TALK');
         Message.success(t('login.form.login.success'));
         const { redirect, ...othersQuery } = router.currentRoute.value.query;
         const redirectHasPermission =
@@ -75,9 +76,8 @@
         // 也可以在不跳转页面的情况下，使用code进行授权
       },
       (errorMsg) => {
-        Message.error(`errorMsg of errorCbk: ${errorMsg}`);
         // 这里一般需要展示登录失败的具体原因,可以使用toast等轻提示
-        console.error(`errorMsg of errorCbk: ${errorMsg}`);
+        Message.error(`errorMsg of errorCbk: ${errorMsg}`);
       }
     );
   };

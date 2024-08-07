@@ -14,6 +14,11 @@
     <template #resultStatus="{ record }">
       <ExecutionStatus v-if="record.resultStatus !== '-'" :status="record.resultStatus" />
     </template>
+    <template #passThreshold="{ record }">
+      <div>
+        {{ `${record.passThreshold || '0.00'}%` }}
+      </div>
+    </template>
     <template #passRate="{ record }">
       <div>
         {{ `${record.passRate || '0.00'}%` }}
@@ -97,7 +102,7 @@
       dataIndex: 'resultStatus',
       slotName: 'resultStatus',
       filterConfig: {
-        options: statusResultOptions.value,
+        options: props.isPreview ? statusResultOptions.value : [],
         filterSlotName: FilterSlotNameEnum.TEST_PLAN_STATUS_FILTER,
       },
       width: 200,
@@ -128,6 +133,7 @@
   };
 
   const { propsRes, propsEvent, loadList, setLoadListParams } = useTable(reportDetailList(), {
+    scroll: { x: '100%' },
     columns,
     heightUsed: 20,
     showSelectorAll: false,
@@ -138,13 +144,19 @@
     loadList();
   }
 
-  watchEffect(() => {
-    if (props.reportId && props.isPreview) {
-      loadReportDetailList();
-    } else {
-      propsRes.value.data = detailTableExample[ReportCardTypeEnum.SUB_PLAN_DETAIL];
+  watch(
+    [() => props.reportId, () => props.isPreview],
+    () => {
+      if (props.reportId && props.isPreview) {
+        loadReportDetailList();
+      } else {
+        propsRes.value.data = detailTableExample[ReportCardTypeEnum.SUB_PLAN_DETAIL];
+      }
+    },
+    {
+      immediate: true,
     }
-  });
+  );
 
   const reportVisible = ref(false);
 

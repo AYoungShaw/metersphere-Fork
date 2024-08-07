@@ -3,6 +3,7 @@ export enum MinderEventName {
   'HOTBOX' = 'HOTBOX', // 热键菜单
   'ENTER_NODE' = 'ENTER_NODE', // 进入节点
   'EXPAND' = 'EXPAND', // 展开节点
+  'COLLAPSE' = 'COLLAPSE', // 折叠节点
   'INSERT_CHILD' = 'INSERT_CHILD', // 插入子节点
   'INSERT_SIBLING' = 'INSERT_SIBLING', // 插入同级节点
   'COPY_NODE' = 'COPY_NODE', // 复制节点
@@ -15,6 +16,19 @@ export enum MinderEventName {
   'MINDER_CHANGED' = 'MINDER_CHANGED', // 脑图更改事件
   'SAVE_MINDER' = 'SAVE_MINDER', // 脑图保存事件
   'DRAG_FINISH' = 'DRAG_FINISH', // 脑图节点拖拽结束事件
+}
+
+export enum MinderKeyEnum {
+  FEATURE_CASE_MINDER = 'featureCaseMinder',
+  CASE_REVIEW_MINDER = 'caseReviewMinder',
+  TEST_PLAN_MINDER = 'testPlanMinder',
+  TEST_PLAN_FEATURE_CASE_MINDER = 'testPlanFeatureCaseMinder',
+}
+
+export enum ModeIcon {
+  right = 'icon-icon_right_branch',
+  default = 'icon-icon_left_and_right_branch',
+  filetree = 'icon-icon_lower_branch1',
 }
 
 export default {};

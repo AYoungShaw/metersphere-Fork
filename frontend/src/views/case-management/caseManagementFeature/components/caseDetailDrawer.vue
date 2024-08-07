@@ -79,7 +79,7 @@
                 <MsIcon type="icon-icon_copy_filled" class="font-[16px]" />{{ t('common.copy') }}</a-doption
               >
               <a-doption class="error-6 text-[rgb(var(--danger-6))]" @click="deleteHandler">
-                <MsIcon type="icon-icon_delete-trash_outlined" class="font-[16px] text-[rgb(var(--danger-6))]" />
+                <MsIcon type="icon-icon_delete-trash_outlined1" class="font-[16px] text-[rgb(var(--danger-6))]" />
                 {{ t('common.delete') }}
               </a-doption>
             </template>
@@ -90,18 +90,18 @@
     <template #default="{ detail, loading }">
       <div ref="wrapperRef" class="bg-white">
         <div class="header relative h-[48px] border-b pl-2">
-          <div class="max-w-[calc(100%-72px)]"
-            ><MsTab
+          <div class="max-w-[calc(100%-72px)]">
+            <MsTab
               v-model:active-key="activeTab"
               :content-tab-list="tabSetting"
               :get-text-func="getTotal"
               class="no-content relative"
               @change="clickMenu"
-          /></div>
-
-          <span class="display-setting h-full text-[var(--color-text-2)]" @click="showMenuSetting">{{
-            t('caseManagement.featureCase.detailDisplaySetting')
-          }}</span>
+            />
+          </div>
+          <span class="display-setting h-full text-[var(--color-text-2)]" @click="showMenuSetting">
+            {{ t('caseManagement.featureCase.detailDisplaySetting') }}
+          </span>
         </div>
         <div>
           <div
@@ -247,14 +247,13 @@
   const commentInputIsActive = computed(() => commentInputRef.value?.isActive);
 
   const tabSetting = ref<TabItemType[]>([]);
-  const activeTab = ref<string>('detail');
+  const activeTab = ref<string | number>('detail');
 
-  function clickMenu(key: string) {
+  function clickMenu(key: string | number) {
     activeTab.value = key;
     featureCaseStore.setActiveTab(key);
     switch (activeTab.value) {
       case 'setting':
-        activeTab.value = 'detail';
         showMenuSetting();
         break;
       default:
@@ -570,7 +569,6 @@
     showSettingDrawer.value = false;
     const tmpArr = (await featureCaseStore.getContentTabList()) || [];
     tabSetting.value = tmpArr.filter((item) => item.isShow);
-    activeTab.value = 'detail';
   };
 
   async function handleUploadImage(file: File) {

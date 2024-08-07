@@ -11,10 +11,7 @@ import io.metersphere.project.mapper.ExtBaseProjectVersionMapper;
 import io.metersphere.project.mapper.ProjectMapper;
 import io.metersphere.project.service.ProjectTemplateService;
 import io.metersphere.project.utils.NodeSortUtils;
-import io.metersphere.sdk.constants.ExecStatus;
-import io.metersphere.sdk.constants.HttpMethodConstants;
-import io.metersphere.sdk.constants.ModuleConstants;
-import io.metersphere.sdk.constants.TemplateScene;
+import io.metersphere.sdk.constants.*;
 import io.metersphere.sdk.exception.MSException;
 import io.metersphere.sdk.util.BeanUtils;
 import io.metersphere.sdk.util.JSON;
@@ -141,7 +138,7 @@ public class FunctionalCaseMinderService {
         Map<String, String> priorityMap = caseCustomFieldList.stream().collect(Collectors.toMap(FunctionalCaseCustomField::getCaseId, FunctionalCaseCustomField::getValue));
 
         //构造父子级数据
-        buildList(functionalCaseMindDTOList, list, priorityMap);
+        buildList(functionalCaseMindDTOList, list, priorityMap, false);
         return list;
     }
 
@@ -152,7 +149,7 @@ public class FunctionalCaseMinderService {
         return customFields.stream().map(TemplateCustomFieldDTO::getFieldId).toList();
     }
 
-    private void buildList(List<FunctionalCaseMindDTO> functionalCaseMindDTOList, List<FunctionalMinderTreeDTO> list, Map<String, String> priorityMap) {
+    private void buildList(List<FunctionalCaseMindDTO> functionalCaseMindDTOList, List<FunctionalMinderTreeDTO> list, Map<String, String> priorityMap, boolean addActualResult) {
         //构造父子级数据
         for (FunctionalCaseMindDTO functionalCaseMindDTO : functionalCaseMindDTOList) {
             FunctionalMinderTreeDTO root = new FunctionalMinderTreeDTO();
@@ -164,14 +161,14 @@ public class FunctionalCaseMinderService {
             rootData.setPriority(StringUtils.isNotBlank(priorityMap.get(functionalCaseMindDTO.getCaseId())) ? Integer.parseInt(priorityMap.get(functionalCaseMindDTO.getCaseId()).substring(1)) + 1 : 1);
             rootData.setStatus(functionalCaseMindDTO.getReviewStatus());
             rootData.setResource(List.of(Translator.get("minder_extra_node.case")));
-            List<FunctionalMinderTreeDTO> children = buildChildren(functionalCaseMindDTO);
+            List<FunctionalMinderTreeDTO> children = buildChildren(functionalCaseMindDTO, addActualResult);
             root.setChildren(children);
             root.setData(rootData);
             list.add(root);
         }
     }
 
-    private List<FunctionalMinderTreeDTO> buildChildren(FunctionalCaseMindDTO functionalCaseMindDTO) {
+    private List<FunctionalMinderTreeDTO> buildChildren(FunctionalCaseMindDTO functionalCaseMindDTO, boolean addActualResult) {
         List<FunctionalMinderTreeDTO> children = new ArrayList<>();
         if (functionalCaseMindDTO.getPrerequisite() != null) {
             String prerequisiteText = new String(functionalCaseMindDTO.getPrerequisite(), StandardCharsets.UTF_8);
@@ -203,6 +200,9 @@ public class FunctionalCaseMinderService {
             String stepText = new String(functionalCaseMindDTO.getSteps(), StandardCharsets.UTF_8);
             if (StringUtils.isNotBlank(stepText)) {
                 List<FunctionalCaseStepDTO> functionalCaseStepDTOS = JSON.parseArray(stepText, FunctionalCaseStepDTO.class);
+                if (addActualResult) {
+                    compareStep(functionalCaseMindDTO.getExecuteSteps(), functionalCaseStepDTOS);
+                }
                 for (FunctionalCaseStepDTO functionalCaseStepDTO : functionalCaseStepDTOS) {
                     i = i + 1;
                     String desc = functionalCaseStepDTO.getDesc();
@@ -215,6 +215,27 @@ public class FunctionalCaseMinderService {
                         expectedResultFunctionalMinderTreeDTO = getFunctionalMinderTreeDTO(result, Translator.get("minder_extra_node.steps_expected_result"), Long.valueOf(functionalCaseStepDTO.getNum()));
                     } else {
                         expectedResultFunctionalMinderTreeDTO = getFunctionalMinderTreeDTO(result, Translator.get("minder_extra_node.steps_expected_result"), Long.valueOf(functionalCaseStepDTO.getNum()));
+                    }
+                    if (addActualResult) {
+                        Map<String, String>statusMap = new HashMap<>();
+                        statusMap.put(ResultStatus.SUCCESS.name(), Translator.get("case.minder.status.success"));
+                        statusMap.put(ResultStatus.ERROR.name(), Translator.get("case.minder.status.error"));
+                        statusMap.put(ResultStatus.BLOCKED.name(), Translator.get("case.minder.status.blocked"));
+                        String actualResult = "";
+                        FunctionalMinderTreeDTO actualResultFunctionalMinderTreeDTO;
+                        if (StringUtils.isNotBlank(functionalCaseStepDTO.getActualResult())) {
+                            actualResult = functionalCaseStepDTO.getActualResult();
+                            actualResultFunctionalMinderTreeDTO = getFunctionalMinderTreeDTO(actualResult, Translator.get("minder_extra_node.steps_actual_result"), Long.valueOf(functionalCaseStepDTO.getNum()));
+                        } else {
+                            actualResultFunctionalMinderTreeDTO = getFunctionalMinderTreeDTO(actualResult, Translator.get("minder_extra_node.steps_actual_result"), Long.valueOf(functionalCaseStepDTO.getNum()));
+                        }
+                        expectedResultFunctionalMinderTreeDTO.getChildren().add(actualResultFunctionalMinderTreeDTO);
+                        if (StringUtils.isNotBlank(functionalCaseStepDTO.getExecuteResult())) {
+                            List<String> resource = stepFunctionalMinderTreeDTO.getData().getResource();
+                            List<String> list = new ArrayList<>(resource);
+                            list.add(0,statusMap.get(functionalCaseStepDTO.getExecuteResult()));
+                            stepFunctionalMinderTreeDTO.getData().setResource(list);
+                        }
                     }
                     stepFunctionalMinderTreeDTO.getChildren().add(expectedResultFunctionalMinderTreeDTO);
                     if (StringUtils.isNotBlank(desc) || StringUtils.isNotBlank(result)) {
@@ -1173,19 +1194,24 @@ public class FunctionalCaseMinderService {
         List<FunctionalCaseCustomField> caseCustomFieldList = extFunctionalCaseMapper.getCaseCustomFieldList(request, deleted, fieldIds);
         Map<String, String> priorityMap = caseCustomFieldList.stream().collect(Collectors.toMap(FunctionalCaseCustomField::getCaseId, FunctionalCaseCustomField::getValue));
         //构造父子级数据
-        buildList(functionalCaseMindDTOList, list, priorityMap);
+        buildList(functionalCaseMindDTOList, list, priorityMap, false);
         return list;
     }
 
     public List<FunctionalMinderTreeDTO> getPlanMindFunctionalCase(FunctionalCasePlanMindRequest request, boolean deleted) {
         List<FunctionalMinderTreeDTO> list = new ArrayList<>();
-        //查出当前模块下的所有用例
+        //查出当前模块下的所有用例,模块可能是根节点，这里做跨项目的处理
+        if (request.getModuleId().contains("root")) {
+            int i = request.getModuleId().indexOf("_");
+            String substring = request.getModuleId().substring(i+1);
+            request.setModuleId(substring);
+        }
         List<FunctionalCaseMindDTO> functionalCaseMindDTOList = extFunctionalCaseMapper.getMinderTestPlanList(request, deleted);
         List<String> fieldIds = getFieldIds(request);
         List<FunctionalCaseCustomField> caseCustomFieldList = extFunctionalCaseMapper.getCaseCustomFieldList(request, deleted, fieldIds);
         Map<String, String> priorityMap = caseCustomFieldList.stream().collect(Collectors.toMap(FunctionalCaseCustomField::getCaseId, FunctionalCaseCustomField::getValue));
         //构造父子级数据
-        buildList(functionalCaseMindDTOList, list, priorityMap);
+        buildList(functionalCaseMindDTOList, list, priorityMap, true);
         return list;
     }
 
@@ -1252,5 +1278,27 @@ public class FunctionalCaseMinderService {
         //默认模块下不允许创建子模块。  它本身也就是叶子节点。
         return new BaseTreeNode(ModuleConstants.DEFAULT_NODE_ID, name, ModuleConstants.NODE_TYPE_DEFAULT, ModuleConstants.ROOT_NODE_PARENT_ID);
     }
+
+    private static void compareStep(byte[] steps, List<FunctionalCaseStepDTO> newCaseSteps) {
+        if (steps != null) {
+            String historyStepStr = new String(steps, StandardCharsets.UTF_8);
+            if (StringUtils.isNotBlank(historyStepStr)) {
+                List<FunctionalCaseStepDTO> historySteps = JSON.parseArray(historyStepStr, FunctionalCaseStepDTO.class);
+                Map<String, FunctionalCaseStepDTO> historyStepMap = historySteps.stream().collect(Collectors.toMap(FunctionalCaseStepDTO::getId, t -> t));
+                newCaseSteps.forEach(newCaseStep -> {
+                    setHistoryInfo(newCaseStep, historyStepMap);
+                });
+            }
+        }
+    }
+
+    private static void setHistoryInfo(FunctionalCaseStepDTO newCaseStep, Map<String, FunctionalCaseStepDTO> historyStepMap) {
+        FunctionalCaseStepDTO historyStep = historyStepMap.get(newCaseStep.getId());
+        if (historyStep != null && StringUtils.equals(historyStep.getDesc(), newCaseStep.getDesc()) && StringUtils.equals(historyStep.getResult(), newCaseStep.getResult())) {
+            newCaseStep.setExecuteResult(historyStep.getExecuteResult());
+            newCaseStep.setActualResult(historyStep.getActualResult());
+        }
+    }
+
 
 }

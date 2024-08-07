@@ -67,7 +67,7 @@ export default {
     main: {
       header: {
         minder: 'Minder',
-        style: 'Appearance style',
+        style: 'style',
       },
       main: {
         save: 'Save',
@@ -93,7 +93,7 @@ export default {
     tag: {
       case: 'Case',
       module: 'Module',
-      precondition: 'Precondition',
+      precondition: 'Pre-operation',
       desc: 'Step desc',
       expect: 'Expected result',
       remark: 'Remark',

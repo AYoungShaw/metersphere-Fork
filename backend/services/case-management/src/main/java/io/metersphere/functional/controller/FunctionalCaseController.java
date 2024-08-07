@@ -8,11 +8,9 @@ import io.metersphere.functional.dto.FunctionalCaseDetailDTO;
 import io.metersphere.functional.dto.FunctionalCasePageDTO;
 import io.metersphere.functional.dto.FunctionalCaseVersionDTO;
 import io.metersphere.functional.dto.response.FunctionalCaseImportResponse;
+import io.metersphere.functional.excel.domain.FunctionalCaseExportColumns;
 import io.metersphere.functional.request.*;
-import io.metersphere.functional.service.FunctionalCaseFileService;
-import io.metersphere.functional.service.FunctionalCaseLogService;
-import io.metersphere.functional.service.FunctionalCaseNoticeService;
-import io.metersphere.functional.service.FunctionalCaseService;
+import io.metersphere.functional.service.*;
 import io.metersphere.project.dto.CustomFieldOptions;
 import io.metersphere.project.service.ProjectTemplateService;
 import io.metersphere.sdk.constants.PermissionConstants;
@@ -37,6 +35,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.NotBlank;
 import org.apache.shiro.authz.annotation.Logical;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -59,6 +58,8 @@ public class FunctionalCaseController {
     private ProjectTemplateService projectTemplateService;
     @Resource
     private FunctionalCaseFileService functionalCaseFileService;
+    @Resource
+    private FunctionalCaseXmindService functionalCaseXmindService;
 
     //TODO 获取模板列表(多模板功能暂时不做)
 
@@ -223,7 +224,7 @@ public class FunctionalCaseController {
 
     @PostMapping("/pre-check/excel")
     @Operation(summary = "用例管理-功能用例-excel导入检查")
-    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_UPDATE)
+    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_IMPORT)
     @CheckOwner(resourceId = "#request.getProjectId()", resourceType = "project")
     public FunctionalCaseImportResponse preCheckExcel(@RequestPart("request") FunctionalCaseImportRequest request, @RequestPart(value = "file", required = false) MultipartFile file) {
         return functionalCaseFileService.preCheckExcel(request, file);
@@ -232,7 +233,7 @@ public class FunctionalCaseController {
 
     @PostMapping("/import/excel")
     @Operation(summary = "用例管理-功能用例-excel导入")
-    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_UPDATE)
+    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_IMPORT)
     @CheckOwner(resourceId = "#request.getProjectId()", resourceType = "project")
     public FunctionalCaseImportResponse importExcel(@RequestPart("request") FunctionalCaseImportRequest request, @RequestPart(value = "file", required = false) MultipartFile file) {
         SessionUser user = SessionUtils.getUser();
@@ -247,5 +248,45 @@ public class FunctionalCaseController {
         Page<Object> page = PageHelper.startPage(request.getCurrent(), request.getPageSize(),
                 StringUtils.isNotBlank(request.getSortString()) ? request.getSortString() : "create_time desc");
         return PageUtils.setPageInfo(page, functionalCaseService.operationHistoryList(request));
+    }
+
+
+    @PostMapping("/export/excel")
+    @Operation(summary = "用例管理-功能用例-excel导出")
+    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_EXPORT)
+    public void testCaseExport(@Validated @RequestBody FunctionalCaseExportRequest request) {
+        functionalCaseFileService.export(SessionUtils.getUserId(), request);
+    }
+
+    @GetMapping("/stop/{projectId}")
+    @Operation(summary = "用例管理-功能用例-导出-停止导出")
+    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_EXPORT)
+    @CheckOwner(resourceId = "#projectId", resourceType = "project")
+    public void caseStopExport(@PathVariable String projectId) {
+        functionalCaseFileService.stopExport(projectId, SessionUtils.getUserId());
+    }
+
+    @GetMapping("/download/xmind/template/{projectId}")
+    @Operation(summary = "用例管理-功能用例-xmind导入-下载模板")
+    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ)
+    @CheckOwner(resourceId = "#projectId", resourceType = "project")
+    public void xmindTemplateExport(@PathVariable String projectId, HttpServletResponse response) {
+        functionalCaseXmindService.downloadXmindTemplate(projectId, response);
+    }
+
+    @GetMapping("/export/columns/{projectId}")
+    @Operation(summary = "用例管理-获取导出字段配置")
+    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ)
+    @CheckOwner(resourceId = "#projectId", resourceType = "project")
+    public FunctionalCaseExportColumns getExportColumns(@PathVariable String projectId) {
+        return functionalCaseFileService.getExportColumns(projectId);
+    }
+
+
+    @GetMapping(value = "/download/file/{projectId}/{fileId}")
+    @Operation(summary = "用例管理-功能用例-下载文件")
+    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_EXPORT)
+    public ResponseEntity<byte[]> downloadImgById(@PathVariable String projectId, @PathVariable String fileId) {
+        return functionalCaseFileService.downloadFile(projectId, fileId);
     }
 }

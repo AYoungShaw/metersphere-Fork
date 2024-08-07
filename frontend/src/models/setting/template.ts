@@ -120,6 +120,7 @@ export interface ActionTemplateManage {
   enablePlatformDefault?: boolean;
   internal?: boolean; // 是否为系统模板
   platForm?: string;
+  uploadImgFileIds: string[]; // 模板附件
   [key: string]: any;
 }
 
@@ -166,4 +167,24 @@ export interface UpdateWorkFlowSetting {
   fromId: string; // 开始id
   toId: string; // 结束id
   enable: boolean;
+}
+
+// 默认缺陷模板系统自定义字段
+export interface defaultBugField {
+  title: string;
+  description: string;
+  descriptionFileIds: string[];
+  [key: string]: any;
+}
+
+// 用例模模板默认自定义系统字段
+export interface defaultCaseField {
+  name: string;
+  prerequisite: string; // 前置条件
+  caseEditType: string; // 编辑模式：步骤模式/文本模式
+  steps: string;
+  textDescription: string;
+  expectedResult: string; // 预期结果
+  description: string;
+  [key: string]: any;
 }

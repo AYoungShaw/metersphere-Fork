@@ -13,6 +13,7 @@ import io.metersphere.api.dto.request.ApiEditPosRequest;
 import io.metersphere.api.dto.request.ApiTransferRequest;
 import io.metersphere.api.dto.request.ImportRequest;
 import io.metersphere.api.dto.request.http.MsHTTPElement;
+import io.metersphere.api.dto.request.http.MsHeader;
 import io.metersphere.api.dto.schema.JsonSchemaItem;
 import io.metersphere.api.mapper.*;
 import io.metersphere.api.model.CheckLogModel;
@@ -117,6 +118,8 @@ public class ApiDefinitionControllerTests extends BaseTest {
 
     private static final String ALL_API = "api_definition_module.api.all";
     private static final String UNPLANNED_API = "api_unplanned_request";
+    private static final String JSON_SCHEMA_PREVIEW = "json-schema/preview";
+    private static final String JSON_SCHEMA_AUTO_GENERATE = "json-schema/auto-generate";
 
     private static final String EXPORT = "/export/";
     private static ApiDefinition apiDefinition;
@@ -593,7 +596,17 @@ public class ApiDefinitionControllerTests extends BaseTest {
             apiTestCaseService.addCase(testCaseAddRequest, "admin");
         }
         updateRequest.setPath("/api/test/path/method/case");
+        MsHeader msHeader = new MsHeader();
+        msHeader.setKey("111");
+        // 添加差异
+        msHttpElement.setHeaders(List.of(msHeader));
+        updateRequest.setRequest(getMsElementParam(msHttpElement));
         this.requestPostWithOk(UPDATE, updateRequest);
+        ApiTestCaseExample example = new ApiTestCaseExample();
+        example.createCriteria().andApiDefinitionIdEqualTo(apiDefinition.getId());
+        List<ApiTestCase> apiTestCases = apiTestCaseMapper.selectByExample(example);
+        // 校验差异后的变更通知
+        apiTestCases.forEach(apiTestCase -> Assertions.assertTrue(apiTestCase.getApiChange()));
 
         // @@校验权限
         request.setId(apiDefinition.getId());
@@ -1718,16 +1731,16 @@ public class ApiDefinitionControllerTests extends BaseTest {
                 {"example":null,"id":null,"title":null,"type":"object","description":null,"items":null,"properties":{"id":{"example":10,"id":null,"title":null,"type":"integer","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"int64","enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null},"name":{"example":"@string","id":null,"title":null,"type":"string","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"","enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null},"category":{"example":null,"id":null,"title":null,"type":"object","description":null,"items":null,"properties":{"id":{"example":"@integer","id":null,"title":null,"type":"integer","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"int64","enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null},"name":{"example":"Dogs","id":null,"title":null,"type":"string","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"","enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null}},"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":null,"enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null},"photoUrls":{"example":null,"id":null,"title":null,"type":"array","description":null,"items":[{"example":null,"id":null,"title":null,"type":"string","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"","enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null}],"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":null,"enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null},"tags":{"example":null,"id":null,"title":null,"type":"array","description":null,"items":[{"example":null,"id":null,"title":null,"type":"object","description":null,"items":null,"properties":{"id":{"example":null,"id":null,"title":null,"type":"integer","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"int64","enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null},"name":{"example":null,"id":null,"title":null,"type":"string","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"mainimum":null,"maximum":null,"schema":null,"format":"","enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null}},"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":null,"enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null}],"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":null,"enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null},"status":{"example":"available","id":null,"title":null,"type":"string","description":"pet status in the store","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"","enumString":["available","pending","sold"],"enumInteger":null,"enumNumber":null,"extensions":null},"testnumber":{"example":1.23139183198000000283719387,"id":null,"title":null,"type":"number","description":"pet status in the store","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"","enumString":["available","pending","sold"],"enumInteger":null,"enumNumber":null,"extensions":null},"testnumber11":{"example":"@number","id":null,"title":null,"type":"number","description":"pet status in the store","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"","enumString":["available","pending","sold"],"enumInteger":null,"enumNumber":null,"extensions":null},"testfalse":{"example":"@boolean","id":null,"title":null,"type":"boolean","description":"pet status in the store","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"","enumString":["available","pending","sold"],"enumInteger":null,"enumNumber":null,"extensions":null},"testfalse":{"example":false,"id":null,"title":null,"type":"boolean","description":"pet status in the store","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"","enumString":["available","pending","sold"],"enumInteger":null,"enumNumber":null,"extensions":null},"testnull":{"example":null,"id":null,"title":null,"type":"null","description":"pet status in the store","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"","enumInteger":null,"enumNumber":null,"extensions":null},"testass": null},"additionalProperties":null,"required":["name","photoUrls"],"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":null,"enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null}
                """;
         //正常数据;
-        requestPost("preview", JSON.parseObject(jsonString, JsonSchemaItem.class)).andExpect(status().isOk());
+        requestPostWithOk(JSON_SCHEMA_PREVIEW, JSON.parseObject(jsonString, JsonSchemaItem.class));
         //正常array数据
         String jsonArray = """
                 {"example":null,"id":null,"title":null,"type":"array","description":null,"items":{"example":null,"id":null,"title":null,"type":"object","description":null,"items":null,"properties":{"id":{"example":"@integer","id":null,"title":null,"type":"integer","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":"int64","enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null},"name":{"example":null,"id":null,"title":null,"type":"string","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"mainimum":null,"maximum":null,"schema":null,"format":"","enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null}},"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":null,"enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null},"properties":null,"additionalProperties":null,"required":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"schema":null,"format":null,"enumString":null,"enumInteger":null,"enumNumber":null,"extensions":null}
                 """;
-        requestPost("preview", JSON.parseObject(jsonArray, JsonSchemaItem.class)).andExpect(status().isOk());
+        requestPostWithOk(JSON_SCHEMA_PREVIEW, JSON.parseObject(jsonArray, JsonSchemaItem.class));
 
         // 校验转换是否正确
         String schema = """
-                {"type":"object","enable":true,"properties":{"array":{"type":"array","enable":true,"items":[{"type":"string","example":"1","enable":true},{"type":"number","example":"2","enable":true}]},"string":{"type":"string","example":"stringValue","enable":true},"int":{"type":"integer","example":"1","enable":true},"num":{"type":"number","example":"1.00","enable":true},"boolean":{"type":"boolean","example":"booleanValue","enable":true},"null":{"type":"null","enable":true}}}
+                {"type":"object","enable":true,"properties":{"array":{"type":"array","enable":true,"items":[{"type":"string","example":"1","enable":true},{"type":"number","example":"2","enable":true}]},"string":{"type":"string","example":"stringValue","enable":true},"int":{"type":"integer","example":"1","enable":true},"num":{"type":"number","example":"1.00","enable":true},"boolean":{"type":"boolean","example":"booleanValue","enable":true},"null":{"type":"null","enable":true},"":{"type":"string","enable":true}}}
                 """;
         String jsonResult = """
                 {
@@ -1739,7 +1752,7 @@ public class ApiDefinitionControllerTests extends BaseTest {
                   "null" : null
                 }
                 """;
-        MvcResult mvcResult = requestPostWithOkAndReturn("preview", JSON.parseObject(schema, JsonSchemaItem.class));
+        MvcResult mvcResult = requestPostWithOkAndReturn(JSON_SCHEMA_PREVIEW, JSON.parseObject(schema, JsonSchemaItem.class));
         String resultData = getResultData(mvcResult, String.class);
         Assertions.assertEquals(JSON.parseObject(jsonResult), JSON.parseObject(resultData));
 
@@ -1760,7 +1773,7 @@ public class ApiDefinitionControllerTests extends BaseTest {
                    null
                 ]
                 """;
-        mvcResult = requestPostWithOkAndReturn("preview", JSON.parseObject(schema, JsonSchemaItem.class));
+        mvcResult = requestPostWithOkAndReturn(JSON_SCHEMA_PREVIEW, JSON.parseObject(schema, JsonSchemaItem.class));
         resultData = getResultData(mvcResult, String.class);
         Assertions.assertEquals(JSON.parseObject(jsonResult), JSON.parseObject(resultData));
 
@@ -1768,16 +1781,49 @@ public class ApiDefinitionControllerTests extends BaseTest {
         schema = """
                 {"type":"object","enable":false}
                 """;
-        mvcResult = requestPostWithOkAndReturn("preview", JSON.parseObject(schema, JsonSchemaItem.class));
+        mvcResult = requestPostWithOkAndReturn(JSON_SCHEMA_PREVIEW, JSON.parseObject(schema, JsonSchemaItem.class));
         Assertions.assertEquals(getResultData(mvcResult, String.class), "{}");
 
         // 校验禁用
         schema = """
                 {"type":"object","enable":true,"properties":{"array":{"type":"array","enable":false,"items":[{"type":"string","example":"1","enable":false},{"type":"number","example":"2","enable":false}]},"string":{"type":"string","example":"stringValue","enable":false},"int":{"type":"integer","example":"1","enable":false},"num":{"type":"number","example":"1.00","enable":false},"boolean":{"type":"boolean","example":"booleanValue","enable":false},"null":{"type":"null","enable":false}}}
                 """;
-        mvcResult = requestPostWithOkAndReturn("preview", JSON.parseObject(schema, JsonSchemaItem.class));
+        mvcResult = requestPostWithOkAndReturn(JSON_SCHEMA_PREVIEW, JSON.parseObject(schema, JsonSchemaItem.class));
         resultData = getResultData(mvcResult, String.class);
         Assertions.assertEquals(JSON.parseObject("{}"), JSON.parseObject(resultData));
+    }
+
+    @Test
+    @Order(104)
+    public void testJsonSchemaAutoGenerate() throws Exception {
+        String jsonString = """
+                {"id":null,"title":null,"example":null,"type":"object","description":null,"items":null,"properties":{"array":{"id":null,"title":null,"example":null,"type":"array","description":null,"items":[{"id":null,"title":null,"example":"","type":"string","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true},{"id":null,"title":null,"example":"","type":"number","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true}],"properties":null,"additionalProperties":null,"required":null,"defaultValue":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true},"string":{"id":null,"title":null,"example":"","type":"string","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true},"int":{"id":null,"title":null,"example":"","type":"integer","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true},"num":{"id":null,"title":null,"example":"","type":"number","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true},"boolean":{"id":null,"title":null,"example":"","type":"boolean","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true},"null":{"id":null,"title":null,"example":null,"type":"null","description":null,"items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true}},"additionalProperties":null,"required":null,"defaultValue":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true}
+                """;
+        // 默认生成
+        requestPost(JSON_SCHEMA_AUTO_GENERATE, JSON.parseObject(jsonString, JsonSchemaItem.class));
+        // 带枚举值
+        jsonString = """
+                {"type":"object","enable":true,"properties":{"array":{"type":"array","enable":true,"items":[{"type":"string","example":"","description":"","additionalProperties":null,"defaultValue":"","pattern":null,"maxLength":4,"minLength":0,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enable":true,"regex":"^[A-Z]"},{"type":"number","example":"","description":"","additionalProperties":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enable":true}]},"string":{"type":"string","example":"","description":"","additionalProperties":null,"defaultValue":"","pattern":null,"maxLength":5,"minLength":1,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":["11111","22222"],"enable":true},"int":{"type":"integer","example":"","description":"","additionalProperties":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":0,"maximum":4,"maxItems":null,"minItems":null,"format":null,"enumValues":["111","2333","444"],"enable":true},"num":{"type":"number","example":"","description":"","additionalProperties":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":0,"maximum":5,"maxItems":null,"minItems":null,"format":null,"enumValues":["111","222","3333"],"enable":true},"boolean":{"type":"boolean","example":"","description":"","additionalProperties":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enable":true},"null":{"type":"null","enable":true}}}
+                """;
+        requestPostWithOk(JSON_SCHEMA_AUTO_GENERATE, JSON.parseObject(jsonString, JsonSchemaItem.class));
+
+        // 默认值和正则
+        jsonString = """
+                {"id":null,"title":null,"example":null,"type":"object","description":null,"items":null,"properties":{"array":{"id":null,"title":null,"example":null,"type":"array","description":null,"items":[{"id":null,"title":null,"example":"","type":"string","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":"默认值","pattern":null,"maxLength":4,"minLength":0,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true},{"id":null,"title":null,"example":"","type":"number","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true}],"properties":null,"additionalProperties":null,"required":null,"defaultValue":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true},"string":{"id":null,"title":null,"example":"","type":"string","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":"","pattern":"[A-Z0-9_]+","maxLength":5,"minLength":1,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true},"int":{"id":null,"title":null,"example":"","type":"integer","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":3,"pattern":null,"maxLength":null,"minLength":null,"minimum":0,"maximum":4,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true},"num":{"id":null,"title":null,"example":"","type":"number","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":2,"pattern":null,"maxLength":null,"minLength":null,"minimum":0,"maximum":5,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true},"boolean":{"id":null,"title":null,"example":"","type":"boolean","description":"","items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":"true","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true},"null":{"id":null,"title":null,"example":null,"type":"null","description":null,"items":null,"properties":null,"additionalProperties":null,"required":null,"defaultValue":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true}},"additionalProperties":null,"required":null,"defaultValue":null,"pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enumValues":null,"enable":true}
+                """;
+        requestPostWithOk(JSON_SCHEMA_AUTO_GENERATE, JSON.parseObject(jsonString, JsonSchemaItem.class));
+
+        // 长度截取
+        jsonString = """
+                {"type":"object","enable":true,"properties":{"arraywww":{"type":"array","enable":true,"items":[{"type":"string","example":"1","description":"","additionalProperties":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enable":true},{"type":"number","example":"2","description":"","additionalProperties":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enable":true}],"minItems":null,"maxItems":null},"string":{"type":"string","example":"@natural(1,100)","description":"","additionalProperties":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enable":true},"int":{"type":"integer","example":"intValue","description":"","additionalProperties":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enable":true},"num":{"type":"number","example":"","description":"","additionalProperties":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enable":true},"boolean":{"type":"boolean","example":"booleanValue","description":"","additionalProperties":null,"defaultValue":"","pattern":null,"maxLength":null,"minLength":null,"minimum":null,"maximum":null,"maxItems":null,"minItems":null,"format":null,"enable":true},"null":{"type":"null","enable":true},"默认值大于最大长度":{"type":"string","example":"","description":"","enable":true,"defaultValue":"sdfdsd","maxLength":1,"minLength":0},"默认值小于最小长度":{"type":"string","example":"","description":"","enable":true,"defaultValue":"1","maxLength":3,"minLength":2},"数组项小于最小项":{"type":"array","enable":true,"items":[],"minItems":2,"maxItems":3},"数组项大于最大项":{"type":"array","enable":true,"items":[null,null],"minItems":0,"maxItems":1},"正则大于最大长度":{"type":"string","example":"","description":"","enable":true,"defaultValue":"","maxLength":2,"minLength":0,"pattern":"[A-Z]{4}"}}}
+                """;
+        requestPostWithOk(JSON_SCHEMA_AUTO_GENERATE, JSON.parseObject(jsonString, JsonSchemaItem.class));
+
+        // 字符串自动生成
+        jsonString = """
+                {"type":"object","enable":true,"properties":{"默认8位":{"type":"string","example":"","description":"","enable":true,"defaultValue":"","format":"date-time"},"最小2位":{"type":"string","example":"","description":"","enable":true,"defaultValue":"","minLength":2},"最大4":{"type":"string","example":"","description":"","enable":true,"defaultValue":"","maxLength":4},"最小2位，最大4":{"type":"string","example":"","description":"","enable":true,"defaultValue":"","maxLength":4,"minLength":2}}}
+                """;
+        requestPostWithOk(JSON_SCHEMA_AUTO_GENERATE, JSON.parseObject(jsonString, JsonSchemaItem.class));
     }
 
     @Test
@@ -1863,14 +1909,8 @@ public class ApiDefinitionControllerTests extends BaseTest {
         request.setProjectId(DEFAULT_PROJECT_ID);
         request.setProtocols(List.of("HTTP"));
         request.setSelectAll(false);
-        request.setSelectIds(List.of("1001"));
-        MvcResult mvcResult = this.requestPostWithOkAndReturn(EXPORT + "swagger", request);
-        String returnData = mvcResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        ResultHolder resultHolder = JSON.parseObject(returnData, ResultHolder.class);
-        // 返回请求正常
-        Assertions.assertNotNull(resultHolder);
-        Pager<?> pageData = JSON.parseObject(JSON.toJSONString(resultHolder.getData()), Pager.class);
-        Assertions.assertNotNull(pageData);
+        request.setSelectIds(List.of("1002"));
+        this.requestPost(EXPORT + "swagger", request);
     }
 
 }

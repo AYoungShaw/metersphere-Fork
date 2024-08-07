@@ -12,6 +12,7 @@
         props.disabled ? 'ms-form-table--disabled' : '',
       ]"
       bordered
+      :row-class="rowClass"
       v-on="propsEvent"
       @drag-change="tableChange"
       @init-end="validateAndUpdateErrorMessageList"
@@ -20,13 +21,28 @@
     >
       <!-- 展开行-->
       <template #expand-icon="{ expanded, record }">
-        <div
-          class="flex items-end gap-[2px] text-[var(--color-text-4)]"
-          :class="expanded ? '!text-[rgb(var(--primary-5))]' : ''"
+        <a-tooltip
+          :content="
+            t(
+              record.children.length === 0
+                ? 'msFormTable.noChildren'
+                : expanded
+                ? 'msFormTable.collapse'
+                : 'msFormTable.expand'
+            )
+          "
         >
-          <MsIcon type="icon-icon_split_turn-down_arrow" />
-          <div v-if="record.children" class="break-keep">{{ record.children.length }}</div>
-        </div>
+          <div
+            class="flex items-end gap-[2px] text-[var(--color-text-4)]"
+            :class="[
+              expanded ? '!text-[rgb(var(--primary-5))]' : '',
+              record.children.length === 0 ? 'cursor-not-allowed' : '',
+            ]"
+          >
+            <MsIcon type="icon-icon_split_turn-down_arrow" />
+            <div v-if="record.children" class="break-keep">{{ record.children.length }}</div>
+          </div>
+        </a-tooltip>
       </template>
       <template
         v-for="item of props.columns.filter((e) => e.slotName !== undefined)"
@@ -38,7 +54,7 @@
           label=""
           :rules="{
             validator: (value, callback) => {
-              validRepeat(rowIndex, item.dataIndex as string, value, callback);
+              validRepeat(rowIndex, item.dataIndex as string, record[item.dataIndex as string], record, callback);
             },
           }"
           :disabled="props.disabled || item.disabled || record.disabled"
@@ -51,17 +67,16 @@
               v-if="item.hasRequired"
               :content="t(record.required ? 'msFormTable.paramRequired' : 'msFormTable.paramNotRequired')"
             >
-              <MsButton
-                type="icon"
+              <div
+                class="ms-form-table-required-button"
                 :class="[
-                  record.required ? '!text-[rgb(var(--danger-5))]' : '!text-[var(--color-text-brand)]',
-                  '!mr-[4px] !p-[4px]',
+                  record.required ? 'ms-form-table-required-button--required' : '',
+                  props.disabled ? 'ms-form-table-required-button--disabled' : '',
                 ]"
-                :size="item.size || 'medium'"
-                @click="toggleRequired(record, rowIndex, item)"
+                @click="toggleRequired(record, rowIndex, column)"
               >
-                <div>*</div>
-              </MsButton>
+                <article>*</article>
+              </div>
             </a-tooltip>
             <div v-if="item.isNull && item.isNull(record)" class="ms-form-table-td-text">-</div>
             <a-input
@@ -144,6 +159,7 @@
               class="ms-form-table-input"
               :auto-size="{ minRows: 1, maxRows: 1 }"
               :size="item.size || 'medium'"
+              :max-length="item.maxLength"
               @input="() => handleFormChange(record, rowIndex, item)"
             ></a-textarea>
             <MsQuickInput
@@ -151,9 +167,11 @@
               v-model:model-value="record[item.dataIndex as string]"
               :title="item.title as string || ''"
               :disabled="props.disabled || item.disabled || record.disabled"
+              :max-length="item.maxLength"
               class="ms-form-table-input"
               type="textarea"
               @input="() => handleFormChange(record, rowIndex, item)"
+              @change="() => handleFormChange(record, rowIndex, item)"
             >
             </MsQuickInput>
             <template v-else-if="item.inputType === 'text'">
@@ -212,10 +230,9 @@
   import { FormInstance } from '@arco-design/web-vue';
   import { cloneDeep } from 'lodash-es';
 
-  import MsButton from '@/components/pure/ms-button/index.vue';
   import MsIcon from '@/components/pure/ms-icon-font/index.vue';
   import MsBaseTable from '@/components/pure/ms-table/base-table.vue';
-  import type { MsTableColumnData } from '@/components/pure/ms-table/type';
+  import type { MsTableColumnData, MsTableProps } from '@/components/pure/ms-table/type';
   import useTable from '@/components/pure/ms-table/useTable';
   import MsTableMoreAction from '@/components/pure/ms-table-more-action/index.vue';
   import MsTagsInput from '@/components/pure/ms-tags-input/index.vue';
@@ -278,6 +295,7 @@
       disabled?: boolean; // 是否禁用
       showSelectorAll?: boolean; // 是否显示全选
       rowSelection?: TableRowSelection;
+      diffMode?: 'add' | 'delete';
       spanMethod?: (data: {
         record: TableData;
         column: TableColumnData | TableOperationColumn;
@@ -318,7 +336,7 @@
     }
   }
 
-  const { propsRes, propsEvent } = useTable(() => Promise.resolve([]), {
+  const tableProps = ref<Partial<MsTableProps<Record<string, any>>>>({
     firstColumnWidth: 32,
     tableKey: props.showSetting ? props.tableKey : undefined,
     scroll: props.scroll,
@@ -332,6 +350,8 @@
     showPagination: false,
     rowSelection: props.selectable ? undefined : props.rowSelection,
   });
+
+  const { propsRes, propsEvent } = useTable(() => Promise.resolve([]), tableProps.value);
   const selectedKeys = computed(() => propsRes.value.data.filter((e) => e.enable).map((e) => e.id));
   propsEvent.value.rowSelectChange = (record: Record<string, any>) => {
     propsRes.value.data = propsRes.value.data.map((e) => {
@@ -354,17 +374,31 @@
 
   // 校验重复
   const formRef = ref<FormInstance>();
-  async function validRepeat(rowIndex: number, dataIndex: string, value: any, callback: (error?: string) => void) {
+  async function validRepeat(
+    rowIndex: number,
+    dataIndex: string,
+    value: any,
+    record: Record<string, any>,
+    callback: (error?: string) => void
+  ) {
     const currentColumn = props.columns.find((item) => item.dataIndex === dataIndex);
     if (!currentColumn?.needValidRepeat) {
       callback();
       return;
     }
-    propsRes.value.data?.forEach((row, index) => {
-      if (row[dataIndex].length && index !== rowIndex && row[dataIndex] === value) {
-        callback(`${t(currentColumn?.title as string)}${t('msFormTable.paramRepeatMessage')}`);
-      }
-    });
+    if (record.parent) {
+      (record.parent.children as Record<string, any>[])?.forEach((row, index) => {
+        if (row[dataIndex].length && index !== rowIndex && row[dataIndex] === value) {
+          callback(`${t(currentColumn?.title as string)}${t('msFormTable.paramRepeatMessage')}`);
+        }
+      });
+    } else {
+      propsRes.value.data?.forEach((row, index) => {
+        if (row[dataIndex].length && index !== rowIndex && row[dataIndex] === value) {
+          callback(`${t(currentColumn?.title as string)}${t('msFormTable.paramRepeatMessage')}`);
+        }
+      });
+    }
     callback();
   }
 
@@ -444,6 +478,9 @@
   }
 
   function toggleRequired(record: Record<string, any>, rowIndex: number, columnConfig: FormTableColumn) {
+    if (props.disabled) {
+      return;
+    }
     record.required = !record.required;
     emit('formChange', record, columnConfig, rowIndex);
     addTableLine(rowIndex, columnConfig.addLineDisabled);
@@ -502,6 +539,22 @@
     emit('selectAll', checked);
   }
 
+  function rowClass(record: TableData, rowIndex: number) {
+    if (record.diff) {
+      if (props.diffMode === 'add') {
+        return 'add-row-class';
+      }
+      if (props.diffMode === 'delete') {
+        return 'delete-row-class';
+      }
+    }
+    return '';
+  }
+
+  defineExpose({
+    validateAndUpdateErrorMessageList,
+  });
+
   await initColumns();
 </script>
 
@@ -557,7 +610,7 @@
   .ms-form-table--disabled {
     :deep(.arco-table-td-content) {
       span,
-      div {
+      div:not(.ms-form-table-required-button--required) {
         color: var(--color-text-4) !important;
       }
     }
@@ -678,6 +731,22 @@
     }
     .arco-form-item-content-flex {
       flex-wrap: nowrap;
+    }
+  }
+  :deep(.add-row-class) {
+    .arco-table-td {
+      background: rgb(var(--success-1));
+      .arco-table-td-content {
+        background: rgb(var(--success-1));
+      }
+    }
+  }
+  :deep(.delete-row-class) {
+    .arco-table-td {
+      background: rgb(var(--danger-1));
+      .arco-table-td-content {
+        background: rgb(var(--danger-1));
+      }
     }
   }
 </style>

@@ -24,9 +24,9 @@
       </div>
     </template>
     <template #typeTitle="{ columnConfig }">
-      <div class="flex items-center text-[var(--color-text-3)]">
+      <div class="flex items-center text-[var(--color-text-3)]" :class="columnConfig.hasRequired ? 'pl-[30px]' : ''">
         {{ t((columnConfig.title as string) || 'apiTestDebug.paramType') }}
-        <a-tooltip :disabled="!columnConfig.typeTitleTooltip" position="right">
+        <a-tooltip v-if="columnConfig.typeTitleTooltip" :disabled="!columnConfig.typeTitleTooltip" position="right">
           <template #content>
             <template v-if="Array.isArray(columnConfig.typeTitleTooltip)">
               <div v-for="tip of columnConfig.typeTitleTooltip" :key="tip">{{ tip }}</div>
@@ -94,7 +94,7 @@
       >
         <template #content>
           <div class="ms-params-popover-title">
-            {{ t('apiTestDebug.paramName') }}
+            {{ t(columnConfig.title as string) }}
           </div>
           <div class="ms-params-popover-value">
             {{ record[columnConfig.dataIndex as string] }}
@@ -124,9 +124,17 @@
           v-model:model-value="record[columnConfig.dataIndex as string]"
           :disabled="props.disabledExceptParam || columnConfig.disabledColumn"
           :placeholder="t('apiTestDebug.commonPlaceholder')"
-          class="ms-form-table-input ms-form-table-input--hasPlaceholder"
+          class="ms-form-table-input ms-params-input ms-form-table-input--hasPlaceholder"
           @input="() => addTableLine(rowIndex, columnConfig.addLineDisabled)"
-        />
+        >
+          <template v-if="props.showQuickCopy" #suffix>
+            <MsIcon
+              type="icon-icon_copy_outlined"
+              class="ms-params-input-suffix-icon"
+              @click="copyParamsName(record[columnConfig.dataIndex as string])"
+            />
+          </template>
+        </a-input>
       </a-popover>
     </template>
     <template #name="{ record, columnConfig, rowIndex }">
@@ -149,7 +157,15 @@
           :placeholder="t('apiTestDebug.commonPlaceholder')"
           class="ms-form-table-input ms-form-table-input--hasPlaceholder"
           @input="() => addTableLine(rowIndex, columnConfig.addLineDisabled)"
-        />
+        >
+          <template v-if="props.showQuickCopy" #suffix>
+            <MsIcon
+              type="icon-icon_copy_outlined"
+              class="ms-params-input-suffix-icon"
+              @click="copyParamsName(record[columnConfig.dataIndex as string])"
+            />
+          </template>
+        </a-input>
       </a-popover>
     </template>
     <!-- 参数类型 -->
@@ -158,17 +174,16 @@
         v-if="columnConfig.hasRequired"
         :content="t(record.required ? 'apiTestDebug.paramRequired' : 'apiTestDebug.paramNotRequired')"
       >
-        <MsButton
-          :disabled="props.disabledExceptParam"
-          type="icon"
+        <div
+          class="ms-form-table-required-button"
           :class="[
-            record.required ? '!text-[rgb(var(--danger-5))]' : '!text-[var(--color-text-brand)]',
-            '!mr-[4px] !p-[4px]',
+            record.required ? 'ms-form-table-required-button--required' : '',
+            props.disabledExceptParam || props.disabledParamValue ? 'ms-form-table-required-button--disabled' : '',
           ]"
           @click="toggleRequired(record, rowIndex)"
         >
-          <div>*</div>
-        </MsButton>
+          <article>*</article>
+        </div>
       </a-tooltip>
       <a-select
         v-model:model-value="record.paramType"
@@ -269,8 +284,8 @@
         v-model:value="record.value"
         :disabled="props.disabledParamValue"
         @change="() => addTableLine(rowIndex, columnConfig.addLineDisabled)"
-        @dblclick="() => quickInputParams(record)"
         @apply="() => addTableLine(rowIndex, columnConfig.addLineDisabled)"
+        @set-params="() => quickInputParams(record)"
       />
     </template>
     <!-- 文件 -->
@@ -400,17 +415,16 @@
         v-if="columnConfig.hasRequired"
         :content="t(record.required ? 'apiTestDebug.paramRequired' : 'apiTestDebug.paramNotRequired')"
       >
-        <MsButton
-          type="icon"
+        <div
+          class="ms-form-table-required-button"
           :class="[
-            record.required ? '!text-[rgb(var(--danger-5))]' : '!text-[var(--color-text-brand)]',
-            '!mr-[4px] !p-[4px]',
+            record.required ? 'ms-form-table-required-button--required' : '',
+            props.disabledExceptParam || props.disabledParamValue ? 'ms-form-table-required-button--disabled' : '',
           ]"
-          :disabled="props.disabledExceptParam"
           @click="toggleRequired(record, rowIndex)"
         >
-          <div>*</div>
-        </MsButton>
+          <article>*</article>
+        </div>
       </a-tooltip>
       <a-input
         v-model="record.expectedValue"
@@ -590,7 +604,8 @@
 </template>
 
 <script async setup lang="ts">
-  import { TableColumnData, TableData } from '@arco-design/web-vue';
+  import { useClipboard } from '@vueuse/core';
+  import { Message, TableColumnData, TableData } from '@arco-design/web-vue';
   import { cloneDeep } from 'lodash-es';
 
   import { NO_CHECK } from '@/components/pure/ms-advance-filter/index';
@@ -626,6 +641,7 @@
   // 异步加载组件
   const MsAddAttachment = defineAsyncComponent(() => import('@/components/business/ms-add-attachment/index.vue'));
   const MsParamsInput = defineAsyncComponent(() => import('@/components/business/ms-params-input/index.vue'));
+  const { copy, isSupported } = useClipboard({ legacy: true });
 
   export interface ParamTableColumn extends FormTableColumn {
     isAutoComplete?: boolean; // 用于 key 列区分是否是请求/响应头联想输入
@@ -676,6 +692,7 @@
       deleteIntercept?: (record: any, deleteCall: () => void) => void; // 删除行拦截器
       typeChangeIntercept?: (record: any, doChange: () => void) => void; // type 列切换拦截
       enableChangeIntercept?: (record: any, val: string | number | boolean) => boolean | Promise<boolean>; // enable 列切换拦截
+      showQuickCopy?: boolean; // 显示快捷复制icon
     }>(),
     {
       params: () => [],
@@ -855,9 +872,9 @@
       const lastLineData = paramsData.value[rowIndex]; // 上一行数据
       const selectColumnKeys = props.columns.filter((e) => e.options).map((e) => e.dataIndex); // 找到下拉框选项的列
       const nextLine = {
+        ...cloneDeep(defaultLineData.value), // 深拷贝，避免有嵌套引用类型，数据隔离
         id,
         enable: true, // 是否勾选
-        ...cloneDeep(defaultLineData.value), // 深拷贝，避免有嵌套引用类型，数据隔离
       } as any;
       selectColumnKeys.forEach((key) => {
         // 如果是更改了下拉框导致添加新的一列，需要将更改后的下拉框的值应用到下一行（产品为了方便统一输入参数类型）
@@ -937,6 +954,9 @@
   );
 
   function toggleRequired(record: Record<string, any>, rowIndex: number) {
+    if (props.disabledExceptParam || props.disabledParamValue) {
+      return;
+    }
     record.required = !record.required;
     addTableLine(rowIndex);
     emitChange('toggleRequired');
@@ -1203,6 +1223,14 @@
 
   function selectAutoComplete(val: string, record: Record<string, any>, item: FormTableColumn) {
     record[item.dataIndex as string] = val;
+  }
+
+  function copyParamsName(value: string) {
+    const copyValue = `\${${value}}`;
+    if (isSupported) {
+      copy(copyValue);
+      Message.info(t('common.copySuccessToClipboard'));
+    }
   }
 
   const isDisabledCondition = ref([NO_CHECK.value]);

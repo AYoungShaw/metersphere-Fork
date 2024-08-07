@@ -36,6 +36,7 @@
     </div>
     <conditionContent
       v-model:data="activeItem"
+      :condition-type="props.conditionType"
       :disabled="props.disabled"
       :total-list="list"
       :response="props.response"
@@ -43,6 +44,7 @@
       :show-pre-post-request="props.showPrePostRequest"
       :request-radio-text-props="props.requestRadioTextProps"
       :sql-code-editor-height="props.sqlCodeEditorHeight"
+      :show-quick-copy="props.showQuickCopy"
       @copy="copyListItem"
       @delete="deleteListItem"
       @change="changeHandler"
@@ -65,6 +67,7 @@
 
   const props = withDefaults(
     defineProps<{
+      conditionType: 'preOperation' | 'postOperation' | 'assertion' | 'scenario'; // 前置、后置、断言、场景
       disabled?: boolean;
       conditionTypes: Array<ConditionType>;
       addText: string;
@@ -73,6 +76,7 @@
       showAssociatedScene?: boolean;
       showPrePostRequest?: boolean; // 是否展示前后置请求忽略选项
       sqlCodeEditorHeight?: string;
+      showQuickCopy?: boolean; // 显示快捷复制icon
     }>(),
     {
       showAssociatedScene: false,

@@ -12,6 +12,7 @@ import { getPackageType, getSystemVersion } from '@/api/modules/system';
 import { getMenuList } from '@/api/modules/user';
 import defaultSettings from '@/config/settings.json';
 import { useI18n } from '@/hooks/useI18n';
+import useUser from '@/hooks/useUser';
 import router from '@/router';
 import { NO_PROJECT_ROUTE_NAME } from '@/router/constants';
 import { watchStyle, watchTheme } from '@/utils/theme';
@@ -48,6 +49,7 @@ const useAppStore = defineStore('app', {
     ...defaultSettings,
     loading: false,
     loadingTip: '',
+    loginLoading: false,
     topMenus: [] as RouteRecordRaw[],
     currentTopMenu: {} as RouteRecordRaw,
     breadcrumbList: [] as BreadcrumbItem[],
@@ -111,6 +113,12 @@ const useAppStore = defineStore('app', {
     },
     getEnvList(state: AppState): EnvironmentItem[] {
       return state.envList;
+    },
+    getLoginLoadingStatus(state: AppState): boolean {
+      return state.loginLoading;
+    },
+    getPackageType(state: AppState): string {
+      return state.packageType;
     },
   },
   actions: {
@@ -233,6 +241,12 @@ const useAppStore = defineStore('app', {
       this.packageType = '';
     },
     /**
+     * 设置登录页面的loading
+     */
+    setLoginLoading(value: boolean) {
+      this.loginLoading = value;
+    },
+    /**
      * 获取系统版本
      */
     async initSystemVersion() {
@@ -257,7 +271,10 @@ const useAppStore = defineStore('app', {
     },
     async getProjectInfos() {
       try {
-        if (!this.currentProjectId) {
+        const { isWhiteListPage } = useUser();
+        const routeName = router.currentRoute.value.name as string;
+        if (!this.currentProjectId || routeName?.includes('setting') || isWhiteListPage()) {
+          // 如果没有项目id，或访问的是系统设置下的页面/白名单页面，则不读取项目基础信息
           return;
         }
         const res = await getProjectInfo(this.currentProjectId);

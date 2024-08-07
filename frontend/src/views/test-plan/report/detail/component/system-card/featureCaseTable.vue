@@ -1,5 +1,8 @@
 <template>
   <MsBaseTable v-bind="propsRes" v-on="propsEvent">
+    <template #num="{ record }">
+      <MsButton :disabled="!props.isPreview" type="text" @click="toDetail(record)">{{ record.num }}</MsButton>
+    </template>
     <template #caseLevel="{ record }">
       <CaseLevel :case-level="record.priority" />
     </template>
@@ -15,7 +18,7 @@
   </MsBaseTable>
   <MsDrawer
     v-model:visible="showDetailVisible"
-    :title="t('ms.case.associate.title')"
+    :title="t('common.detail')"
     :width="1200"
     :footer="false"
     no-content-padding
@@ -28,7 +31,8 @@
 </template>
 
 <script setup lang="ts">
-  import { onBeforeMount } from 'vue';
+  import { TableSortable } from '@arco-design/web-vue';
+  import { cloneDeep } from 'lodash-es';
 
   import MsButton from '@/components/pure/ms-button/index.vue';
   import MsDrawer from '@/components/pure/ms-drawer/index.vue';
@@ -45,14 +49,18 @@
     getReportShareFeatureCaseList,
   } from '@/api/modules/test-plan/report';
   import { useI18n } from '@/hooks/useI18n';
+  import useOpenNewPage from '@/hooks/useOpenNewPage';
 
   import { FeatureCaseItem } from '@/models/testPlan/report';
   import type { ExecuteHistoryItem } from '@/models/testPlan/testPlan';
+  import { CaseManagementRouteEnum } from '@/enums/routeEnum';
   import { FilterSlotNameEnum } from '@/enums/tableFilterEnum';
   import { ReportCardTypeEnum } from '@/enums/testPlanReportEnum';
 
   import { executionResultMap } from '@/views/case-management/caseManagementFeature/components/utils';
   import { detailTableExample } from '@/views/test-plan/report/detail/component/reportConfig';
+
+  const { openNewPage } = useOpenNewPage();
 
   const props = defineProps<{
     reportId: string;
@@ -62,16 +70,22 @@
   }>();
   const { t } = useI18n();
 
+  const sortableConfig = computed<TableSortable | undefined>(() => {
+    return props.isPreview
+      ? {
+          sortDirections: ['ascend', 'descend'],
+          sorter: true,
+        }
+      : undefined;
+  });
+
   const staticColumns: MsTableColumn = [
     {
       title: 'ID',
       dataIndex: 'num',
       slotName: 'num',
       sortIndex: 1,
-      sortable: {
-        sortDirections: ['ascend', 'descend'],
-        sorter: true,
-      },
+      sortable: cloneDeep(sortableConfig.value),
       fixed: 'left',
       width: 100,
       ellipsis: true,
@@ -81,10 +95,7 @@
       title: 'case.caseName',
       dataIndex: 'name',
       showTooltip: true,
-      sortable: {
-        sortDirections: ['ascend', 'descend'],
-        sorter: true,
-      },
+      sortable: cloneDeep(sortableConfig.value),
       width: 180,
     },
     {
@@ -94,7 +105,7 @@
       filterConfig: {
         valueKey: 'key',
         labelKey: 'statusText',
-        options: Object.values(executionResultMap),
+        options: props.isPreview ? Object.values(executionResultMap) : [],
         filterSlotName: FilterSlotNameEnum.CASE_MANAGEMENT_EXECUTE_RESULT,
       },
       width: 150,
@@ -127,11 +138,11 @@
       width: 100,
     },
   ];
-  // TODO 计划组用例明细字段接口目前还没有
+
   const testPlanNameColumns: MsTableColumn = [
     {
       title: 'report.plan.name',
-      dataIndex: 'name',
+      dataIndex: 'planName',
       showTooltip: true,
       width: 200,
     },
@@ -158,14 +169,27 @@
     setLoadListParams({ reportId: props.reportId, shareId: props.shareId ?? undefined });
     loadList();
   }
+  // 跳转用例详情
+  function toDetail(record: FeatureCaseItem) {
+    openNewPage(CaseManagementRouteEnum.CASE_MANAGEMENT_CASE, {
+      id: record.id,
+      pId: record.projectId,
+    });
+  }
 
-  watchEffect(() => {
-    if (props.reportId && props.isPreview) {
-      loadCaseList();
-    } else {
-      propsRes.value.data = detailTableExample[ReportCardTypeEnum.FUNCTIONAL_DETAIL];
+  watch(
+    [() => props.reportId, () => props.isPreview],
+    () => {
+      if (props.reportId && props.isPreview) {
+        loadCaseList();
+      } else {
+        propsRes.value.data = detailTableExample[ReportCardTypeEnum.FUNCTIONAL_DETAIL];
+      }
+    },
+    {
+      immediate: true,
     }
-  });
+  );
 
   const showDetailVisible = ref<boolean>(false);
 
@@ -182,6 +206,7 @@
       });
       executeList.value = [res];
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.log(error);
     } finally {
       executeLoading.value = false;

@@ -9,6 +9,7 @@
     :ok-disabled="requestVModel.executeLoading || (isHttpProtocol && !requestVModel.url)"
     :handle-before-cancel="handleBeforeCancel"
     show-full-screen
+    unmount-on-close
     @confirm="handleSave"
     @continue="handleContinue"
     @close="handleClose"
@@ -86,7 +87,7 @@
             @replace="handleReplace"
           />
           <MsButton type="icon" status="secondary" class="mr-4" @click="emit('deleteStep')">
-            <MsIcon type="icon-icon_delete-trash_outlined" />
+            <MsIcon type="icon-icon_delete-trash_outlined1" />
             {{ t('common.delete') }}
           </MsButton>
         </div>
@@ -110,7 +111,6 @@
             :loading="protocolLoading"
             :disabled="_stepType.isQuoteApi || props.step?.isQuoteScenarioStep"
             class="w-[90px]"
-            @change="(val) => handleActiveDebugProtocolChange(val as string)"
           >
             <a-tooltip
               v-for="item of protocolOptions"
@@ -360,7 +360,6 @@
   import { TabErrorMessage } from '@/views/api-test/components/requestComposition/index.vue';
   import postcondition from '@/views/api-test/components/requestComposition/postcondition.vue';
   import precondition from '@/views/api-test/components/requestComposition/precondition.vue';
-  import response from '@/views/api-test/components/requestComposition/response/index.vue';
   import setting from '@/views/api-test/components/requestComposition/setting.vue';
 
   import { getPluginScript, getProtocolList } from '@/api/modules/api-test/common';
@@ -370,6 +369,7 @@
   import { useAppStore } from '@/store';
   import { getGenerateId, parseQueryParams } from '@/utils';
   import { scrollIntoView } from '@/utils/dom';
+  import { getLocalStorage, setLocalStorage } from '@/utils/local-storage';
 
   import {
     EnableKeyValueParam,
@@ -385,6 +385,7 @@
   import { ScenarioStepFileParams, ScenarioStepItem } from '@/models/apiTest/scenario';
   import type { EnvConfig } from '@/models/projectManagement/environmental';
   import {
+    ProtocolKeyEnum,
     RequestAuthType,
     RequestBodyFormat,
     RequestComposition,
@@ -414,6 +415,9 @@
   const httpBody = defineAsyncComponent(() => import('@/views/api-test/components/requestComposition/body.vue'));
   const httpQuery = defineAsyncComponent(() => import('@/views/api-test/components/requestComposition/query.vue'));
   const httpRest = defineAsyncComponent(() => import('@/views/api-test/components/requestComposition/rest.vue'));
+  const response = defineAsyncComponent(
+    () => import('@/views/api-test/components/requestComposition/response/index.vue')
+  );
   // const addDependencyDrawer = defineAsyncComponent(
   //   () => import('@/views/api-test/management/components/addDependencyDrawer.vue')
   // );
@@ -1273,6 +1277,16 @@
   );
 
   watch(
+    () => requestVModel.value.protocol,
+    (val) => {
+      if (requestVModel.value.isNew) {
+        setLocalStorage(ProtocolKeyEnum.API_SCENARIO_CUSTOM_PROTOCOL, val);
+      }
+      handleActiveDebugProtocolChange(val);
+    }
+  );
+
+  watch(
     () => visible.value,
     async (val) => {
       if (val) {
@@ -1304,17 +1318,23 @@
           handleActiveDebugProtocolChange(requestVModel.value.protocol);
         } else {
           // 新建自定义请求
+          const localProtocol = getLocalStorage<string>(ProtocolKeyEnum.API_SCENARIO_CUSTOM_PROTOCOL);
           const id = getGenerateId();
           requestVModel.value = cloneDeep({
             ...defaultApiParams,
             stepId: id,
             uniqueId: id,
+            protocol:
+              localProtocol?.length && protocolOptions.value.some((item) => item.value === localProtocol)
+                ? localProtocol
+                : 'HTTP',
           });
         }
         requestVModel.value.activeTab = contentTabList.value[0].value;
         if (requestVModel.value.protocol === 'HTTP') {
           setDefaultActiveTab();
         }
+        handleActiveDebugProtocolChange(requestVModel.value.protocol);
         nextTick(() => {
           isSwitchingContent.value = false;
         });

@@ -12,8 +12,9 @@
       :max-length="255"
     />
     <TreeFolderAll
+      ref="treeFolderAllRef"
       v-model:isExpandAll="isExpandAll"
-      v-model:selectedProtocols="selectedProtocols"
+      :protocol-key="ProtocolKeyEnum.TEST_PLAN_API_CASE_PROTOCOL"
       :active-folder="activeFolder"
       :folder-name="t('testPlan.testPlanIndex.apiCase')"
       :all-count="allCount"
@@ -21,7 +22,6 @@
       @set-active-folder="setActiveFolder"
       @selected-protocols-change="selectedProtocolsChange"
     />
-    <a-divider class="my-[8px]" />
     <a-spin class="min-h-[200px] w-full" :loading="loading">
       <MsTree
         :selected-keys="selectedKeys"
@@ -67,6 +67,7 @@
   import { getNodeParentId } from '@/utils/tree';
 
   import { ModuleTreeNode } from '@/models/common';
+  import { ProtocolKeyEnum } from '@/enums/apiEnum';
 
   const props = defineProps<{
     modulesCount?: Record<string, number>; // 模块数量统计对象
@@ -117,7 +118,8 @@
   const folderTree = ref<ModuleTreeNode[]>([]);
   const loading = ref(false);
   const selectedKeys = useVModel(props, 'selectedKeys', emit);
-  const selectedProtocols = ref<string[]>([]);
+  const treeFolderAllRef = ref<InstanceType<typeof TreeFolderAll>>();
+  const selectedProtocols = computed<string[]>(() => treeFolderAllRef.value?.selectedProtocols ?? []);
 
   //  初始化模块树
   async function initModules() {

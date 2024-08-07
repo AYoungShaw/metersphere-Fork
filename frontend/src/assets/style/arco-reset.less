@@ -213,6 +213,12 @@
   .btn-text-sec-active();
   .btn-text-sec-disabled();
 }
+.arco-btn-text--primary {
+  color: rgb(var(--primary-5)) !important;
+  .btn-text-primary-hover();
+  .btn-text-primary-active();
+  .btn-text-primary-disabled();
+}
 .arco-btn-text--secondary {
   color: var(--color-text-3) !important;
   .btn-text-sec-hover();
@@ -432,12 +438,12 @@
 /** 多选框 **/
 .arco-checkbox-checked {
   .arco-checkbox-icon {
-    @apply !border-none;
+    border: 1px solid rgb(var(--primary-5)) !important;
   }
   .arco-checkbox-icon-check {
     @apply text-white;
 
-    background-color: rgb(var(--primary-6));
+    background-color: rgb(var(--primary-5));
   }
 }
 .arco-checkbox {
@@ -482,6 +488,7 @@
 
 /** radio **/
 .arco-radio-group-button {
+  padding: 2px;
   .arco-radio-button-content {
     @apply break-keep;
   }
@@ -490,6 +497,7 @@
   .arco-radio-button {
     @apply bg-transparent;
 
+    margin: 0;
     line-height: 20px;
   }
   .arco-radio-checked {

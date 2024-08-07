@@ -160,6 +160,7 @@ export default {
   'common.nameNotNull': '名称不能为空',
   'common.namePlaceholder': '请输入名称，按回车键保存',
   'common.unsavedLeave': '有标签页的内容未保存，离开后未保存的内容将丢失，确定要离开吗？',
+  'common.editUnsavedLeave': '编辑内容未保存，离开后未保存的内容将丢失，确定要离开吗？',
   'common.image': '图片',
   'common.text': '文本',
   'common.resourceDeleted': '资源已被删除',
@@ -198,4 +199,8 @@ export default {
   'common.auth_redirect_tip': '即将跳转至认证源页面进行认证',
   'common.default': '默认',
   'common.jump': '跳转',
+  'common.gotIt': '知道了',
+  'common.inputPleaseEnterTags': '请输入更新标签回车添加，不得超过64字符',
+  'common.cutSuccess': '剪切成功',
+  'common.copySuccessToClipboard': '已复制到剪切板',
 };

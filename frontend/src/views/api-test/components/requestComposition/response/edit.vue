@@ -108,7 +108,7 @@
                 ? 'font-medium !text-[rgb(var(--primary-5))]'
                 : '!text-[var(--color-text-4)]'
             "
-            @click="activeResponse.body.jsonBody.enableJsonSchema = true"
+            @click="handleChangeJsonType('Schema')"
           >
             Schema
           </MsButton>
@@ -121,7 +121,7 @@
                 ? 'font-medium !text-[rgb(var(--primary-5))]'
                 : '!text-[var(--color-text-4)]'
             "
-            @click="activeResponse.body.jsonBody.enableJsonSchema = false"
+            @click="handleChangeJsonType('Json')"
           >
             Json
           </MsButton>
@@ -147,7 +147,9 @@
         "
       >
         <MsJsonSchema
-          v-if="activeResponse.body.jsonBody.enableJsonSchema"
+          v-if="
+            activeResponse.body.jsonBody.enableJsonSchema && activeResponse.body.bodyType === ResponseBodyFormat.JSON
+          "
           ref="jsonSchemaRef"
           v-model:data="activeResponse.body.jsonBody.jsonSchemaTableData"
           v-model:selectedKeys="selectedKeys"
@@ -164,9 +166,16 @@
           :show-charset-change="false"
           show-code-format
         >
-          <template #rightTitle>
-            <a-button type="outline" class="arco-btn-outline--secondary p-[0_8px]" size="mini" @click="autoMakeJson">
-              <div class="text-[var(--color-text-1)]">{{ t('apiTestManagement.autoMake') }}</div>
+          <template #leftTitle>
+            <a-button
+              v-if="activeResponse.body.bodyType === ResponseBodyFormat.JSON"
+              type="text"
+              class="arco-btn-text--primary gap-[4px] p-[2px_6px]"
+              size="small"
+              @click="autoMakeJson"
+            >
+              <MsIcon :size="14" type="icon-icon_press" />
+              <div class="text-[12px]">{{ t('apiTestManagement.autoMake') }}</div>
             </a-button>
           </template>
         </MsCodeEditor>
@@ -246,7 +255,7 @@
   import paramTable, { ParamTableColumn } from '@/views/api-test/components/paramTable.vue';
   import popConfirm from '@/views/api-test/components/popConfirm.vue';
 
-  import { convertJsonSchemaToJson } from '@/api/modules/api-test/management';
+  import { jsonSchemaAutoGenerate } from '@/api/modules/api-test/management';
   import { responseHeaderOption } from '@/config/apiTest';
   import { useI18n } from '@/hooks/useI18n';
   import useAppStore from '@/store/modules/app';
@@ -423,7 +432,7 @@
         }
         if (schema) {
           // 再将 json schema 转换为 json 格式
-          const res = await convertJsonSchemaToJson(schema);
+          const res = await jsonSchemaAutoGenerate(schema);
           activeResponse.value.body.jsonBody.jsonValue = res;
         } else {
           Message.warning(t('apiTestManagement.pleaseInputJsonSchema'));
@@ -542,6 +551,13 @@
 
   function handleStatusCodeChange() {
     emit('change');
+  }
+
+  function handleChangeJsonType(type: 'Schema' | 'Json') {
+    activeResponse.value.body.jsonBody.enableJsonSchema = type === 'Schema';
+    if (activeResponse.value.body.jsonBody.jsonValue === '') {
+      autoMakeJson();
+    }
   }
 </script>
 

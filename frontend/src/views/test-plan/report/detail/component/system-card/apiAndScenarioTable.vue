@@ -72,9 +72,10 @@
     shareId?: string;
     activeType: ReportCardTypeEnum;
     isPreview?: boolean;
+    isGroup?: boolean;
   }>();
 
-  const columns: MsTableColumn = [
+  const staticColumns: MsTableColumn = [
     {
       title: 'ID',
       dataIndex: 'num',
@@ -95,7 +96,7 @@
       dataIndex: 'priority',
       slotName: 'priority',
       filterConfig: {
-        options: casePriorityOptions,
+        options: props.isPreview ? casePriorityOptions : [],
         filterSlotName: FilterSlotNameEnum.CASE_MANAGEMENT_CASE_LEVEL,
       },
       width: 150,
@@ -106,12 +107,22 @@
       dataIndex: 'executeResult',
       slotName: 'lastExecResult',
       filterConfig: {
-        options: lastReportStatusListOptions.value,
+        options: props.isPreview ? lastReportStatusListOptions.value : [],
         filterSlotName: FilterSlotNameEnum.API_TEST_CASE_API_LAST_EXECUTE_STATUS,
       },
       width: 150,
       showDrag: true,
     },
+  ];
+  const testPlanNameColumns: MsTableColumn = [
+    {
+      title: 'report.plan.name',
+      dataIndex: 'planName',
+      showTooltip: true,
+      width: 200,
+    },
+  ];
+  const lastStaticColumns: MsTableColumn = [
     {
       title: 'common.belongModule',
       dataIndex: 'moduleName',
@@ -135,15 +146,22 @@
     },
   ];
 
+  const columns = computed(() => {
+    if (props.isGroup) {
+      return [...staticColumns, ...testPlanNameColumns, ...lastStaticColumns];
+    }
+    return [...staticColumns, ...lastStaticColumns];
+  });
+
   const useApiTable = useTable(getApiPage, {
     scroll: { x: '100%' },
-    columns,
+    columns: columns.value,
     showSelectorAll: false,
     showSetting: false,
   });
   const useScenarioTable = useTable(getScenarioPage, {
     scroll: { x: '100%' },
-    columns,
+    columns: columns.value,
     showSelectorAll: false,
     showSetting: false,
   });
@@ -153,7 +171,10 @@
   });
 
   async function loadCaseList() {
-    currentCaseTable.value.setLoadListParams({ reportId: props.reportId, shareId: props.shareId ?? undefined });
+    currentCaseTable.value.setLoadListParams({
+      reportId: props.reportId,
+      shareId: props.shareId ?? undefined,
+    });
     currentCaseTable.value.loadList();
   }
 
@@ -183,13 +204,18 @@
     }
   }
 
-  watchEffect(() => {
-    if (props.reportId && props.activeType && props.isPreview) {
-      currentCaseTable.value.resetFilterParams();
-      currentCaseTable.value.resetPagination();
-      loadCaseList();
-    } else {
-      currentCaseTable.value.propsRes.value.data = detailTableExample[props.activeType];
+  watch(
+    [() => props.reportId, () => props.isPreview],
+    () => {
+      if (props.reportId && props.isPreview) {
+        currentCaseTable.value.resetPagination();
+        loadCaseList();
+      } else {
+        currentCaseTable.value.propsRes.value.data = detailTableExample[props.activeType];
+      }
+    },
+    {
+      immediate: true,
     }
-  });
+  );
 </script>

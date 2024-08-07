@@ -106,8 +106,8 @@ const subPlanList: PlanReportDetail = {
   endTime: 0,
   summary: '',
   caseTotal: 1,
-  passThreshold: 100.0,
-  passRate: 0.0,
+  passThreshold: 100,
+  passRate: 100,
   executeRate: 0,
   bugCount: 0,
   planCount: 0,
@@ -135,6 +135,7 @@ const functionalList: FeatureCaseItem = {
   executeUserName: '',
   bugCount: 0,
   reportId: '',
+  projectId: '',
 };
 // 缺陷明细
 const bugList: ReportBugItem = {

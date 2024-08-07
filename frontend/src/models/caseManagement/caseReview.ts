@@ -1,4 +1,7 @@
+import { OptionItem } from '@/api/modules/message/index';
+
 import { BatchApiParams, TableQueryParams } from '@/models/common';
+import { StartReviewStatus } from '@/enums/caseEnum';
 
 // 评审状态, PREPARED: 待开始, UNDERWAY: 进行中, COMPLETED: 已完成, ARCHIVED: 已归档(暂时没有)
 export type ReviewStatus = 'PREPARED' | 'UNDERWAY' | 'COMPLETED';
@@ -131,9 +134,10 @@ export interface BatchReviewCaseParams extends BatchApiParams {
   reviewId: string; // 评审id
   userId: string; // 用户id, 用来判断是否只看我的
   reviewPassRule: ReviewPassRule; // 评审规则
-  status: ReviewResult; // 评审结果
+  status: StartReviewStatus; // 评审结果
   content: string; // 评论内容
   notifier: string; // 评论@的人的Id, 多个以';'隔开
+  reviewCommentFileIds?: string[]; // 富文本ids
 }
 // 评审详情-批量修改评审人
 export interface BatchChangeReviewerParams extends BatchApiParams {
@@ -219,7 +223,7 @@ export interface ReviewCaseItem {
 }
 // 评审详情-提交评审入参
 export interface ReviewFormParams {
-  status: ReviewResult;
+  status: StartReviewStatus;
   content: string;
   notifiers?: string[];
   reviewCommentFileIds?: string[];
@@ -247,6 +251,12 @@ export interface ReviewHistoryItem {
   contentText: string;
 }
 
+export interface ReviewerAndStatus {
+  reviewerStatus: OptionItem[]; // 每个评审人最终的评审结果
+  status: ReviewResult; // 用例评审最终结果
+  caseId: string;
+}
+
 // 评审详情-用例列表项
 export interface CaseReviewFunctionalCaseUserItem {
   caseId: string;
@@ -262,4 +272,12 @@ export interface CaseReviewMinderParams {
   reviewId: string;
   viewFlag: boolean; // 是否只看我的
   viewStatusFlag: boolean; // 我的评审结果
+}
+
+// 测试计划用例脑图
+export interface CasePlanMinderParams {
+  projectId: string;
+  moduleId: string;
+  current?: number;
+  planId: string;
 }

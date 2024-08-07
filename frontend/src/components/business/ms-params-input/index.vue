@@ -227,8 +227,14 @@
         <MsIcon
           v-if="!props.disabled"
           type="icon-icon_mock"
+          :size="16"
           class="ms-params-input-suffix-icon"
           @click.stop="openParamSetting"
+        />
+        <MsIcon
+          type="icon-icon_full_screen_one"
+          class="ms-params-input-suffix-icon ml-[8px]"
+          @click.stop="emit('setParams')"
         />
       </template>
       <template #option="{ data }">
@@ -280,6 +286,7 @@
     (e: 'change', val: string): void;
     (e: 'dblclick'): void;
     (e: 'apply', val: string): void;
+    (e: 'setParams'): void;
   }>();
 
   const { t } = useI18n();
@@ -693,7 +700,7 @@
       }
     }
   }
-  .ms-params-input:not(.arco-input-focus) {
+  .ms-params-input:not(.arco-input-focus, .ms-params-input--focus) {
     @apply bg-transparent;
 
     border-color: transparent !important;

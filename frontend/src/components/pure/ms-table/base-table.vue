@@ -66,7 +66,7 @@
         <a-table-column
           v-for="(item, idx) in currentColumns"
           :key="idx"
-          :width="item.isTag || item.isStringTag ? item.width || 360 : item.width"
+          :width="item.isTag || item.isStringTag ? columnLastWidthMap[item.dataIndex as string] : item.width"
           :align="item.align"
           :fixed="item.fixed"
           :sortable="item.sortable"
@@ -129,16 +129,12 @@
             <div :class="{ 'flex w-full flex-row items-center': !item.isTag && !item.align }">
               <template v-if="item.dataIndex === SpecialColumnEnum.ENABLE">
                 <slot name="enable" v-bind="{ record }">
-                  <div v-if="record.enable" class="flex flex-row flex-nowrap items-center gap-[2px]">
-                    <icon-check-circle-fill class="text-[rgb(var(--success-6))]" />
-                    <div>{{ item.enableTitle ? t(item.enableTitle) : t('msTable.enable') }}</div>
-                  </div>
-                  <div v-else class="flex flex-row flex-nowrap items-center gap-[2px]">
-                    <MsIcon type="icon-icon_disable" class="text-[var(--color-text-4)]" />
-                    <div class="text-[var(--color-text-1)]">
-                      {{ item.disableTitle ? t(item.disableTitle) : t('msTable.disable') }}
-                    </div>
-                  </div>
+                  <a-switch
+                    v-model:model-value="record.enable"
+                    size="small"
+                    :disabled="!hasAnyPermission(item.permission)"
+                    :before-change="(val) => handleChangeEnable(val, record)"
+                  />
                 </slot>
               </template>
               <template v-else-if="item.isTag || item.isStringTag">
@@ -178,7 +174,7 @@
                 />
                 <a-tooltip
                   v-else
-                  placement="top"
+                  position="top"
                   content-class="max-w-[400px]"
                   :content="String(record[item.dataIndex as string])"
                   :disabled="record[item.dataIndex as string] === '' || record[item.dataIndex as string] === undefined || record[item.dataIndex as string] === null"
@@ -244,20 +240,22 @@
       </template>
     </a-table>
     <div
-      v-if="showBatchAction || !!attrs.showPagination"
+      v-if="showBatchAction || !!attrs.showPagination || alwaysShowSelectedCount"
       id="ms-table-footer-wrapper"
       class="mt-[16px] flex w-full flex-row flex-nowrap items-center overflow-hidden"
       :class="{ 'justify-between': showBatchAction }"
     >
       <span v-if="props.actionConfig && selectedCount > 0 && !showBatchAction" class="title text-[var(--color-text-2)]">
-        {{ t('msTable.batch.selected', { count: selectedCount }) }}
+        <slot name="count">
+          {{ t('msTable.batch.selected', { count: selectedCount }) }}
+        </slot>
         <a-button class="clear-btn ml-[12px] px-2" type="text" @click="emit('clearSelector')">
           {{ t('msTable.batch.clear') }}
         </a-button>
       </span>
       <div class="flex flex-grow items-center">
         <batch-action
-          v-if="showBatchAction"
+          v-if="showBatchAction || alwaysShowSelectedCount"
           class="flex-1"
           :select-row-count="selectedCount"
           :action-config="props.actionConfig"
@@ -265,7 +263,11 @@
           :size="props.paginationSize"
           @batch-action="handleBatchAction"
           @clear="() => emit('clearSelector')"
-        />
+        >
+          <template #count>
+            <slot name="count"></slot>
+          </template>
+        </batch-action>
       </div>
       <ms-pagination
         v-if="!!attrs.showPagination"
@@ -306,6 +308,7 @@
 
   import { useI18n } from '@/hooks/useI18n';
   import { useAppStore, useTableStore } from '@/store';
+  import { hasAnyPermission } from '@/utils/permission';
 
   import { DragSortParams } from '@/models/common';
   import { ColumnEditTypeEnum, SelectAllEnum, SpecialColumnEnum, TableKeyEnum } from '@/enums/tableEnum';
@@ -354,6 +357,7 @@
     showSelectorAll?: boolean;
     firstColumnWidth?: number; // 选择、拖拽列的宽度
     paginationSize?: 'small' | 'mini' | 'medium' | 'large';
+    alwaysShowSelectedCount?: boolean; // 是否总是保持显示已选项
   }>();
   const emit = defineEmits<{
     (e: 'batchAction', value: BatchActionParams, queryParams: BatchActionQueryParams): void;
@@ -367,6 +371,7 @@
     (e: 'expand', record: TableData): void | Promise<any>;
     (e: 'cell-click', record: TableData, column: TableColumnData, ev: Event): void | Promise<any>;
     (e: 'clearSelector'): void;
+    (e: 'enableChange', record: any, newValue: string | number | boolean): void;
     (
       e: 'filterChange',
       dataIndex: string,
@@ -501,6 +506,71 @@
     },
     {
       immediate: true,
+    }
+  );
+
+  const columnLastWidthMap = ref<Record<string, any>>({});
+
+  // 获取单个标签的宽度
+  const getTagWidth = (tag: Record<string, any>, lastText: string) => {
+    const maxTagWidth = 144; // 单个标签最大宽度
+    const spanPadding = 8; // 标签内边距
+    const spanBorder = 2; // 标签边框
+    const marginRight = 4; // 标签之间的间距
+
+    const el = document.createElement('div');
+    el.style.visibility = 'hidden';
+    el.style.position = 'absolute';
+    el.style.fontSize = '12px';
+    // 最后一个标签显示为 +n，按照+n的宽度来计算
+    el.textContent = lastText || tag.name || tag;
+
+    document.body.appendChild(el);
+    let width = el.offsetWidth + spanPadding * 2 + spanBorder;
+
+    // 衡量宽度后将元素移除
+    document.body.removeChild(el);
+    width = width > maxTagWidth ? maxTagWidth + marginRight : width + marginRight;
+    return width;
+  };
+
+  // 获取所有行里边对应列标签宽度总和
+  const getRowTagTotalWidth = (tags: TableData[]) => {
+    const maxShowTagCount = 3; // 包含数字标签最多展示3个
+    const tablePadding = 24; // 表单元格内边距总和
+
+    const tagArr = tags.length > maxShowTagCount ? tags.slice(0, maxShowTagCount) : tags;
+    const totalWidth = tagArr.reduce((acc, tag, index) => {
+      const lastText = index === maxShowTagCount - 1 ? `+${tags.length - maxShowTagCount - 1}` : '';
+      const width = getTagWidth(tag, lastText);
+      return acc + width;
+    }, 0);
+
+    return totalWidth + tablePadding;
+  };
+
+  // TODO 求总和里边最大宽度作为标签列宽 这里需要考虑一下性能优化
+  const getMaxRowTagWidth = (rows: TableData[], dataIndex: string) => {
+    const allTags = ((rows as TableData) || []).map((row: TableData) => row[dataIndex] || []);
+
+    const rowWidths = (allTags || []).map((tags: any) => {
+      return getRowTagTotalWidth(tags);
+    });
+    // 确保返回非负值
+    return Math.max(...rowWidths, 0);
+  };
+
+  watch(
+    () => attrs.data,
+    (val) => {
+      if (val) {
+        currentColumns.value.forEach((column) => {
+          const dataIndex = column.dataIndex as string;
+          if (column.isTag || column.isStringTag) {
+            columnLastWidthMap.value[dataIndex] = getMaxRowTagWidth((val as TableData[]) || [], dataIndex);
+          }
+        });
+      }
     }
   );
 
@@ -648,7 +718,6 @@
       newIndex = newDragData.findIndex((item: any) => item[rowKey || 'id'] === extra.dragTarget?.[rowKey || 'id']);
       oldIndex = oldDragData.findIndex((item: any) => item[rowKey || 'id'] === extra.dragTarget?.[rowKey || 'id']);
       let position: 'AFTER' | 'BEFORE' = 'BEFORE';
-
       position = newIndex > oldIndex ? 'AFTER' : 'BEFORE';
       const params: DragSortParams = {
         projectId: appStore.currentProjectId,
@@ -670,9 +739,8 @@
         targetIndex = newIndex - 1;
       }
       params.targetId = newDragData[targetIndex]?.[rowKey || 'id'] ?? newDragData[newIndex]?.[rowKey || 'id'];
-
-      if (oldIndex !== newIndex) {
-        // 原地移动不触发
+      // 只有一个的时候不允许拖拽放置参数报错
+      if (newDragData.length > 1) {
         emit('dragChange', params);
       }
     }
@@ -691,6 +759,11 @@
       });
     }
   };
+
+  function handleChangeEnable(newValue: string | number | boolean, record: TableData) {
+    emit('enableChange', record, newValue);
+    return false;
+  }
 
   // 根据参数获取全选按钮的位置
   const getBatchLeft = () => {

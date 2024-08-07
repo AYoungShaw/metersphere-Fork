@@ -1,22 +1,18 @@
 <template>
   <div :class="`${hasAnyPermission(['PROJECT_TEST_PLAN_REPORT:READ+UPDATE']) && !shareId ? '' : 'cursor-not-allowed'}`">
     <MsRichText
+      ref="msRichTextRef"
       v-model:raw="innerSummary.content"
       v-model:filedIds="innerSummary.richTextTmpFileIds"
       :upload-image="handleUploadImage"
       :preview-url="ReportPlanPreviewImageUrl"
       class="mt-[8px] w-full"
       :editable="props.canEdit"
-      @click="handleClick"
+      @click="handleRichClick"
+      @update="emit('handleSetSave')"
     />
     <MsFormItemSub
-      v-if="
-        hasAnyPermission(['PROJECT_TEST_PLAN_REPORT:READ+UPDATE']) &&
-        !shareId &&
-        props.showButton &&
-        props.canEdit &&
-        props.isPreview
-      "
+      v-if="hasAnyPermission(['PROJECT_TEST_PLAN_REPORT:READ+UPDATE']) && !shareId && props.canEdit && props.isPreview"
       :text="t('report.detail.oneClickSummary')"
       :show-fill-icon="true"
       @fill="handleSummary"
@@ -24,7 +20,7 @@
   </div>
 
   <div
-    v-show="props.showButton && hasAnyPermission(['PROJECT_TEST_PLAN_REPORT:READ+UPDATE']) && !shareId && props.canEdit"
+    v-show="hasAnyPermission(['PROJECT_TEST_PLAN_REPORT:READ+UPDATE']) && !shareId && props.canEdit"
     class="mt-[16px] flex items-center gap-[12px]"
   >
     <a-button type="primary" @click="handleUpdateReportDetail">{{ t('common.save') }}</a-button>
@@ -33,15 +29,11 @@
 </template>
 
 <script setup lang="ts">
-  import { ref } from 'vue';
-  import { useVModel } from '@vueuse/core';
-
   import MsRichText from '@/components/pure/ms-rich-text/MsRichText.vue';
   import MsFormItemSub from '@/components/business/ms-form-item-sub/index.vue';
 
   import { editorUploadFile } from '@/api/modules/test-plan/report';
   import { ReportPlanPreviewImageUrl } from '@/api/requrls/test-plan/report';
-  import useDoubleClick from '@/hooks/useDoubleClick';
   import { useI18n } from '@/hooks/useI18n';
   import { hasAnyPermission } from '@/utils/permission';
 
@@ -53,7 +45,6 @@
   const props = defineProps<{
     richText: customValueForm;
     shareId?: string;
-    showButton: boolean;
     isPlanGroup: boolean;
     detail: PlanReportDetail;
     canEdit: boolean;
@@ -63,11 +54,12 @@
   const emit = defineEmits<{
     (e: 'updateSummary', form: customValueForm): void;
     (e: 'cancel'): void;
-    (e: 'dblclick'): void;
+    (e: 'handleClick'): void;
+    (e: 'handleSetSave'): void;
     (e: 'handleSummary', content: string): void;
   }>();
 
-  const innerSummary = useVModel(props, 'richText', emit);
+  const innerSummary = ref(props.richText);
 
   function handleCancel() {
     emit('cancel');
@@ -109,13 +101,13 @@
       return `<p style=""><span color="" fontsize=""> <strong>${props.detail.testPlanName}</strong>包含 ${props.detail.planCount}个子计划。
              其中 ${props.detail.passCountOfPlan} 个子计划通过， ${props.detail.failCountOfPlan} 个子计划不通过。</span></p>`;
     }
-    const functionalCasText = `（1）本次测试包含${functionalCaseDetail.caseTotal}条功能测试用例，执行了${functionalCaseDetail.hasExecutedCase}条，未执行${functionalCaseDetail.pending}条，执行率为${functionalCaseDetail.apiExecutedRate}，通过用例${functionalCaseDetail.success}条，通过率为${functionalCaseDetail.successRate}。共发现缺陷${props.detail.functionalBugCount}个。<br>`;
+    const functionalCasText = `▪ 本次测试包含${functionalCaseDetail.caseTotal}条功能测试用例，执行了${functionalCaseDetail.hasExecutedCase}条，未执行${functionalCaseDetail.pending}条，执行率为${functionalCaseDetail.apiExecutedRate}，通过用例${functionalCaseDetail.success}条，通过率为${functionalCaseDetail.successRate}。共发现缺陷${props.detail.functionalBugCount}个。<br>`;
     const functionCaseDesc = functionalCaseDetail.caseTotal ? `${functionalCasText}` : ``;
 
-    const apiCaseText = `（2）本次测试包含${apiCaseDetail.caseTotal}条接口测试用例，执行了${apiCaseDetail.hasExecutedCase}条，未执行${apiCaseDetail.pending}条，执行率为${apiCaseDetail.apiExecutedRate}，通过用例${apiCaseDetail.success}条，通过率为${apiCaseDetail.successRate}。共发现缺陷 ${props.detail.apiBugCount} 个。<br>`;
+    const apiCaseText = `▪ 本次测试包含${apiCaseDetail.caseTotal}条接口测试用例，执行了${apiCaseDetail.hasExecutedCase}条，未执行${apiCaseDetail.pending}条，执行率为${apiCaseDetail.apiExecutedRate}，通过用例${apiCaseDetail.success}条，通过率为${apiCaseDetail.successRate}。共发现缺陷 ${props.detail.apiBugCount} 个。<br>`;
     const apiCaseDesc = apiCaseDetail.caseTotal ? `${apiCaseText}` : ``;
 
-    const scenarioCaseText = `（3）本次测试包含${apiScenarioDetail.caseTotal}条场景测试用例，执行了${apiScenarioDetail.hasExecutedCase}条，未执行${apiScenarioDetail.pending}条，执行率为${apiScenarioDetail.apiExecutedRate}%，通过用例${apiScenarioDetail.success}条，通过率为${apiScenarioDetail.successRate}。共发现缺陷${props.detail.scenarioBugCount}个`;
+    const scenarioCaseText = `▪ 本次测试包含${apiScenarioDetail.caseTotal}条场景测试用例，执行了${apiScenarioDetail.hasExecutedCase}条，未执行${apiScenarioDetail.pending}条，执行率为${apiScenarioDetail.apiExecutedRate}，通过用例${apiScenarioDetail.success}条，通过率为${apiScenarioDetail.successRate}。共发现缺陷${props.detail.scenarioBugCount}个`;
     const scenarioCaseDesc = apiScenarioDetail.caseTotal ? `${scenarioCaseText}` : ``;
 
     const isPass = Number(allSuccessRate) >= Number(props.detail.passThreshold);
@@ -134,12 +126,25 @@
     emit('handleSummary', summaryContent.value);
   }
 
-  function emitDoubleClick() {
+  const msRichTextRef = ref<InstanceType<typeof MsRichText>>();
+  function handleRichClick() {
     if (!props.shareId) {
-      emit('dblclick');
+      msRichTextRef.value?.focus();
+      emit('handleClick');
     }
   }
-  const { handleClick } = useDoubleClick(emitDoubleClick);
+
+  watch(
+    () => props.richText,
+    (val) => {
+      if (val) {
+        innerSummary.value = { ...val };
+      }
+    },
+    {
+      deep: true,
+    }
+  );
 </script>
 
 <style scoped></style>

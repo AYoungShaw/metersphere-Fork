@@ -36,6 +36,7 @@ export interface MsSearchSelectProps {
   triggerProps?: TriggerProps; // 触发器属性
   loading?: boolean; // 加载状态
   fallbackOption?: boolean | ((value: string | number | boolean | Record<string, unknown>) => SelectOptionData); // 自定义值中不存在的选项
+  optionNotExitsText?: string; // 选项不存在时的提示文案
   shouldCalculateMaxTag?: boolean; // 是否需要计算最大展示选项数量
   disabled?: boolean; // 是否禁用
   size?: 'mini' | 'small' | 'medium' | 'large'; // 尺寸
@@ -68,7 +69,7 @@ export default defineComponent(
     const inputValue = ref('');
     const tempInputValue = ref('');
     const filterOptions = ref<SelectOptionData[]>([...props.options]); // 实际渲染的 options，会根据搜索关键字进行过滤
-    const remoteOriginOptions = ref<SelectOptionData[]>([...props.options]); // 远程模式下的原始 options，接口返回的数据会存储在这里
+    const remoteOriginOptions = ref<SelectOptionData[]>([...props.options]); // 远程模式下的原始 options，接口返回的数据会存储在这里；静态模式下，默认为 options
 
     const selectRef = ref();
     const { maxTagCount, getOptionComputedStyle, singleTagMaxWidth, calculateMaxTag } = useSelect({
@@ -173,7 +174,10 @@ export default defineComponent(
                 if (e[key]?.toLowerCase().includes(val.toLowerCase())) {
                   // 是否匹配
                   hasMatch = true;
-                  item[key] = e[key].replace(new RegExp(val, 'gi'), highlightedKeyword); // 高亮关键字替换
+                  item[key] = e[key].replace(
+                    new RegExp(val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), // 转义搜索关键字中的所有特殊字符
+                    highlightedKeyword
+                  ); // 高亮关键字替换
                 }
               }
             }
@@ -442,6 +446,22 @@ export default defineComponent(
       return props.allowClear;
     });
 
+    function checkOptionExit(label?: string) {
+      if (typeof props.optionLabelRender === 'function') {
+        return label;
+      }
+      const option = remoteOriginOptions.value.find((e) => e[props.labelKey || 'label'] === label);
+      return option ? option[props.labelKey || 'label'] : props.optionNotExitsText || t('ms.select.optionsNotExits');
+    }
+
+    function fallbackNotExitOption(value: string | number | boolean | Record<string, any>) {
+      return {
+        label: checkOptionExit(typeof value === 'object' ? value[props.labelKey || 'label'] : value),
+        value,
+        disabled: true,
+      };
+    }
+
     return () => (
       <div class="w-full">
         <a-tooltip
@@ -460,7 +480,7 @@ export default defineComponent(
             placeholder={t(props.placeholder || '')}
             allow-clear={allowClear.value}
             allow-search={props.allowSearch}
-            filter-option={true}
+            filter-option={false}
             loading={loading.value}
             multiple={props.multiple}
             max-tag-count={maxTagCount.value}
@@ -468,10 +488,11 @@ export default defineComponent(
             value-key={props.valueKey || 'value'}
             popup-container={props.popupContainer || document.body}
             trigger-props={props.triggerProps}
-            fallback-option={props.fallbackOption}
+            fallback-option={props.fallbackOption || fallbackNotExitOption}
             disabled={props.disabled}
             size={props.size}
             onChange={handleChange}
+            onBlur={emit('blur')}
             onSearch={handleSearch}
             onPopupVisibleChange={(val: boolean) => {
               popupVisible.value = val;
@@ -506,7 +527,7 @@ export default defineComponent(
                     class="one-line-text"
                     style={singleTagMaxWidth.value > 0 ? { maxWidth: `${singleTagMaxWidth.value}px` } : {}}
                   >
-                    {slots.label ? slots.label(data) : data.label}
+                    {slots.label ? slots.label(data) : checkOptionExit(data.label)}
                   </div>
                 </a-tooltip>
               ),
@@ -546,6 +567,7 @@ export default defineComponent(
       'atLeastOne',
       'objectValue',
       'remoteFilterFunc',
+      'optionNotExitsText',
       'shouldCalculateMaxTag',
       'disabled',
       'size',
@@ -558,6 +580,7 @@ export default defineComponent(
       'remove',
       'change',
       'changeObject',
+      'blur',
     ],
   }
 );

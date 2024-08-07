@@ -167,7 +167,7 @@
 
     <template #passRate="{ record }">
       <div class="mr-[8px] w-[100px]">
-        <StatusProgress :status-detail="defaultCountDetailMap[record.id]" height="5px" />
+        <StatusProgress :status-detail="defaultCountDetailMap[record.id]" height="5px" :type="record.type" />
       </div>
       <div class="text-[var(--color-text-1)]">
         {{ `${defaultCountDetailMap[record.id]?.passRate ? defaultCountDetailMap[record.id].passRate : '-'}%` }}
@@ -351,7 +351,9 @@
     <template #title>
       <div class="flex items-center">
         <div>{{ t('testPlan.featureCase.executionHistory') }}</div>
-        <div class="text-[var(--color-text-4)]"> （{{ activeRecord?.name }}） </div>
+        <a-tooltip :content="activeRecord?.name" :mouse-enter-delay="300">
+          <div class="text-[var(--color-text-4)]"> （{{ characterLimit(activeRecord?.name) }}） </div>
+        </a-tooltip>
       </div>
     </template>
     <executeHistoryTable v-if="executionHistoryDrawerVisible" :plan-id="activeRecord?.id" is-group />
@@ -766,7 +768,9 @@
         : archiveActions;
 
     const reportAction =
-      planStatus !== 'ARCHIVED' && record.type === testPlanTypeEnum.GROUP ? [...configReportActions] : [];
+      planStatus !== 'ARCHIVED' && record.type === testPlanTypeEnum.GROUP && record.childrenCount
+        ? [...configReportActions]
+        : [];
 
     const executeHistoryAction =
       record.type === testPlanTypeEnum.GROUP
@@ -1322,16 +1326,14 @@
       return;
     }
     activeRecord.value = cloneDeep(record);
+    // 状态需要从统计里边获取
+    activeRecord.value.status = getStatus(record.id);
     showStatusDeleteModal.value = true;
   }
-  // 计划组配置报告 TODO 后台需要加接口
+
+  // 计划组自定义报告
   async function configReportHandler(record: TestPlanItem) {
     try {
-      // await generateReport({
-      //   projectId: appStore.currentProjectId,
-      //   testPlanId: record.id,
-      //   triggerMode: 'MANUAL',
-      // });
       router.push({
         name: TestPlanRouteEnum.TEST_PLAN_INDEX_CONFIG,
         query: {

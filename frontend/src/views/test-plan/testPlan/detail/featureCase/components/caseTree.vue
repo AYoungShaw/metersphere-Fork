@@ -18,7 +18,6 @@
       :all-count="allCount"
       @set-active-folder="setActiveFolder"
     />
-    <a-divider class="my-[8px]" />
     <a-spin class="min-h-[200px] w-full" :loading="loading">
       <MsTree
         :selected-keys="selectedKeys"
@@ -58,8 +57,8 @@
   import MsTree from '@/components/business/ms-tree/index.vue';
   import type { MsTreeNodeData } from '@/components/business/ms-tree/types';
 
-  import { getFeatureCaseModule } from '@/api/modules/test-plan/testPlan';
   import { useI18n } from '@/hooks/useI18n';
+  import useTestPlanFeatureCaseStore from '@/store/modules/testPlan/testPlanFeatureCase';
   import { mapTree } from '@/utils';
   import { getNodeParentId } from '@/utils/tree';
 
@@ -77,6 +76,7 @@
 
   const route = useRoute();
   const { t } = useI18n();
+  const testPlanFeatureCaseStore = useTestPlanFeatureCaseStore();
 
   const virtualListProps = computed(() => {
     return {
@@ -110,8 +110,8 @@
   }
 
   const moduleKeyword = ref('');
-  const folderTree = ref<ModuleTreeNode[]>([]);
-  const loading = ref(false);
+  const folderTree = computed(() => testPlanFeatureCaseStore.moduleTree);
+  const loading = computed(() => testPlanFeatureCaseStore.loading);
 
   const selectedKeys = useVModel(props, 'selectedKeys', emit);
 
@@ -119,22 +119,7 @@
    * 初始化模块树
    */
   async function initModules() {
-    try {
-      loading.value = true;
-      const res = await getFeatureCaseModule({ testPlanId: route.query.id as string, treeType: props.treeType });
-      folderTree.value = mapTree<ModuleTreeNode>(res, (node) => {
-        return {
-          ...node,
-          count: props.modulesCount?.[node.id] || 0,
-        };
-      });
-      emit('init', folderTree.value);
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.log(error);
-    } finally {
-      loading.value = false;
-    }
+    await testPlanFeatureCaseStore.initModules(route.query.id as string, props.treeType);
   }
 
   /**
@@ -150,6 +135,25 @@
     emit('folderNodeSelect', _selectedKeys as string[], offspringIds, node.name, getNodeParentId(node));
   }
 
+  /**
+   * 选中父节点
+   * @param tree 原来的模块树
+   */
+  function selectParentNode(tree: ModuleTreeNode[]) {
+    mapTree(tree || [], (e) => {
+      if (e.id === selectedKeys.value[0]) {
+        if (e.parentId) {
+          selectedKeys.value = [e.parentId];
+          folderNodeSelect([e.parentId], e.parent);
+        } else {
+          setActiveFolder('all');
+        }
+        return e;
+      }
+      return e;
+    });
+  }
+
   onBeforeMount(() => {
     setIsExpandAll();
     initModules();
@@ -161,12 +165,13 @@
   watch(
     () => props.modulesCount,
     (obj) => {
-      folderTree.value = mapTree<ModuleTreeNode>(folderTree.value, (node) => {
+      const tree = mapTree<ModuleTreeNode>(folderTree.value, (node) => {
         return {
           ...node,
           count: obj?.[node.id] || 0,
         };
       });
+      testPlanFeatureCaseStore.setModulesTree(tree);
       allCount.value = obj?.all || 0;
     }
   );
@@ -174,5 +179,6 @@
   defineExpose({
     setActiveFolder,
     initModules,
+    selectParentNode,
   });
 </script>

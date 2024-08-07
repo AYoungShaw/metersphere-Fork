@@ -1,6 +1,6 @@
 <script lang="tsx">
   import { computed, defineComponent, h, ref } from 'vue';
-  import { RouteRecordRaw, useRoute, useRouter } from 'vue-router';
+  import { RouteRecordRaw, useRouter } from 'vue-router';
   import { Message } from '@arco-design/web-vue';
   import { cloneDeep, debounce } from 'lodash-es';
 
@@ -32,7 +32,6 @@
       const userStore = useUserStore();
       const { logout } = useUser();
       const router = useRouter();
-      const route = useRoute();
       // @desc: 初始化配置的项目模块
       appStore.getProjectInfos();
       const { menuTree } = useMenuTree();
@@ -55,14 +54,6 @@
             // 如果菜单是外链
             if (regexUrl.test(item.path)) {
               openWindow(item.path);
-              selectedKey.value = [item.name as string];
-              return;
-            }
-            // 已激活的菜单重复点击不处理
-            if (
-              route.name === item.name ||
-              ((route.name as string).includes(item.name as string) && route.meta?.hideChildrenInMenu)
-            ) {
               selectedKey.value = [item.name as string];
               return;
             }
@@ -221,11 +212,11 @@
       }
 
       watch(
-        () => xPack.value,
-        async (val) => {
+        () => [xPack.value, appStore.getPackageType],
+        async ([val, packageType]) => {
           if (val) {
             personalMenus.value = [...copyPersonalMenus.value];
-            if (appStore.packageType === 'enterprise' && licenseStore.hasLicense()) {
+            if (packageType === 'enterprise') {
               getOrgList();
             }
           } else {
@@ -248,7 +239,7 @@
 
       watchEffect(() => {
         if (switchOrgVisible.value || menuSwitchOrgVisible.value) {
-          if (appStore.packageType === 'enterprise' && licenseStore.hasLicense()) {
+          if (appStore.getPackageType === 'enterprise' && licenseStore.hasLicense()) {
             getOrgList();
           }
           nextTick(() => {
@@ -376,7 +367,10 @@
             }}
           >
             <a-menu-item
-              class={['flex w-full items-center justify-between', collapsed.value ? 'h-[56px] w-[56px]' : '']}
+              class={[
+                'flex w-full items-center justify-between overflow-hidden',
+                collapsed.value ? 'h-[56px] w-[56px]' : '',
+              ]}
               key="personalInfo"
             >
               {
@@ -384,14 +378,16 @@
                   class={[
                     collapsed.value
                       ? 'relative flex h-full items-center justify-center hover:!bg-transparent'
-                      : 'relative flex items-center gap-[8px] hover:!bg-transparent',
+                      : 'relative flex flex-1 items-center gap-[8px] overflow-hidden hover:!bg-transparent',
                   ]}
                 >
-                  <MsAvatar is-user size={20} class="!mr-0 hover:!bg-transparent" />
-                  {collapsed.value ? null : userStore.name}
+                  <MsAvatar is-user size={20} class="!mr-0 w-[20px] hover:!bg-transparent" />
+                  <div class="one-line-text flex-1 hover:!bg-transparent">
+                    {collapsed.value ? null : userStore.name}
+                  </div>
                 </div>
               }
-              {collapsed.value ? null : <icon-caret-down class="!m-0" />}
+              {collapsed.value ? null : <icon-caret-down class="!m-0 w-[16px]" />}
             </a-menu-item>
           </a-trigger>
         );
@@ -408,7 +404,10 @@
         );
       };
 
-      let mouseEnterTimer: NodeJS.Timeout;
+      const currentOrgName = computed(() => {
+        const org = originOrgList.value.find((e) => e.id === appStore.currentOrgId);
+        return org?.name || '';
+      });
       // 渲染菜单项
       const renderMenuItem = (element: RouteRecordRaw | null, icon: (() => any) | null) =>
         element?.name === SettingRouteEnum.SETTING_ORGANIZATION ? (
@@ -421,23 +420,17 @@
               ) : (
                 t(element?.meta?.locale || '')
               )}
-              {xPack.value
-                ? orgTrigger(element, menuSwitchOrgVisible, () => (
-                    <div
-                      class={collapsed.value ? 'hidden' : '!bg-transparent'} // 菜单折叠时隐藏切换组织按钮
-                      onMouseenter={() => {
-                        mouseEnterTimer = setTimeout(() => {
-                          menuSwitchOrgVisible.value = true;
-                        }, 500);
-                      }}
-                      onMouseleave={() => {
-                        clearTimeout(mouseEnterTimer);
-                      }}
-                    >
-                      <MsIcon type="icon-icon_switch_outlined" class="text-[var(--color-text-4)]" />
-                    </div>
-                  ))
-                : ''}
+              {xPack.value ? (
+                <a-tooltip content={currentOrgName.value} position="right">
+                  <div
+                    class={collapsed.value ? 'hidden' : 'current-org-tag'} // 菜单折叠时隐藏切换组织按钮
+                  >
+                    {currentOrgName.value.substring(0, 1)}
+                  </div>
+                </a-tooltip>
+              ) : (
+                ''
+              )}
             </div>
           </a-menu-item>
         ) : (
@@ -671,5 +664,20 @@
   .active-org {
     color: rgb(var(--primary-5));
     background-color: rgb(var(--primary-1));
+  }
+  .current-org-tag {
+    @apply rounded-full text-center align-middle;
+
+    top: 24px;
+    right: -12px;
+    z-index: 101;
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+    border: 1px solid #ffffff;
+    color: var(--color-text-2);
+    background: linear-gradient(90deg, rgb(var(--primary-9)) 3.36%, #ffffff 100%);
+    box-shadow: 0 0 7px rgb(15 0 78 / 9%);
+    line-height: 14px;
   }
 </style>

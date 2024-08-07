@@ -82,7 +82,7 @@
       title: '',
       disabled: false,
       size: 'medium',
-      maxLength: 255,
+      maxLength: 1000,
     }
   );
   const emit = defineEmits<{

@@ -1,5 +1,5 @@
 <p align="center"><a href="https://metersphere.io"><img src="https://metersphere.oss-cn-hangzhou.aliyuncs.com/img/MeterSphere-%E7%B4%AB%E8%89%B2.png" alt="MeterSphere" width="300" /></a></p>
-<h3 align="center">现代化、开源的测试管理和接口测试工具</h3>
+<h3 align="center">新一代的开源持续测试工具</h3>
 <p align="center">
   <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img src="https://shields.io/github/license/metersphere/metersphere?color=%231890FF" alt="License: GPL v3"></a>
   <a href="https://www.codacy.com/gh/metersphere/metersphere/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=metersphere/metersphere&amp;utm_campaign=Badge_Grade"><img src="https://app.codacy.com/project/badge/Grade/da67574fd82b473992781d1386b937ef" alt="Codacy"></a>
@@ -10,7 +10,7 @@
 </p>
 <hr />
 
-MeterSphere 是新一代的测试管理和接口测试工具，让软件测试工作更简单、更高效，不再成为持续交付的瓶颈。
+MeterSphere 是新一代的开源持续测试工具，让软件测试工作更简单、更高效，不再成为持续交付的瓶颈。
 
 -   **测试管理**：从测试用例管理，到测试计划执行、缺陷管理、测试报告生成，具有远超 TestLink 等传统测试管理工具的使用体验；
 -   **接口测试**：集 Postman 的易用与 JMeter 的灵活于一体，接口调试、接口定义、接口 Mock、场景自动化、接口报告，你想要的都有；
@@ -36,7 +36,6 @@ docker run -d -p 8081:8081 --name=metersphere -v ~/.metersphere/data:/opt/meters
 -   技术交流群
      
 <image height="150px" width="150px" src="https://github.com/metersphere/metersphere/assets/23045261/57314d2c-ea97-4a7d-b20c-0eb577c0ebbf"/>
-
 
 ## UI 展示
 
@@ -75,6 +74,8 @@ MeterSphere v3.x 的版本发布计划：
 - 2024 年 6 月 27 日：发布 v3.0 正式版本；
 - 2024 年 12 月 26 日：发布 v3.6-lts LTS 版本。
 
+MeterSphere 产品版本分为社区版和企业版，详情请参见：[MeterSphere 产品版本对比](https://metersphere.io/v3/pricing.html)
+
 ## 技术栈
 
 -   后端: [Spring Boot](https://www.tutorialspoint.com/spring_boot/spring_boot_introduction.htm)
@@ -91,6 +92,7 @@ MeterSphere v3.x 的版本发布计划：
 - [Jenkins](https://www.jenkins.io/) 持续集成插件：实现在 Jenkins 流水线中触发并自动执行 MeteSphere 测试计划。
 - 自定义数据库驱动：支持对 达梦、Oracle、SQLite、Microsoft SQL Server 等数据库的连接和数据访问。
 - 接口协议插件：实现接口测试中对 TCP、Dubbo、MQTT 等协议的支持。
+- IDE 插件：[IDEA 插件](https://github.com/metersphere/metersphere-idea-plugin/) 支持在开发工具 IDEA 中一键将 API 同步到 MeterSphere。
 
 ## 飞致云的其他明星项目
 

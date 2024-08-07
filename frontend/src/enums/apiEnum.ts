@@ -165,7 +165,7 @@ export enum RequestAssertionCondition {
   START_WITH = 'START_WITH', // 以 xx 开头
   UNCHECKED = 'UNCHECKED', // 不校验
 }
-// 接口请求-前后置条件-处理器类型
+// 接口请求-前后置操作-处理器类型
 export enum RequestConditionProcessor {
   SCRIPT = 'SCRIPT', // 脚本操作
   SQL = 'SQL', // SQL操作
@@ -174,7 +174,7 @@ export enum RequestConditionProcessor {
   SCENARIO_SCRIPT = 'ENV_SCENARIO_SCRIPT', // 场景脚本
   REQUEST_SCRIPT = 'ENV_REQUEST_SCRIPT', // 请求脚本
 }
-// 接口请求-前后置条件-脚本处理器语言
+// 接口请求-前后置操作-脚本处理器语言
 export enum RequestConditionScriptLanguage {
   BEANSHELL = 'BEANSHELL', // Beanshell
   BEANSHELL_JSR233 = 'BEANSHELL_JSR233', // Beanshell JSR233
@@ -342,4 +342,15 @@ export enum ReportExecStatus {
   RUNNING = 'RUNNING',
   STOPPED = 'STOPPED',
   COMPLETED = 'COMPLETED',
+}
+
+export enum ProtocolKeyEnum {
+  API_MODULE_TREE_PROTOCOL = 'API_MODULE_TREE_PROTOCOL',
+  TEST_PLAN_API_CASE_PROTOCOL = 'TEST_PLAN_API_CASE_PROTOCOL',
+  ASSOCIATE_CASE_PROTOCOL = 'ASSOCIATE_CASE_PROTOCOL',
+  API_SCENARIO_IMPORT_PROTOCOL = 'API_SCENARIO_IMPORT_PROTOCOL',
+  API_SCENARIO_CUSTOM_PROTOCOL = 'API_SCENARIO_CUSTOM_PROTOCOL',
+  API_NEW_PROTOCOL = 'API_NEW_PROTOCOL',
+  API_DEBUG_NEW_PROTOCOL = 'API_DEBUG_NEW_PROTOCOL',
+  CASE_MANAGEMENT_ASSOCIATE_PROTOCOL = 'CASE_MANAGEMENT_ASSOCIATE_PROTOCOL', // 功能用例关联用例
 }

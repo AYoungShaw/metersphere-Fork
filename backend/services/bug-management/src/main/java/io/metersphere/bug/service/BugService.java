@@ -28,7 +28,10 @@ import io.metersphere.project.dto.filemanagement.FileLogRecord;
 import io.metersphere.project.mapper.FileAssociationMapper;
 import io.metersphere.project.mapper.FileMetadataMapper;
 import io.metersphere.project.mapper.ProjectMapper;
-import io.metersphere.project.service.*;
+import io.metersphere.project.service.FileAssociationService;
+import io.metersphere.project.service.FileMetadataService;
+import io.metersphere.project.service.ProjectApplicationService;
+import io.metersphere.project.service.ProjectTemplateService;
 import io.metersphere.sdk.constants.*;
 import io.metersphere.sdk.exception.MSException;
 import io.metersphere.sdk.file.FileCenter;
@@ -200,7 +203,7 @@ public class BugService {
          *  缺陷创建或者修改逻辑:
          *  1. 判断所属项目是否关联第三方平台;
          *  2. 第三方平台缺陷需调用插件同步缺陷至其他平台(自定义字段需处理);
-         *  3. 保存MS缺陷(基础字段, 自定义字段)
+         *  3. 保存MS缺陷(基础字段, 自定义字段) && 发送处理人通知
          *  4. 处理附件(第三方平台缺陷需异步调用接口同步附件至第三方)
          *  5. 处理富文本临时文件
          *  6. 处理用例关联关系
@@ -229,7 +232,7 @@ public class BugService {
             }
         }
         // 处理基础字段
-        Bug bug = handleAndSaveBug(request, currentUser, platformName, platformBug);
+        Bug bug = handleAndSaveBugAndNotice(request, currentUser, platformName, platformBug);
         // 处理自定义字段
         handleAndSaveCustomFields(request, isUpdate, platformBug);
         // 处理附件
@@ -329,7 +332,10 @@ public class BugService {
             if (StringUtils.equals(platformName, bug.getPlatform())) {
                 // 需同步删除平台缺陷
                 Platform platform = projectApplicationService.getPlatform(bug.getProjectId(), true);
-                platform.deleteBug(bug.getPlatformBugId());
+                PlatformBugDeleteRequest deleteRequest = new PlatformBugDeleteRequest();
+                deleteRequest.setPlatformBugKey(bug.getPlatformBugId());
+                deleteRequest.setProjectConfig(projectApplicationService.getProjectBugThirdPartConfig(bug.getProjectId()));
+                platform.deleteBug(deleteRequest);
             }
             // 删除缺陷后, 前置操作: 删除关联用例, 删除关联附件
             bugCommonService.clearAssociateResource(bug.getProjectId(), List.of(id));
@@ -400,10 +406,57 @@ public class BugService {
      */
     public void batchDelete(BugBatchRequest request, String currentUser) {
         List<String> batchIds = getBatchIdsByRequest(request);
-        batchIds.forEach(id -> delete(id, currentUser));
+        BugExample example = new BugExample();
+        example.createCriteria().andIdIn(batchIds);
+        List<Bug> bugs = bugMapper.selectByExample(example);
+        String currentPlatform = projectApplicationService.getPlatformName(bugs.getFirst().getProjectId());
+        List<String> platformBugIds =  new ArrayList<>();
+        if (CollectionUtils.isNotEmpty(bugs)) {
+            Map<String, List<Bug>> groupBugs = bugs.stream().collect(Collectors.groupingBy(Bug::getPlatform));
+            // 根据不同平台, 删除缺陷
+            groupBugs.forEach((platform, bugList) -> {
+                List<String> bugIds = bugList.stream().map(Bug::getId).toList();
+                example.clear();
+                example.createCriteria().andIdIn(bugIds);
+                if (StringUtils.equals(platform, BugPlatform.LOCAL.getName())) {
+                    // Local缺陷
+                    Bug record = new Bug();
+                    record.setDeleted(true);
+                    record.setDeleteUser(currentUser);
+                    record.setDeleteTime(System.currentTimeMillis());
+                    bugMapper.updateByExampleSelective(record, example);
+                } else {
+                    /*
+                     * 第三方平台缺陷
+                     * 和当前项目所属平台不一致, 只删除MS缺陷, 不同步删除平台缺陷, 一致时需同步删除平台缺陷
+                     */
+                    bugCommonService.clearAssociateResource(bugList.getFirst().getProjectId(), bugIds);
+                    bugMapper.deleteByExample(example);
+                    if (StringUtils.equals(platform, currentPlatform)) {
+                        platformBugIds.addAll(bugList.stream().map(Bug::getPlatformBugId).toList());
+                    }
+                }
+            });
+        }
+
         // 批量日志
         List<LogDTO> logs = getBatchLogByRequest(batchIds, OperationLogType.DELETE.name(), OperationLogModule.BUG_MANAGEMENT_INDEX, "/bug/batch-delete", request.getProjectId(), false, false, null, currentUser);
         operationLogService.batchAdd(logs);
+
+        // 异步处理第三方平台缺陷, 防止超时
+        Thread.startVirtualThread(() -> {
+            if (CollectionUtils.isNotEmpty(platformBugIds)) {
+                Platform platform = projectApplicationService.getPlatform(bugs.getFirst().getProjectId(), true);
+                String projectBugThirdPartConfig = projectApplicationService.getProjectBugThirdPartConfig(bugs.getFirst().getProjectId());
+                platformBugIds.forEach(platformBugKey -> {
+                    // 需同步删除平台缺陷
+                    PlatformBugDeleteRequest deleteRequest = new PlatformBugDeleteRequest();
+                    deleteRequest.setPlatformBugKey(platformBugKey);
+                    deleteRequest.setProjectConfig(projectBugThirdPartConfig);
+                    platform.deleteBug(deleteRequest);
+                });
+            }
+        });
     }
 
     /**
@@ -922,13 +975,13 @@ public class BugService {
     }
 
     /**
-     * 处理保存缺陷基础信息
+     * 处理保存缺陷基础信息并发送处理人通知
      *
      * @param request      请求参数
      * @param currentUser  当前用户ID
      * @param platformName 第三方平台名称
      */
-    private Bug handleAndSaveBug(BugEditRequest request, String currentUser, String platformName, PlatformBugUpdateDTO platformBug) {
+    private Bug handleAndSaveBugAndNotice(BugEditRequest request, String currentUser, String platformName, PlatformBugUpdateDTO platformBug) {
         Bug bug = new Bug();
         BeanUtils.copyBean(bug, request);
         bug.setPlatform(platformName);
@@ -978,11 +1031,14 @@ public class BugService {
                 // 平台状态为空
                 bug.setStatus(StringUtils.EMPTY);
             }
-            // 第三方平台内置的处理人字段需要从自定义字段中移除
-            request.getCustomFields().removeIf(field -> StringUtils.startsWith(field.getName(), BugTemplateCustomField.HANDLE_USER.getName()));
+            // 第三方平台内置的处理人字段需要从自定义字段中移除 (当使用MS系统模板时)
+            if (!isPluginDefaultTemplate(request.getTemplateId(), request.getProjectId())) {
+                request.getCustomFields().removeIf(field -> StringUtils.startsWith(field.getName(), BugTemplateCustomField.HANDLE_USER.getName()));
+            }
         }
 
-        //保存基础信息
+        boolean noticeHandler = false;
+        // 保存基础信息
         if (StringUtils.isEmpty(bug.getId())) {
             bug.setId(IDGenerator.nextStr());
             bug.setNum(Long.valueOf(NumGenerator.nextNum(request.getProjectId(), ApplicationNumScope.BUG_MANAGEMENT)).intValue());
@@ -999,11 +1055,13 @@ public class BugService {
             bugContent.setBugId(bug.getId());
             bugContent.setDescription(StringUtils.isEmpty(request.getDescription()) ? StringUtils.EMPTY : request.getDescription());
             bugContentMapper.insert(bugContent);
+            noticeHandler = true;
         } else {
             Bug originalBug = checkBugExist(request.getId());
             // 追加处理人
             if (!StringUtils.equals(originalBug.getHandleUser(), bug.getHandleUser())) {
                 bug.setHandleUsers(originalBug.getHandleUsers() + "," + bug.getHandleUser());
+                noticeHandler = true;
             }
             bug.setUpdateUser(currentUser);
             bug.setUpdateTime(System.currentTimeMillis());
@@ -1012,6 +1070,11 @@ public class BugService {
             bugContent.setBugId(bug.getId());
             bugContent.setDescription(StringUtils.isEmpty(request.getDescription()) ? StringUtils.EMPTY : request.getDescription());
             bugContentMapper.updateByPrimaryKeySelective(bugContent);
+        }
+
+        // 异步发送处理人通知 (第三方不通知 && 处理人没更改不通知)
+        if (StringUtils.equals(platformName, BugPlatform.LOCAL.getName()) && noticeHandler) {
+            bugSyncNoticeService.sendHandleUserNotice(bug, currentUser);
         }
         return bug;
     }
@@ -1517,7 +1580,7 @@ public class BugService {
                 // 移除除状态, 处理人以外的所有非API映射的字段
                 platformCustomFields.removeIf(field -> systemCustomFieldApiMap.containsKey(field.getId()) && StringUtil.isBlank(systemCustomFieldApiMap.get(field.getId())));
             } else {
-                systemCustomFieldApiMap = new HashMap<>();
+                systemCustomFieldApiMap = new HashMap<>(16);
             }
             return platformCustomFields.stream().map(field -> {
                 PlatformCustomFieldItemDTO platformCustomFieldItem = new PlatformCustomFieldItemDTO();
