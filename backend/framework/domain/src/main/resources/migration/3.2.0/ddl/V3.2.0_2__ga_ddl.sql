@@ -11,7 +11,9 @@ CREATE TABLE export_task(
                             `id` VARCHAR(50) NOT NULL   COMMENT '任务唯一ID' ,
                             `name` VARCHAR(255)    COMMENT '名称' ,
                             `type` VARCHAR(50) NOT NULL   COMMENT '资源类型' ,
-                            `fileId` VARCHAR(255)    COMMENT '文件id' ,
+                            `file_id` VARCHAR(255)    COMMENT '文件id' ,
+                            `file_type` VARCHAR(64)    COMMENT '文件类型' ,
+                            `project_id` VARCHAR(255) NOT NULL   COMMENT '项目id' ,
                             `state` VARCHAR(50) NOT NULL   COMMENT '状态' ,
                             `create_user` VARCHAR(50) NOT NULL   COMMENT '创建人' ,
                             `create_time` BIGINT NOT NULL   COMMENT '创建时间' ,
@@ -24,6 +26,7 @@ CREATE TABLE export_task(
 
 
 CREATE INDEX idx_create_user ON export_task(`create_user`);
+CREATE INDEX idx_project_id ON export_task(`project_id`);
 CREATE INDEX idx_state ON export_task(`state`);
 CREATE INDEX idx_create_time ON export_task(`create_time`);
 CREATE INDEX idx_type ON export_task(`type`);

@@ -1,8 +1,10 @@
 package io.metersphere.functional.domain;
 
-import io.metersphere.validation.groups.*;
+import io.metersphere.validation.groups.Created;
+import io.metersphere.validation.groups.Updated;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,7 +26,7 @@ public class ExportTask implements Serializable {
     private String type;
 
     @Schema(description = "文件id")
-    private String fileid;
+    private String fileId;
 
     @Schema(description = "状态", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "{export_task.state.not_blank}", groups = {Created.class})
@@ -43,18 +45,28 @@ public class ExportTask implements Serializable {
     @Schema(description = "创建时间")
     private Long updateTime;
 
+    @Schema(description = "项目id", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "{export_task.project_id.not_blank}", groups = {Created.class})
+    @Size(min = 1, max = 50, message = "{export_task.project_id.length_range}", groups = {Created.class, Updated.class})
+    private String projectId;
+
+    @Schema(description = "文件类型")
+    private String fileType;
+
     private static final long serialVersionUID = 1L;
 
     public enum Column {
         id("id", "id", "VARCHAR", false),
         name("name", "name", "VARCHAR", true),
         type("type", "type", "VARCHAR", true),
-        fileid("fileId", "fileid", "VARCHAR", false),
+        fileId("file_id", "fileId", "VARCHAR", false),
         state("state", "state", "VARCHAR", true),
         createUser("create_user", "createUser", "VARCHAR", false),
         createTime("create_time", "createTime", "BIGINT", false),
         updateUser("update_user", "updateUser", "VARCHAR", false),
-        updateTime("update_time", "updateTime", "BIGINT", false);
+        updateTime("update_time", "updateTime", "BIGINT", false),
+        projectId("project_id", "projectId", "VARCHAR", false),
+        fileType("file_type", "fileType", "VARCHAR", false);
 
         private static final String BEGINNING_DELIMITER = "`";
 

@@ -91,6 +91,8 @@ public class FunctionalCaseControllerTests extends BaseTest {
     public static final String EXPORT_COLUMNS_URL = "/functional/case/export/columns/";
     public static final String DOWNLOAD_FILE_URL = "/functional/case/download/file/";
     public static final String STOP_EXPORT_URL = "/functional/case/stop/";
+    public static final String EXPORT_XMIND_URL = "/functional/case/export/xmind";
+    public static final String EXPORT_XMIND_CHECK_URL = "/functional/case/check/export-task";
 
     @Resource
     private NotificationMapper notificationMapper;
@@ -856,8 +858,8 @@ public class FunctionalCaseControllerTests extends BaseTest {
     @Order(24)
     public void downloadFile() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders.get(DOWNLOAD_FILE_URL + DEFAULT_PROJECT_ID + "/" + "123142342")
-                        .header(SessionConstants.HEADER_TOKEN, sessionId)
-                        .header(SessionConstants.CSRF_TOKEN, csrfToken));
+                .header(SessionConstants.HEADER_TOKEN, sessionId)
+                .header(SessionConstants.CSRF_TOKEN, csrfToken));
     }
 
     @Test
@@ -865,4 +867,51 @@ public class FunctionalCaseControllerTests extends BaseTest {
     public void stopExport() throws Exception {
         this.requestGetExcel(STOP_EXPORT_URL + DEFAULT_PROJECT_ID);
     }
+
+    @Test
+    @Order(3)
+    public void exportXmind() throws Exception {
+        FunctionalCaseExportRequest request = new FunctionalCaseExportRequest();
+        request.setProjectId(DEFAULT_PROJECT_ID);
+        request.setSelectIds(List.of("TEST_FUNCTIONAL_CASE_ID"));
+        List<FunctionalCaseHeader> sysHeaders = new ArrayList<>() {{
+            add(new FunctionalCaseHeader() {{
+                setId("num");
+                setName("ID");
+            }});
+            add(new FunctionalCaseHeader() {{
+                setId("name");
+                setName("用例名称");
+            }});
+        }};
+        request.setSystemFields(sysHeaders);
+        List<FunctionalCaseHeader> customHeaders = new ArrayList<>() {{
+            add(new FunctionalCaseHeader() {{
+                setId("A");
+                setName("测试3");
+            }});
+        }};
+        request.setCustomFields(customHeaders);
+        List<FunctionalCaseHeader> otherHeaders = new ArrayList<>() {{
+            add(new FunctionalCaseHeader() {{
+                setId("createTime");
+                setName("创建时间");
+            }});
+        }};
+        request.setOtherFields(otherHeaders);
+
+        request.setFileId("123142342");
+        this.requestPost(EXPORT_XMIND_URL, request);
+        request.setSelectIds(new ArrayList<>());
+        this.requestPost(EXPORT_XMIND_URL, request);
+        request.setSelectIds(List.of("TEST_FUNCTIONAL_CASE_ID_8"));
+        this.requestPost(EXPORT_XMIND_URL, request);
+    }
+
+    @Test
+    @Order(4)
+    public void checkExportTask() throws Exception {
+        this.requestGetExcel( EXPORT_XMIND_CHECK_URL);
+    }
+
 }

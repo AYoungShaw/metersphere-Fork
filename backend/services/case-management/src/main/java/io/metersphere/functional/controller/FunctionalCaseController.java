@@ -258,12 +258,12 @@ public class FunctionalCaseController {
         functionalCaseFileService.export(SessionUtils.getUserId(), request);
     }
 
-    @GetMapping("/stop/{projectId}")
+    @GetMapping("/stop/{taskId}")
     @Operation(summary = "用例管理-功能用例-导出-停止导出")
     @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_EXPORT)
     @CheckOwner(resourceId = "#projectId", resourceType = "project")
-    public void caseStopExport(@PathVariable String projectId) {
-        functionalCaseFileService.stopExport(projectId, SessionUtils.getUserId());
+    public void caseStopExport(@PathVariable String taskId) {
+        functionalCaseFileService.stopExport(taskId, SessionUtils.getUserId());
     }
 
     @GetMapping("/download/xmind/template/{projectId}")
@@ -287,6 +287,21 @@ public class FunctionalCaseController {
     @Operation(summary = "用例管理-功能用例-下载文件")
     @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_EXPORT)
     public ResponseEntity<byte[]> downloadImgById(@PathVariable String projectId, @PathVariable String fileId) {
-        return functionalCaseFileService.downloadFile(projectId, fileId);
+        return functionalCaseFileService.downloadFile(projectId, fileId, SessionUtils.getUserId());
+    }
+
+
+    @PostMapping("/export/xmind")
+    @Operation(summary = "用例管理-功能用例-xmind导出")
+    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_EXPORT)
+    public void caseExportXmind(@Validated @RequestBody FunctionalCaseExportRequest request) {
+        functionalCaseXmindService.exportFunctionalCaseXmind(request, SessionUtils.getUserId());
+    }
+
+    @GetMapping(value = "/check/export-task")
+    @Operation(summary = "用例管理-功能用例-导出任务校验")
+    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_EXPORT)
+    public String checkExportTask() {
+        return functionalCaseFileService.checkExportTask(SessionUtils.getCurrentProjectId(), SessionUtils.getUserId());
     }
 }
