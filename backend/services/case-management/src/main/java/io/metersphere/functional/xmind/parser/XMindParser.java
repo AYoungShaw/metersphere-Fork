@@ -52,7 +52,7 @@ public class XMindParser {
                 File dir = new File(res);
                 FileUtils.deleteDirectory(dir);
             }
-            // 删除零时文件
+            // 删除临时文件
             if (file != null) {
                 file.delete();
             }
@@ -66,7 +66,7 @@ public class XMindParser {
         List<JsonRootBean> jsonRootBeans = new ArrayList<>();
         if (contents != null) {
             for (String content : contents) {
-                caseCount += content.split("(case-:)").length;
+                caseCount += content.split("((?i)case)").length;
                 JsonRootBean jsonRootBean = JSON.parseObject(content, JsonRootBean.class);
                 jsonRootBeans.add(jsonRootBean);
             }

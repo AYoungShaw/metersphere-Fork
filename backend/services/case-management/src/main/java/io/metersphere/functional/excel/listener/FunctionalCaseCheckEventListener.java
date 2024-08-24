@@ -61,7 +61,7 @@ public class FunctionalCaseCheckEventListener extends AnalysisEventListener<Map<
     protected List<ExcelErrData<FunctionalCaseExcelData>> errList = new ArrayList<>();
     private static final String ERROR_MSG_SEPARATOR = ";";
     private HashMap<String, AbstractCustomFieldValidator> customFieldValidatorMap;
-    protected static final int TAGS_COUNT = 15;
+    protected static final int TAGS_COUNT = 10;
     protected static final int TAG_LENGTH = 64;
     protected static final int STEP_LENGTH = 1000;
     private FunctionalCaseService functionalCaseService;
@@ -71,7 +71,7 @@ public class FunctionalCaseCheckEventListener extends AnalysisEventListener<Map<
         excelDataClass = clazz;
         //当前项目模板的自定义字段
         customFieldsMap = customFields.stream().collect(Collectors.toMap(TemplateCustomFieldDTO::getFieldName, i -> i));
-        customFieldValidatorMap = CustomFieldValidatorFactory.getValidatorMap();
+        customFieldValidatorMap = CustomFieldValidatorFactory.getValidatorMap(request.getProjectId());
         functionalCaseService = CommonBeanFactory.getBean(FunctionalCaseService.class);
 
     }
@@ -310,6 +310,10 @@ public class FunctionalCaseCheckEventListener extends AnalysisEventListener<Map<
      * @param errMsg
      */
     private void validateTags(FunctionalCaseExcelData data, StringBuilder errMsg) {
+        if (StringUtils.isBlank(data.getTags())) {
+            data.setTags(StringUtils.EMPTY);
+            return;
+        }
         List<String> tags = functionalCaseService.handleImportTags(data.getTags());
         if (tags.size() > TAGS_COUNT) {
             errMsg.append(Translator.get("tags_count"))

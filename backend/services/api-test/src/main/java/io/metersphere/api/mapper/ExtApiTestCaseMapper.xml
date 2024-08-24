@@ -35,6 +35,14 @@
           and api_change is false
           and ignore_api_change is false
     </update>
+    <update id="clearApiChange">
+        update api_test_case
+        set api_change = false
+        where api_change = true and id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
 
     <select id="getPos" resultType="java.lang.Long">
         SELECT pos
@@ -727,14 +735,31 @@
             )
         </if>
     </select>
-    <select id="getApiCaseForBatchSync" resultType="io.metersphere.api.domain.ApiTestCase">
-        select id, api_definition_id
-        from api_test_case
-        where id in
-        <foreach collection="ids" item="id" separator="," open="(" close=")">
+    <select id="getRefApiScenarioCreator" resultType="io.metersphere.api.domain.ApiTestCase">
+        select atc.id, api_scenario.create_user
+        from api_test_case atc
+        inner join api_scenario_step ass
+            on atc.id = ass.resource_id
+                and ass.ref_type = 'REF'
+                    and atc.id in
+                        <foreach collection="ids" item="id" open="(" separator="," close=")">
+                            #{id}
+                        </foreach>
+        inner join api_scenario
+            on ass.scenario_id = api_scenario.id
+                and api_scenario.deleted = 0;
+    </select>
+    <resultMap id="ApiTestCaseDetailMap" type="io.metersphere.api.dto.definition.ApiTestCaseWithBlob">
+        <result column="request" jdbcType="LONGVARBINARY" property="request"/>
+        <result column="tags" jdbcType="VARCHAR" property="tags" typeHandler="io.metersphere.handler.ListTypeHandler"/>
+    </resultMap>
+    <select id="selectAllDetailByApiIds" resultMap="ApiTestCaseDetailMap">
+        SELECT apiTestCase.*,apiTestCaseBlob.request
+        FROM api_test_case apiTestCase
+        INNER JOIN api_test_case_blob apiTestCaseBlob ON apiTestCase.id = apiTestCaseBlob.id
+        WHERE apiTestCase.api_definition_id IN
+        <foreach collection="apiIds" item="id" separator="," open="(" close=")">
             #{id}
         </foreach>
     </select>
-
-
 </mapper>

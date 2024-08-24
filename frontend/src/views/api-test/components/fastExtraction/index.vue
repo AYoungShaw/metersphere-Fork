@@ -119,7 +119,7 @@
       </div>
       <div class="match-result">
         <div v-if="isMatched && matchResult.length === 0">{{ t('apiTestDebug.noMatchResult') }}</div>
-        <template v-if="props.config.extractType === RequestExtractExpressionEnum.JSON_PATH">
+        <template v-else-if="props.config.extractType === RequestExtractExpressionEnum.JSON_PATH">
           <pre>{{ matchResult }}</pre>
         </template>
         <template v-else>
@@ -172,10 +172,12 @@
   import type { JSONPathExtract, RegexExtract, XPathExtract } from '@/models/apiTest/common';
   import { RequestExtractExpressionEnum, RequestExtractExpressionRuleType } from '@/enums/apiEnum';
 
+  export type ExtractParamConfig = (RegexExtract | JSONPathExtract | XPathExtract) & Record<string, any>;
+
   const props = withDefaults(
     defineProps<{
       visible: boolean;
-      config: (RegexExtract | JSONPathExtract | XPathExtract) & Record<string, any>;
+      config: ExtractParamConfig;
       response?: string; // 响应内容
       isShowMoreSetting?: boolean; // 是否展示更多设置
     }>(),
@@ -185,11 +187,7 @@
   );
   const emit = defineEmits<{
     (e: 'update:visible', value: boolean): void;
-    (
-      e: 'apply',
-      config: (RegexExtract | JSONPathExtract | XPathExtract) & Record<string, any>,
-      matchResult: any[]
-    ): void;
+    (e: 'apply', config: ExtractParamConfig, matchResult: any[] | string): void;
   }>();
 
   const { t } = useI18n();
@@ -227,6 +225,26 @@
     expressionFormRef.value?.clearValidate();
   }
 
+  /**
+   * 遍历 JSON 对象，将 Number() 转换为数字
+   * @param obj JSON 对象
+   */
+  function traverseJSONObject(obj: Record<string, any>) {
+    Object.keys(obj).forEach((key) => {
+      const val = obj[key];
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        if (typeof val === 'object' && val !== null) {
+          traverseJSONObject(val);
+        } else if (val.includes('Number(')) {
+          obj[key] = val.replace(/Number\(([^)]+)\)/g, '$1');
+          if (!Number.isNaN(Number(obj[key]))) {
+            obj[key] = Number(obj[key]);
+          }
+        }
+      }
+    });
+  }
+
   /*
    * 测试表达式
    */
@@ -258,13 +276,31 @@
             path: expressionForm.value.expression,
             wrap: false,
           });
-          matchResult.value = Array.isArray(results)
-            ? results.map((e: any) =>
-                JSON.stringify(e)
+          if (Array.isArray(results)) {
+            matchResult.value = results.map((e: any) => {
+              let res;
+              if (typeof e === 'object' && e !== null && e !== undefined) {
+                res = JSON.parse(
+                  JSON.stringify(e)
+                    .replace(/Number\(([^)]+)\)/g, '$1')
+                    .replace(/^"|"$/g, '')
+                );
+              } else {
+                res = JSON.stringify(e)
                   .replace(/Number\(([^)]+)\)/g, '$1')
-                  .replace(/^"|"$/g, '')
-              )
-            : results;
+                  .replace(/^"|"$/g, '');
+                if (!Number.isNaN(Number(res))) {
+                  res = Number(res);
+                }
+              }
+              return res;
+            });
+          } else if (typeof results === 'object') {
+            traverseJSONObject(results);
+            matchResult.value = results;
+          } else {
+            matchResult.value = results === null ? `${results}` : results || [];
+          }
         } catch (error) {
           matchResult.value = JSONPath({ json: props.response || '', path: expressionForm.value.expression }) || [];
         }
@@ -311,7 +347,11 @@
   function confirmHandler() {
     expressionFormRef.value?.validate(async (errors: undefined | Record<string, ValidatedError>) => {
       if (!errors) {
-        emit('apply', expressionForm.value, matchResult.value);
+        emit(
+          'apply',
+          expressionForm.value,
+          typeof matchResult.value === 'object' ? JSON.stringify(matchResult.value) : matchResult.value
+        );
       }
     });
   }

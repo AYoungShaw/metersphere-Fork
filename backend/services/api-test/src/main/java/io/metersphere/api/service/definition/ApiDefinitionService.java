@@ -653,7 +653,7 @@ public class ApiDefinitionService extends MoveNodeService {
         return copyName;
     }
 
-    private void handleDeleteApiDefinition(List<String> ids, boolean deleteAllVersion, String projectId, String userId, boolean isBatch) {
+    public void handleDeleteApiDefinition(List<String> ids, boolean deleteAllVersion, String projectId, String userId, boolean isBatch) {
         if (deleteAllVersion) {
             //全部删除  进入回收站
             List<String> refIds = extApiDefinitionMapper.getRefIds(ids, false);
@@ -842,7 +842,7 @@ public class ApiDefinitionService extends MoveNodeService {
         }
     }
 
-    private void handleTrashDelApiDefinition(List<String> ids, String userId, String projectId, boolean isBatch) {
+    public void handleTrashDelApiDefinition(List<String> ids, String userId, String projectId, boolean isBatch) {
         if (CollectionUtils.isNotEmpty(ids)) {
             SubListUtils.dealForSubList(ids, 2000, subList -> doTrashDel(subList, userId, projectId, isBatch));
         }
@@ -918,6 +918,12 @@ public class ApiDefinitionService extends MoveNodeService {
         Map<String, String> userMap = userLoginService.getUserNameMap(new ArrayList<>(userIds));
         apiDefinitionDTO.setCreateUserName(userMap.get(apiDefinitionDTO.getCreateUser()));
         apiDefinitionDTO.setUpdateUserName(userMap.get(apiDefinitionDTO.getUpdateUser()));
+        ApiDefinitionModule apiDefinitionModule = apiDefinitionModuleMapper.selectByPrimaryKey(apiDefinitionDTO.getModuleId());
+        if (apiDefinitionModule != null) {
+            apiDefinitionDTO.setModuleName(apiDefinitionModule.getName());
+        } else {
+            apiDefinitionDTO.setModuleName(Translator.get("api_unplanned_request"));
+        }
         return apiDefinitionDTO;
     }
 

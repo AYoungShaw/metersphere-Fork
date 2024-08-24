@@ -29,7 +29,7 @@
             :content="t('common.add')"
           >
             <MsButton type="icon" class="ms-minder-node-float-menu-icon-button">
-              <MsIcon type="icon-icon_add_outlined" class="text-[var(--color-text-4)]" />
+              <MsIcon type="icon-icon_bug" class="text-[var(--color-text-4)]" />
             </MsButton>
           </a-tooltip>
           <template #content>
@@ -47,7 +47,7 @@
           trigger="click"
           position="bl"
           :click-outside-to-close="false"
-          popup-container=".ms-minder-container"
+          popup-container="body"
         >
           <a-tooltip
             v-if="props.canEdit && hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])"
@@ -103,8 +103,9 @@
           v-else-if="activeExtraKey === 'bug'"
           ref="bugListRef"
           :active-case="activeCaseInfo"
-          is-test-plan-case
+          :test-plan-case-id="selectNode?.data?.id"
           :show-disassociate-button="props.canEdit && hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])"
+          @disassociate-bug-done="emit('refreshPlan')"
         />
         <ReviewCommentList
           v-else
@@ -112,6 +113,7 @@
           :review-comment-list="executeHistoryList"
           active-comment="executiveComment"
           not-show-review-name
+          show-step-detail-trigger
         />
       </template>
     </MsMinderEditor>
@@ -176,8 +178,8 @@
   } from '@/components/pure/ms-minder-editor/script/tool/utils';
   import { MsFileItem } from '@/components/pure/ms-upload/types';
   import Attachment from '@/components/business/ms-minders/featureCaseMinder/attachment.vue';
-  import BugList from '@/components/business/ms-minders/featureCaseMinder/bugList.vue';
   import useMinderBaseApi from '@/components/business/ms-minders/featureCaseMinder/useMinderBaseApi';
+  import BugList from './bugList.vue';
   import AddStep from '@/views/case-management/caseManagementFeature/components/addStep.vue';
   import AddDefectDrawer from '@/views/case-management/caseManagementFeature/components/tabContent/tabBug/addDefectDrawer.vue';
   import LinkDefectDrawer from '@/views/case-management/caseManagementFeature/components/tabContent/tabBug/linkDefectDrawer.vue';
@@ -286,7 +288,6 @@
     };
     importJson.value.treePath = [];
     clearSelectedNodes();
-    window.minder.importJson(importJson.value);
     if (props.activeModule !== 'all') {
       // 携带具体的模块 ID 加载时，进入该模块内
       nextTick(() => {
@@ -483,11 +484,12 @@
   const executeHistoryList = ref<ExecuteHistoryItem[]>([]);
   async function initExecuteHistory(data: MinderJsonNodeData) {
     try {
-      executeHistoryList.value = await executeHistory({
+      const res = await executeHistory({
         caseId: data?.caseId,
         id: data.id,
         testPlanId: props.planId,
       });
+      executeHistoryList.value = res.map((item) => ({ ...item, stepsText: item.stepsExecResult }));
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
@@ -517,7 +519,7 @@
   const bugListRef = ref<InstanceType<typeof BugList>>();
   function handleAddBugDone() {
     if (extraVisible.value && activeExtraKey.value === 'bug') {
-      bugListRef.value?.handleShowTypeChange();
+      bugListRef.value?.loadBugList();
     }
     emit('refreshPlan');
   }
@@ -543,38 +545,40 @@
 
   // 执行
   const executeVisible = ref(false);
-  // 新增或更新用例的实际结果节点
+  // 更新用例的实际结果节点
   function updateCaseActualResultNode(node: MinderJsonNode, content: string) {
-    let actualResultNode;
-    actualResultNode = node.children?.find((item: MinderJsonNode) => item.data?.id === `actualResult-${node.data?.id}`);
+    const actualResultNode = node.children?.find((item: MinderJsonNode) =>
+      item.data?.resource?.includes(actualResultTag)
+    );
     if (actualResultNode) {
-      actualResultNode
-        .setData('resource', [actualResultTag])
-        .setData('text', content ?? '')
-        .render();
-    } else {
-      actualResultNode = createNode(
-        { resource: [actualResultTag], text: content ?? '', id: `actualResult-${node.data?.id}` },
-        node
-      );
-      handleRenderNode(node, [actualResultNode]);
+      actualResultNode.setData('text', content ?? '').render();
     }
   }
-  // 点击模块/用例执行
+  function isActualResultNode(node: MinderJsonNode) {
+    return node.data?.resource?.includes(actualResultTag) && node.parent?.data?.resource?.includes(caseTag);
+  }
+  // 点击模块/用例/用例的实际结果执行
   function handleExecuteDone(status: LastExecuteResults, content: string) {
+    const curSelectNode = window.minder.getSelectedNode();
+    const node = isActualResultNode(curSelectNode) ? curSelectNode.parent : curSelectNode;
     executeVisible.value = false;
-    const resource = selectNode.value.data?.resource;
+    const resource = node.data?.resource;
     if (resource?.includes(caseTag)) {
       //  用例添加标签
-      window.minder.execCommand('resource', [executionResultMap[status].statusText, caseTag]);
-      // 新增或更新用例的实际结果节点
-      updateCaseActualResultNode(selectNode.value, content);
+      node.setData('resource', [executionResultMap[status].statusText, caseTag]).render();
+      // 更新用例的实际结果节点
+      updateCaseActualResultNode(node, content);
       // 更新执行历史
       if (extraVisible.value && activeExtraKey.value === 'history') {
-        initExecuteHistory(selectNode.value.data);
+        initExecuteHistory(node.data);
       }
     } else if (resource?.includes(moduleTag)) {
-      initCaseTree();
+      // 先清空子节点，从后向前遍历时，删除节点不会影响到尚未遍历的节点
+      for (let i = node.children.length - 1; i >= 0; i--) {
+        window.minder.removeNode(node.children[i]);
+      }
+      // 再重新渲染
+      initNodeCases(node);
     }
     emit('refreshPlan');
   }
@@ -638,7 +642,7 @@
   function submitStepExecuteDone(status: string, content: string) {
     // 用例更新标签
     caseNodeAboveSelectStep.value.setData('resource', [executionResultMap[status].statusText, caseTag]).render();
-    // 新增或更新用例的实际结果节点
+    // 更新用例的实际结果节点
     updateCaseActualResultNode(caseNodeAboveSelectStep.value, content);
     // 更新步骤数据：标签和实际结果
     caseNodeAboveSelectStep.value.children.forEach((child: MinderJsonNode) => {
@@ -751,9 +755,9 @@
       setPriorityView(true, 'P');
       return;
     }
-    selectNode.value = node;
+    selectNode.value = isActualResultNode(node) ? node.parent : node;
 
-    // 展示浮动菜单: 模块节点且有子节点且不是没权限的根结点、用例节点
+    // 展示浮动菜单: 模块节点且有子节点且不是没权限的根结点、用例节点、用例节点下的实际结果
     if (
       node.data?.resource?.includes(caseTag) ||
       (node.data?.resource?.includes(moduleTag) &&
@@ -762,22 +766,28 @@
     ) {
       canShowFloatMenu.value = true;
       setMoreMenuOtherOperationList(node);
+    } else if (isActualResultNode(node) && props.canEdit && hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])) {
+      canShowFloatMenu.value = true;
     } else {
       canShowFloatMenu.value = false;
     }
 
     // 点步骤描述下的【步骤描述/预期结果/实际结果】标签
-    if ([actualResultTag, stepTag, stepExpectTag].some((item) => node.data?.resource?.includes(item))) {
+    if (
+      [actualResultTag, stepTag, stepExpectTag].some((item) => node.data?.resource?.includes(item)) &&
+      props.canEdit &&
+      hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])
+    ) {
       caseNodeAboveSelectStep.value = getCaseNodeWithResource(node, stepTag);
       if (caseNodeAboveSelectStep.value?.data?.id) {
         getStepData(caseNodeAboveSelectStep.value.data.id);
         stepExecuteModelVisible.value = true;
+        return;
       }
-      return;
     }
 
-    // 不展示更多：没操作权限的用例
-    if (node.data?.resource?.includes(caseTag) && !hasOperationPermission.value) {
+    // 不展示更多：没操作权限的用例、用例节点下的实际结果
+    if ((node.data?.resource?.includes(caseTag) && !hasOperationPermission.value) || isActualResultNode(node)) {
       canShowMoreMenu.value = false;
     } else {
       canShowMoreMenu.value = true;
@@ -800,6 +810,7 @@
       }
       // 用例下面所有节点都展开
       expendNodeAndChildren(node);
+      node.layout();
     } else if (data?.resource?.includes(moduleTag) && data.count > 0 && data.isLoaded !== true) {
       // 模块节点且有用例且未加载过用例数据
       if (data.id !== 'NONE') {
@@ -829,7 +840,7 @@
 
 <style lang="less" scoped>
   :deep(.comment-list-item-name) {
-    max-width: 200px;
+    max-width: 130px;
   }
   :deep(.ms-list) {
     margin: 0;

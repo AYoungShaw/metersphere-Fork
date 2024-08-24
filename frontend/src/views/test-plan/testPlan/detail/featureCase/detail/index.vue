@@ -14,18 +14,21 @@
             v-model:model-value="keyword"
             :placeholder="t('caseManagement.caseReview.searchPlaceholder')"
             allow-clear
-            class="mr-[8px] w-[176px]"
+            class="mr-[8px] flex-1"
             @search="loadCaseList"
             @press-enter="loadCaseList"
             @clear="loadCaseList"
           />
-          <a-select
-            v-model:model-value="lastExecResult"
+          <MsCheckboxDropdown
+            v-model:selectList="lastExecResult"
             :options="executeResultOptions"
-            class="flex-1"
-            @change="loadCaseList"
+            :title="t('common.executionResult')"
+            @handle-change="handleExecResultChange"
           >
-          </a-select>
+            <template #item="{ filterItem }">
+              <ExecuteResult :execute-result="filterItem.value as LastExecuteResults" />
+            </template>
+          </MsCheckboxDropdown>
         </div>
         <a-spin :loading="caseListLoading" class="w-full flex-1 overflow-hidden">
           <div class="case-list">
@@ -59,151 +62,158 @@
       </div>
       <!-- 右侧 -->
       <a-spin :loading="caseDetailLoading" class="relative flex h-full flex-1 flex-col overflow-hidden">
-        <div class="flex px-[16px] pt-[16px]">
-          <div class="mr-[24px] flex flex-1 items-center overflow-hidden">
-            <MsStatusTag :status="caseDetail.lastExecuteResult || 'PREPARED'" />
-            <div class="ml-[8px] mr-[2px] cursor-pointer font-medium text-[rgb(var(--primary-5))]" @click="goCaseDetail"
-              >[{{ caseDetail.num }}]</div
-            >
-            <div class="flex-1 overflow-hidden">
-              <a-tooltip :content="caseDetail.name">
-                <div class="one-line-text w-[fit-content] max-w-[100%] font-medium">
-                  {{ caseDetail.name }}
-                </div>
-              </a-tooltip>
-            </div>
-          </div>
-          <a-button
-            v-if="canEdit && hasAnyPermission(['FUNCTIONAL_CASE:READ+UPDATE'])"
-            type="outline"
-            @click="editCaseVisible = true"
-            >{{ t('common.edit') }}</a-button
-          >
+        <div v-if="!caseList.length" class="flex h-full items-center justify-center">
+          <MsEmpty v-if="!caseList.length" />
         </div>
-        <MsTab
-          v-model:active-key="activeTab"
-          :content-tab-list="contentTabList"
-          no-content
-          :get-text-func="getTotal"
-          class="relative mx-[16px] border-b"
-        />
-        <div :class="[' flex-1', activeTab !== 'detail' ? 'tab-content' : 'overflow-hidden']">
-          <MsDescription v-if="activeTab === 'baseInfo'" :descriptions="descriptions" :column="2" one-line-value>
-            <template #value="{ item }">
-              <template v-if="item.key === 'reviewStatus'">
-                <MsIcon
-                  :type="statusIconMap[item.value as keyof typeof statusIconMap]?.icon || ''"
-                  class="mr-1"
-                  :class="[statusIconMap[item.value as keyof typeof statusIconMap].color]"
-                ></MsIcon>
-                <span>{{ statusIconMap[item.value as keyof typeof statusIconMap]?.statusText || '' }} </span>
-              </template>
-            </template>
-          </MsDescription>
-          <div v-else-if="activeTab === 'detail'" class="align-content-start flex h-full flex-col">
-            <CaseTabDetail ref="caseTabDetailRef" is-test-plan :form="caseDetail" :is-disabled-test-plan="!canEdit" />
-            <!-- 开始执行 -->
-            <div
-              v-if="canEdit && hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])"
-              class="z-[101] px-[16px] py-[8px] shadow-[0_-1px_4px_rgba(2,2,2,0.1)]"
+        <template v-else>
+          <div class="flex px-[16px] pt-[16px]">
+            <div class="mr-[24px] flex flex-1 items-center overflow-hidden">
+              <MsStatusTag :status="caseDetail.lastExecuteResult || 'PREPARED'" />
+              <div
+                class="ml-[8px] mr-[2px] cursor-pointer font-medium text-[rgb(var(--primary-5))]"
+                @click="goCaseDetail"
+                >[{{ caseDetail.num }}]</div
+              >
+              <div class="flex-1 overflow-hidden">
+                <a-tooltip :content="caseDetail.name">
+                  <div class="one-line-text w-[fit-content] max-w-[100%] font-medium">
+                    {{ caseDetail.name }}
+                  </div>
+                </a-tooltip>
+              </div>
+            </div>
+            <a-button
+              v-if="canEdit && hasAnyPermission(['FUNCTIONAL_CASE:READ+UPDATE'])"
+              type="outline"
+              @click="editCaseVisible = true"
+              >{{ t('common.edit') }}</a-button
             >
-              <div class="mb-[12px] flex items-center justify-between">
-                <div class="font-medium text-[var(--color-text-1)]">
-                  {{ t('testPlan.featureCase.startExecution') }}
-                </div>
-                <div class="flex items-center">
-                  <a-switch v-model:model-value="autoNext" size="small" />
-                  <div class="mx-[8px]">{{ t('caseManagement.caseReview.autoNext') }}</div>
-                  <a-tooltip position="top">
-                    <template #content>
-                      <div>{{ t('testPlan.featureCase.autoNextTip1') }}</div>
-                      <div>{{ t('testPlan.featureCase.autoNextTip2') }}</div>
-                    </template>
-                    <icon-question-circle
-                      class="text-[var(--color-text-brand)] hover:text-[rgb(var(--primary-4))]"
-                      size="16"
-                    />
-                  </a-tooltip>
-                  <MsTag type="danger" theme="light" size="medium" class="ml-4">
-                    <MsIcon type="icon-icon_defect" class="!text-[14px] text-[rgb(var(--danger-6))]" size="16" />
-                    <span class="ml-1 text-[rgb(var(--danger-6))]"> {{ t('testPlan.featureCase.bug') }}</span>
-                    <span class="ml-1 text-[rgb(var(--danger-6))]">{{ caseDetail.bugListCount }}</span>
-                  </MsTag>
-                  <a-dropdown @select="handleSelect">
-                    <a-button
-                      v-if="hasAllPermission(['PROJECT_BUG:READ', 'PROJECT_TEST_PLAN:READ+EXECUTE'])"
-                      type="outline"
-                      size="small"
-                      class="ml-1"
-                    >
-                      <template #icon> <icon-plus class="text-[12px]" /> </template>
-                    </a-button>
-                    <template #content>
-                      <a-doption
-                        v-permission="['PROJECT_BUG:READ+ADD']"
-                        :disabled="!hasAnyPermission(['PROJECT_BUG:READ+ADD'])"
-                        value="new"
-                        >{{ t('common.newCreate') }}</a-doption
+          </div>
+          <MsTab
+            v-model:active-key="activeTab"
+            :content-tab-list="contentTabList"
+            no-content
+            :get-text-func="getTotal"
+            class="relative mx-[16px] border-b"
+          />
+          <div :class="[' flex-1', activeTab !== 'detail' ? 'tab-content' : 'overflow-hidden']">
+            <MsDescription v-if="activeTab === 'baseInfo'" :descriptions="descriptions" :column="2" one-line-value>
+              <template #value="{ item }">
+                <template v-if="item.key === 'reviewStatus'">
+                  <MsIcon
+                    :type="statusIconMap[item.value as keyof typeof statusIconMap]?.icon || ''"
+                    class="mr-1"
+                    :class="[statusIconMap[item.value as keyof typeof statusIconMap].color]"
+                  ></MsIcon>
+                  <span>{{ statusIconMap[item.value as keyof typeof statusIconMap]?.statusText || '' }} </span>
+                </template>
+              </template>
+            </MsDescription>
+            <div v-else-if="activeTab === 'detail'" class="align-content-start flex h-full flex-col">
+              <CaseTabDetail ref="caseTabDetailRef" is-test-plan :form="caseDetail" :is-disabled-test-plan="!canEdit" />
+              <!-- 开始执行 -->
+              <div
+                v-if="canEdit && hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])"
+                class="z-[101] px-[16px] py-[8px] shadow-[0_-1px_4px_rgba(2,2,2,0.1)]"
+              >
+                <div class="mb-[12px] flex items-center justify-between">
+                  <div class="font-medium text-[var(--color-text-1)]">
+                    {{ t('testPlan.featureCase.startExecution') }}
+                  </div>
+                  <div class="flex items-center">
+                    <a-switch v-model:model-value="autoNext" size="small" />
+                    <div class="mx-[8px]">{{ t('caseManagement.caseReview.autoNext') }}</div>
+                    <a-tooltip position="top">
+                      <template #content>
+                        <div>{{ t('testPlan.featureCase.autoNextTip1') }}</div>
+                        <div>{{ t('testPlan.featureCase.autoNextTip2') }}</div>
+                      </template>
+                      <icon-question-circle
+                        class="text-[var(--color-text-brand)] hover:text-[rgb(var(--primary-4))]"
+                        size="16"
+                      />
+                    </a-tooltip>
+                    <MsTag type="danger" theme="light" size="medium" class="ml-4">
+                      <MsIcon type="icon-icon_defect" class="!text-[14px] text-[rgb(var(--danger-6))]" size="16" />
+                      <span class="ml-1 text-[rgb(var(--danger-6))]"> {{ t('testPlan.featureCase.bug') }}</span>
+                      <span class="ml-1 text-[rgb(var(--danger-6))]">{{ caseDetail.bugListCount }}</span>
+                    </MsTag>
+                    <a-dropdown @select="handleSelect">
+                      <a-button
+                        v-if="hasAllPermission(['PROJECT_BUG:READ', 'PROJECT_TEST_PLAN:READ+EXECUTE'])"
+                        type="outline"
+                        size="small"
+                        class="ml-1"
                       >
-                      <a-doption
-                        v-if="createdBugCount > 0 && hasAnyPermission(['PROJECT_BUG:READ'])"
-                        :disabled="!hasAnyPermission(['PROJECT_BUG:READ'])"
-                        value="link"
-                        >{{ t('common.associated') }}</a-doption
-                      >
-                      <a-popover v-else title="" position="left">
+                        <template #icon> <icon-plus class="text-[12px]" /> </template>
+                      </a-button>
+                      <template #content>
                         <a-doption
-                          v-if="createdBugCount < 1 && hasAnyPermission(['PROJECT_BUG:READ'])"
+                          v-permission="['PROJECT_BUG:READ+ADD']"
+                          :disabled="!hasAnyPermission(['PROJECT_BUG:READ+ADD'])"
+                          value="new"
+                          >{{ t('common.newCreate') }}</a-doption
+                        >
+                        <a-doption
+                          v-if="createdBugCount > 0 && hasAnyPermission(['PROJECT_BUG:READ'])"
                           :disabled="!hasAnyPermission(['PROJECT_BUG:READ'])"
                           value="link"
                           >{{ t('common.associated') }}</a-doption
                         >
-                        <template #content>
-                          <div class="flex items-center text-[14px]">
-                            <span class="text-[var(--color-text-4)]">{{
-                              t('testPlan.featureCase.noBugDataTooltip')
-                            }}</span>
-                            <MsButton
-                              :disabled="!hasAnyPermission(['PROJECT_BUG:READ+ADD'])"
-                              type="text"
-                              @click="handleSelect('new')"
-                            >
-                              {{ t('testPlan.featureCase.noBugDataNewBug') }}
-                            </MsButton>
-                          </div>
-                        </template>
-                      </a-popover>
-                    </template>
-                  </a-dropdown>
+                        <a-popover v-else title="" position="left">
+                          <a-doption
+                            v-if="createdBugCount < 1 && hasAnyPermission(['PROJECT_BUG:READ'])"
+                            :disabled="!hasAnyPermission(['PROJECT_BUG:READ'])"
+                            value="link"
+                            >{{ t('common.associated') }}</a-doption
+                          >
+                          <template #content>
+                            <div class="flex items-center text-[14px]">
+                              <span class="text-[var(--color-text-4)]">{{
+                                t('testPlan.featureCase.noBugDataTooltip')
+                              }}</span>
+                              <MsButton
+                                :disabled="!hasAnyPermission(['PROJECT_BUG:READ+ADD'])"
+                                type="text"
+                                @click="handleSelect('new')"
+                              >
+                                {{ t('testPlan.featureCase.noBugDataNewBug') }}
+                              </MsButton>
+                            </div>
+                          </template>
+                        </a-popover>
+                      </template>
+                    </a-dropdown>
+                  </div>
                 </div>
+                <ExecuteSubmit
+                  :id="activeId"
+                  :case-id="activeCaseId"
+                  :test-plan-id="route.query.id as string"
+                  :step-execution-result="stepExecutionResult"
+                  @done="executeDone"
+                />
               </div>
-              <ExecuteSubmit
-                :id="activeId"
-                :case-id="activeCaseId"
-                :test-plan-id="route.query.id as string"
-                :step-execution-result="stepExecutionResult"
-                @done="executeDone"
-              />
             </div>
+            <BugList
+              v-if="activeTab === 'defectList'"
+              ref="bugRef"
+              :case-id="activeCaseId"
+              :test-plan-case-id="activeId"
+              :can-edit="canEdit && hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])"
+              @link="linkDefect"
+              @new="addBug"
+              @update-count="loadCaseDetail()"
+            />
+            <ExecutionHistory
+              v-if="activeTab === 'executionHistory'"
+              :execute-list="executeHistoryList"
+              :loading="executeLoading"
+              height="h-[calc(100vh-240px)]"
+              show-step-detail-trigger
+            />
           </div>
-          <BugList
-            v-if="activeTab === 'defectList'"
-            ref="bugRef"
-            :case-id="activeCaseId"
-            :test-plan-case-id="activeId"
-            :can-edit="canEdit && hasAnyPermission(['PROJECT_TEST_PLAN:READ+EXECUTE'])"
-            @link="linkDefect"
-            @new="addBug"
-            @update-count="loadCaseDetail()"
-          />
-          <ExecutionHistory
-            v-if="activeTab === 'executionHistory'"
-            :execute-list="executeHistoryList"
-            :loading="executeLoading"
-            height="h-[calc(100vh-240px)]"
-            show-step-detail-trigger
-          />
-        </div>
+        </template>
       </a-spin>
     </div>
   </MsCard>
@@ -234,6 +244,7 @@
 
   import MsButton from '@/components/pure/ms-button/index.vue';
   import MsCard from '@/components/pure/ms-card/index.vue';
+  import MsCheckboxDropdown from '@/components/pure/ms-checkbox-dropdown/index.vue';
   import MsDescription, { Description } from '@/components/pure/ms-description/index.vue';
   import MsEmpty from '@/components/pure/ms-empty/index.vue';
   import MsPagination from '@/components/pure/ms-pagination/index';
@@ -295,10 +306,10 @@
   const activeId = ref(route.query.testPlanCaseId as string);
   const canEdit = ref(route.query.canEdit === 'true');
   const keyword = ref('');
-  const lastExecResult = ref('');
+  const lastExecResult = ref<string[]>([]);
+  const tableFilter = ref();
   const executeResultOptions = computed(() => {
     return [
-      { label: t('common.all'), value: '' },
       ...Object.keys(executionResultMap).map((key) => {
         return {
           value: key,
@@ -324,11 +335,10 @@
         keyword: keyword.value,
         current: pageNation.value.current || 1,
         pageSize: pageNation.value.pageSize,
-        filter: lastExecResult.value
-          ? {
-              lastExecResult: [lastExecResult.value],
-            }
-          : undefined,
+        filter: {
+          ...tableFilter.value,
+          lastExecResult: lastExecResult.value,
+        },
         ...otherListQueryParams.value,
       });
       caseList.value = res.list;
@@ -339,6 +349,11 @@
     } finally {
       caseListLoading.value = false;
     }
+  }
+
+  function handleExecResultChange(val: string[]) {
+    lastExecResult.value = val;
+    loadCaseList();
   }
 
   function goCaseDetail() {
@@ -418,6 +433,7 @@
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
+      loadCaseList();
     } finally {
       caseDetailLoading.value = false;
     }
@@ -451,10 +467,31 @@
     });
   });
   const autoNext = ref(true);
-  async function executeDone() {
+  async function executeDone(status: LastExecuteResults) {
+    caseDetail.value.lastExecuteResult = status;
     if (autoNext.value) {
       // 自动下一个，更改激活的 id会刷新详情
       const index = caseList.value.findIndex((e) => e.id === activeId.value);
+
+      // 如果过滤的状态和执行状态不一样，则这条将从当前列表排除
+      const oneMissingCase = lastExecResult.value?.length && !lastExecResult.value.includes(status);
+      if (oneMissingCase) {
+        if ((pageNation.value.current - 1) * pageNation.value.pageSize + index + 1 < pageNation.value.total) {
+          // 不是最后一个
+          await loadCaseList();
+          activeCaseId.value = caseList.value[index].caseId;
+          activeId.value = caseList.value[index].id;
+        } else {
+          // 是最后一个，如果列表还有其他数据，则选中第一条；如果没有其他数据，则显示暂无数据
+          await loadCaseList();
+          if (caseList.value.length > 1) {
+            activeCaseId.value = caseList.value[0].caseId;
+            activeId.value = caseList.value[0].id;
+          }
+        }
+        return;
+      }
+
       if (index < caseList.value.length - 1) {
         await loadCaseList();
         activeCaseId.value = caseList.value[index + 1].caseId;
@@ -535,6 +572,7 @@
       showLinkDrawer.value = false;
       loadBugListAndCaseDetail();
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.log(error);
     } finally {
       drawerLoading.value = false;
@@ -567,6 +605,7 @@
         total,
         pageSize,
         current,
+        filter,
         keyword: _keyword,
         sort,
         moduleIds,
@@ -580,6 +619,8 @@
         current,
       };
       keyword.value = _keyword;
+      tableFilter.value = filter;
+      lastExecResult.value = filter.lastExecResult;
       otherListQueryParams.value = {
         sort,
         moduleIds,
@@ -604,6 +645,7 @@
         testPlanId: route.query.id as string,
       });
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.log(error);
     } finally {
       executeLoading.value = false;

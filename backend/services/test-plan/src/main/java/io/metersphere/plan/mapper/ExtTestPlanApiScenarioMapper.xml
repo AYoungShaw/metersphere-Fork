@@ -93,8 +93,9 @@
         api_scenario.project_id,
         api_scenario.create_user,
         api_scenario.status,
+        api_scenario.create_time,
+        api_scenario.update_time,
         api_scenario.id as apiScenarioId,
-        test_plan_api_scenario.create_time,
         test_plan_api_scenario.environment_id,
         api_scenario.module_id,
         test_plan_api_scenario.last_exec_result,
@@ -143,6 +144,7 @@
         </if>
         <include refid="filters">
             <property name="filter" value="request.filter"/>
+            <property name="nullExecutorKey" value="request.nullExecutorKey"/>
         </include>
 
         <if test="request.combine != null and request.combine != ''">
@@ -200,9 +202,25 @@
                             <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
                         </when>
                         <!-- 执行人 -->
-                        <when test="key == 'executeUserName'">
-                            and test_plan_api_scenario.execute_user in
+                        <!-- 执行人 -->
+                        <when test="key == 'executeUserName' and values.size() > 0">
+                            and (
+                            test_plan_api_scenario.execute_user in
                             <include refid="io.metersphere.system.mapper.BaseMapper.filterInWrapper"/>
+                            <if test="${nullExecutorKey} == true">
+                                or test_plan_api_scenario.execute_user is null or test_plan_api_scenario.execute_user = ''
+                            </if>
+                            )
+                        </when>
+                        <when test="key == 'executeUserName' and values.size() == 0">
+                            and (
+                            <if test="${nullExecutorKey} == true">
+                                test_plan_api_scenario.execute_user is null or test_plan_api_scenario.execute_user = ''
+                            </if>
+                            <if test="${nullExecutorKey} == false">
+                                1=1
+                            </if>
+                            )
                         </when>
                         <when test="key=='versionId'">
                             and api_scenario.version_id in

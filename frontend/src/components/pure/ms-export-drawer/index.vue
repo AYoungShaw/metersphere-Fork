@@ -14,7 +14,14 @@
     @cancel="handleDrawerCancel"
   >
     <template #title>
-      <slot name="title"></slot>
+      <slot name="title">
+        <div v-if="props.drawerTitleProps">
+          <span class="text-[var(--color-text-1)]">{{ props.drawerTitleProps.title }}</span>
+          <span v-if="props.drawerTitleProps.count" class="ml-1 text-[var(--color-text-4)]">
+            {{ t('common.selectedCount', { count: props.drawerTitleProps.count }) }}
+          </span>
+        </div>
+      </slot>
     </template>
     <div class="panel-wrapper">
       <div class="inner-wrapper">
@@ -57,7 +64,7 @@
                 </div>
               </div>
             </a-checkbox-group>
-            <div class="text-[var(--color-text-4)]">
+            <div v-if="customList.length" class="text-[var(--color-text-4)]">
               <a-checkbox
                 :model-value="isCheckedCustomAll"
                 :indeterminate="customIndeterminate"
@@ -68,8 +75,12 @@
                 </span>
               </a-checkbox>
             </div>
-            <a-checkbox-group :model-value="selectedCustomIds" @change="(value) => handleGroupChange(value, 'custom')">
-              <div v-if="customList.length" class="mb-[32px]">
+            <a-checkbox-group
+              v-if="customList.length"
+              :model-value="selectedCustomIds"
+              @change="(value) => handleGroupChange(value, 'custom')"
+            >
+              <div class="mb-[32px]">
                 <div class="flex flex-row flex-wrap">
                   <a-checkbox
                     v-for="item in customList"
@@ -84,7 +95,7 @@
                 </div>
               </div>
             </a-checkbox-group>
-            <div class="flex flex-row items-center gap-[4px]">
+            <div v-if="otherList.length" class="flex flex-row items-center gap-[4px]">
               <div class="text-[var(--color-text-4)]">
                 <a-checkbox
                   :model-value="isCheckedOtherAll"
@@ -102,8 +113,12 @@
                 </a-checkbox>
               </div>
             </div>
-            <a-checkbox-group :model-value="selectedOtherIds" @change="(value) => handleGroupChange(value, 'other')">
-              <div v-if="otherList.length" class="mb-[32px]">
+            <a-checkbox-group
+              v-if="otherList.length"
+              :model-value="selectedOtherIds"
+              @change="(value) => handleGroupChange(value, 'other')"
+            >
+              <div class="mb-[32px]">
                 <div class="flex flex-row flex-wrap">
                   <a-checkbox
                     v-for="item in otherList"
@@ -128,7 +143,7 @@
             </div>
             <MsButton @click="handleReset">{{ t('system.orgTemplate.clear') }}</MsButton>
           </div>
-          <div class="p-[16px]">
+          <div class="selected-panel p-[16px]">
             <VueDraggable v-model="selectedList" ghost-class="ghost">
               <div
                 v-for="element in selectedList"
@@ -205,6 +220,10 @@
       selectableTitle: string; // 可选字段
       systemTitle: string; // 已选字段| 环境
       selectedTitle: string; // 已选字段| 环境
+    };
+    drawerTitleProps?: {
+      title: string;
+      count?: number;
     };
     disabledCancelKeys?: string[]; // 禁止取消系统字段
   }
@@ -313,6 +332,7 @@
 
   const handleDrawerConfirm = () => {
     emit('confirm', selectedList.value);
+    handleReset();
   };
 
   const handleDrawerCancel = () => {
@@ -469,7 +489,7 @@
       display: flex;
       overflow: hidden;
       width: 100%;
-      height: 100%;
+      height: calc(100vh - 112px);
       border: 1px solid var(--color-text-n8);
       // 可选字段
       .optional-field {
@@ -483,6 +503,11 @@
         color: var(--color-text-3);
         background: var(--color-text-n9);
         @apply flex flex-row items-center justify-between;
+      }
+      .selected-panel {
+        height: calc(100vh - 152px);
+        @apply overflow-y-auto;
+        .ms-scroll-bar();
       }
     }
   }

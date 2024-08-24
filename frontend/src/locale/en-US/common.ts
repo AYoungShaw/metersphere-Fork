@@ -84,6 +84,10 @@ export default {
   'common.quickAddMember': 'Quickly add members',
   'common.filter': 'Filter',
   'common.export': 'Export',
+  'common.exporting': 'Exporting',
+  'common.exportSuccessful': 'Export successful',
+  'common.exportFailed': 'Export failed',
+  'common.downloadFile': 'Download file',
   'common.import': 'Import',
   'common.collapseAll': 'Collapse all',
   'common.expandAll': 'Expand all',
@@ -203,4 +207,5 @@ export default {
   'common.inputPleaseEnterTags': 'Please enter the update tag enter add, not more than 64 characters',
   'common.cutSuccess': 'Cut successfully',
   'common.copySuccessToClipboard': 'Copied to clipboard',
+  'common.casePriority': 'Case Priority',
 };

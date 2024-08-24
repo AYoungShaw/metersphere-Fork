@@ -10,7 +10,7 @@
       :search-placeholder="t('common.searchByIdName')"
       @keyword-search="loadCaseList()"
       @adv-search="loadCaseList()"
-      @refresh="loadCaseList()"
+      @refresh="handleRefreshAll"
     />
     <a-spin :loading="tableLoading" class="w-full">
       <MsBaseTable
@@ -36,6 +36,14 @@
         </template>
         <template #caseLevel="{ record }">
           <CaseLevel :case-level="record.priority" />
+        </template>
+        <template #bugCount="{ record }">
+          <MsBugOperation
+            :can-edit="props.canEdit"
+            :bug-list="record.bugList"
+            :resource-id="record.id"
+            :bug-count="record.bugCount || 0"
+          />
         </template>
         <template #[FilterSlotNameEnum.API_TEST_CASE_API_LAST_EXECUTE_STATUS]="{ filterContent }">
           <ExecutionStatus :module-type="ReportEnum.API_REPORT" :status="filterContent.value" />
@@ -114,6 +122,7 @@
     MsTableProps,
   } from '@/components/pure/ms-table/type';
   import useTable from '@/components/pure/ms-table/useTable';
+  import MsBugOperation from '@/components/business/ms-bug-operation/index.vue';
   import CaseLevel from '@/components/business/ms-case-associate/caseLevel.vue';
   import ApiMethodName from '@/views/api-test/components/apiMethodName.vue';
   import apiStatus from '@/views/api-test/components/apiStatus.vue';
@@ -223,6 +232,38 @@
       showDrag: true,
     },
     {
+      title: 'case.tableColumnCreateTime',
+      slotName: 'createTime',
+      dataIndex: 'createTime',
+      showInTable: true,
+      sortable: {
+        sortDirections: ['ascend', 'descend'],
+        sorter: true,
+      },
+      width: 200,
+      showDrag: true,
+    },
+    {
+      title: 'case.tableColumnUpdateTime',
+      slotName: 'updateTime',
+      dataIndex: 'updateTime',
+      sortable: {
+        sortDirections: ['ascend', 'descend'],
+        sorter: true,
+      },
+      showInTable: true,
+      width: 200,
+      showDrag: true,
+    },
+    {
+      title: 'testPlan.featureCase.bugCount',
+      dataIndex: 'bugCount',
+      slotName: 'bugCount',
+      width: 150,
+      showDrag: true,
+      showInTable: true,
+    },
+    {
       title: 'case.caseLevel',
       dataIndex: 'priority',
       slotName: 'caseLevel',
@@ -300,7 +341,7 @@
         loadOptionParams: {
           projectId: appStore.currentProjectId,
         },
-        remoteMethod: FilterRemoteMethodsEnum.PROJECT_PERMISSION_MEMBER,
+        remoteMethod: FilterRemoteMethodsEnum.EXECUTE_USER,
         placeholderText: t('caseManagement.featureCase.PleaseSelect'),
       },
     },
@@ -317,7 +358,7 @@
     scroll: { x: '100%' },
     tableKey: TableKeyEnum.TEST_PLAN_DETAIL_API_CASE,
     showSetting: true,
-    heightUsed: 460,
+    heightUsed: 445,
     showSubdirectory: true,
     draggable: { type: 'handle' },
     draggableCondition: true,
@@ -437,6 +478,12 @@
       current: propsRes.value.msPagination?.current,
       pageSize: propsRes.value.msPagination?.pageSize,
     });
+  }
+
+  async function handleRefreshAll() {
+    emit('refresh');
+    emit('initModules');
+    loadCaseList();
   }
 
   // 显示执行报告
@@ -607,6 +654,11 @@
         break;
     }
   }
+
+  const showLinkDrawer = ref(false);
+  const showCreateDrawer = ref(false);
+
+  const drawerLoading = ref(false);
 
   // 去接口用例详情页面
   function toDetail(record: PlanDetailApiCaseItem) {

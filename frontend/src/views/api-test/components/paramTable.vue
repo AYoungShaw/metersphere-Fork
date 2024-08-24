@@ -861,6 +861,10 @@
    * @param isForce 是否强制添加
    */
   function addTableLine(rowIndex: number, addLineDisabled?: boolean, isInit?: boolean) {
+    if (props.disabledExceptParam || props.disabledParamValue) {
+      // 禁用状态下不允许添加新行
+      return;
+    }
     if (addLineDisabled) {
       emitChange('addTableLine addLineDisabled', isInit);
       return;
@@ -926,12 +930,11 @@
         });
         const { lastDataIsDefault } = filterKeyValParams(arr, defaultLineData.value, false);
         if (
-          (arr.length === 1 && !lastDataIsDefault) ||
-          (hasNoIdItem &&
-            !props.disabledExceptParam &&
-            !props.disabledParamValue &&
-            !lastDataIsDefault &&
-            !props.isTreeTable)
+          hasNoIdItem &&
+          !props.disabledExceptParam &&
+          !props.disabledParamValue &&
+          !lastDataIsDefault &&
+          !props.isTreeTable
         ) {
           addTableLine(arr.length - 1, false, true);
         }

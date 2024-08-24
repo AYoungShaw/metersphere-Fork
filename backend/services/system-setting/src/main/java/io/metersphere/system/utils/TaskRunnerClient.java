@@ -47,6 +47,8 @@ public class TaskRunnerClient {
             String token = totpGenerator.now();
             HttpHeaders headers = new HttpHeaders();
             headers.add(MsHttpHeaders.OTP_TOKEN, token);
+            headers.add(HttpHeaders.CONTENT_TYPE, "application/json");
+            headers.add(HttpHeaders.ACCEPT, "application/json");
             HttpEntity<String> httpEntity = new HttpEntity<>(headers);
             ResponseEntity<ResultHolder> entity = restTemplateWithTimeOut.exchange(u, HttpMethod.GET, httpEntity, ResultHolder.class, uriVariables);
             return entity.getBody();

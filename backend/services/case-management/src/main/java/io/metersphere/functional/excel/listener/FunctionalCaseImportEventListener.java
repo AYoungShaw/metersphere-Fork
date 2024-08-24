@@ -82,7 +82,7 @@ public class FunctionalCaseImportEventListener extends AnalysisEventListener<Map
     private SessionUser user;
     private int successCount = 0;
     private Map<String, String> pathMap = new HashMap<>();
-    protected static final int TAGS_COUNT = 15;
+    protected static final int TAGS_COUNT = 10;
     protected static final int TAG_LENGTH = 64;
 
     private AtomicLong lastPos;
@@ -95,7 +95,7 @@ public class FunctionalCaseImportEventListener extends AnalysisEventListener<Map
         customFieldsMap = customFields.stream().collect(Collectors.toMap(TemplateCustomFieldDTO::getFieldName, i -> i));
         moduleTree = CommonBeanFactory.getBean(FunctionalCaseModuleService.class).getTree(request.getProjectId());
         functionalCaseService = CommonBeanFactory.getBean(FunctionalCaseService.class);
-        customFieldValidatorMap = CustomFieldValidatorFactory.getValidatorMap();
+        customFieldValidatorMap = CustomFieldValidatorFactory.getValidatorMap(request.getProjectId());
         lastPos = new AtomicLong(pos);
         this.user = user;
 
@@ -276,14 +276,14 @@ public class FunctionalCaseImportEventListener extends AnalysisEventListener<Map
      */
     private void handleSteps(FunctionalCaseExcelData functionalCaseExcelData) {
 
-        if (StringUtils.isNotBlank(functionalCaseExcelData.getCaseEditType()) && StringUtils.equalsIgnoreCase(functionalCaseExcelData.getCaseEditType(), FunctionalCaseTypeConstants.CaseEditType.TEXT.name())) {
-            functionalCaseExcelData.setTextDescription(functionalCaseExcelData.getTextDescription());
-            functionalCaseExcelData.setExpectedResult(functionalCaseExcelData.getExpectedResult());
-        } else {
+        if (StringUtils.isNotBlank(functionalCaseExcelData.getCaseEditType()) && StringUtils.equalsIgnoreCase(functionalCaseExcelData.getCaseEditType(), FunctionalCaseTypeConstants.CaseEditType.STEP.name())) {
             String steps = getSteps(functionalCaseExcelData);
             functionalCaseExcelData.setSteps(steps);
             functionalCaseExcelData.setTextDescription(StringUtils.EMPTY);
             functionalCaseExcelData.setExpectedResult(StringUtils.EMPTY);
+        } else {
+            functionalCaseExcelData.setTextDescription(functionalCaseExcelData.getTextDescription());
+            functionalCaseExcelData.setExpectedResult(functionalCaseExcelData.getExpectedResult());
         }
 
     }
@@ -414,6 +414,10 @@ public class FunctionalCaseImportEventListener extends AnalysisEventListener<Map
      * @param errMsg
      */
     private void validateTags(FunctionalCaseExcelData data, StringBuilder errMsg) {
+        if (StringUtils.isBlank(data.getTags())) {
+            data.setTags(StringUtils.EMPTY);
+            return;
+        }
         List<String> tags = functionalCaseService.handleImportTags(data.getTags());
         if (tags.size() > TAGS_COUNT) {
             errMsg.append(Translator.get("tags_count"))
@@ -425,7 +429,6 @@ public class FunctionalCaseImportEventListener extends AnalysisEventListener<Map
                 errMsg.append(Translator.get("tag_length"))
                         .append(ERROR_MSG_SEPARATOR);
             }
-            return;
         });
     }
 

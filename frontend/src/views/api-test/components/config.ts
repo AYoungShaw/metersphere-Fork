@@ -193,32 +193,13 @@ export const caseStatusOptions = [
   { label: 'apiTestManagement.done', value: RequestCaseStatus.DONE },
 ];
 
-// 断言 参数表格默认行的值
-export const defaultAssertParamsItem: ResponseAssertionItem = {
+// 断言xpath默认行的值
+export const xpathAssertParamsItem: ResponseAssertionItem = {
   expression: '',
-  condition: RequestAssertionCondition.EQUALS,
   expectedValue: '',
   enable: true,
-};
-
-// 断言xpath & reg
-export const defaultAssertXpathParamsItem: ResponseAssertionItem = {
-  expression: '',
-  enable: true,
-};
-// 断言 xpath
-export const defaultExtractParamItem: ExpressionConfig = {
-  enable: true,
-  variableName: '',
-  variableType: RequestExtractEnvType.TEMPORARY,
-  extractScope: RequestExtractScope.BODY,
-  expression: '',
-  extractType: RequestExtractExpressionEnum.JSON_PATH,
-  expressionMatchingRule: RequestExtractExpressionRuleType.EXPRESSION,
-  resultMatchingRule: RequestExtractResultMatchingRule.RANDOM,
-  resultMatchingRuleNum: 1,
-  responseFormat: ResponseBodyXPathAssertionFormat.XML,
-  moreSettingPopoverVisible: false,
+  extractType: RequestExtractExpressionEnum.X_PATH,
+  valid: true,
 };
 // @desc 断言的字段xpath和上边的defaultExtractParamItem不匹配所以添加此类型为了保存参数过滤正确
 export const assertDefaultParamsItem: ResponseAssertionItem = {
@@ -230,10 +211,10 @@ export const assertDefaultParamsItem: ResponseAssertionItem = {
 
 // 断言 json默认值
 export const jsonPathDefaultParamItem = {
-  id: '',
   enable: true,
   expression: '',
   expectedValue: '',
+  extractType: RequestExtractExpressionEnum.JSON_PATH,
   condition: EQUAL.value,
   valid: true,
 };
@@ -259,6 +240,20 @@ export const responseAssertionTypeMap: Record<string, string> = {
   [FullResponseAssertionType.RESPONSE_TIME]: 'apiTestManagement.responseTime',
   [FullResponseAssertionType.SCRIPT]: 'apiTestManagement.script',
   [FullResponseAssertionType.VARIABLE]: 'apiTestManagement.variable',
+};
+// 提取参数
+export const defaultExtractParamItem: ExpressionConfig = {
+  enable: true,
+  variableName: '',
+  variableType: RequestExtractEnvType.TEMPORARY,
+  extractScope: RequestExtractScope.BODY,
+  expression: '',
+  extractType: RequestExtractExpressionEnum.JSON_PATH,
+  expressionMatchingRule: RequestExtractExpressionRuleType.EXPRESSION,
+  resultMatchingRule: RequestExtractResultMatchingRule.RANDOM,
+  resultMatchingRuleNum: 1,
+  responseFormat: ResponseBodyXPathAssertionFormat.XML,
+  moreSettingPopoverVisible: false,
 };
 // 提取类型选项
 export const extractTypeOptions = [
@@ -628,7 +623,7 @@ vars.put("responseData", responseData);`,
       'if (responseCode != expectedCode) {\n' +
       '    AssertionResult.setFailure(true);\n' +
       // eslint-disable-next-line no-template-curly-in-string
-      '    AssertionResult.setFailureMessage("Expected response code: ${expectedCode}, but got: ${responseCode}")\n' +
+      '    AssertionResult.setFailureMessage(`Expected response code: ${expectedCode}, but got: ${responseCode}`)\n' +
       '}\n',
     scenario: `// 导入必要的 Java 类
 var URL = java.net.URL;
@@ -688,15 +683,15 @@ with urllib.request.urlopen(request) as response:
     status_code = response.getcode()
     log.info(f"Status Code: {status_code}")`,
     postOperation: `# 获取 HTTP 请求的响应数据
-responseData = prev.getResponseDataAsString();
+responseData = prev.getResponseDataAsString()
 
 # 输出响应数据到控制台
-log.info("Response Data: " + responseData);
-vars.put("variable_name", "variable_value");
+log.info("Response Data: " + responseData)
+vars.put("variable_name", "variable_value")
 
 # 你可以进一步处理响应数据
 # 例如：保存响应数据到变量
-vars.put("responseData", responseData);`,
+vars.put("responseData", responseData)`,
     assertion: `# 获取响应状态码
 response_code = prev.getResponseCode()
 

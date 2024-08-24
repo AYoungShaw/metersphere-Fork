@@ -13,10 +13,10 @@
       <div class="flex flex-wrap items-baseline justify-between gap-[12px]">
         <div class="flex flex-1 flex-wrap items-center gap-[16px]">
           <a-select
-            v-if="requestVModel.isNew"
+            v-if="requestVModel.isNew && !isHttpProtocol"
             v-model:model-value="requestVModel.protocol"
             :loading="protocolLoading"
-            class="w-[90px]"
+            class="w-[100px]"
             @change="(val) => handleActiveDebugProtocolChange(val as string)"
           >
             <a-tooltip
@@ -30,7 +30,7 @@
               </a-option>
             </a-tooltip>
           </a-select>
-          <div v-else class="flex items-center gap-[4px]">
+          <div v-else-if="!requestVModel.isNew" class="flex items-center gap-[4px]">
             <apiMethodName
               :method="(requestVModel.protocol as RequestMethods)"
               tag-background-color="rgb(var(--link-7))"
@@ -45,9 +45,27 @@
             </a-tooltip>
           </div>
           <a-input-group v-if="isHttpProtocol" class="flex-1">
+            <a-select
+              v-if="requestVModel.isNew"
+              v-model:model-value="requestVModel.protocol"
+              :loading="protocolLoading"
+              class="w-[100px] hover:z-10"
+              @change="(val) => handleActiveDebugProtocolChange(val as string)"
+            >
+              <a-tooltip
+                v-for="item of protocolOptions"
+                :key="item.value as string"
+                :content="item.label"
+                :mouse-enter-delay="300"
+              >
+                <a-option :value="item.value">
+                  {{ item.label }}
+                </a-option>
+              </a-tooltip>
+            </a-select>
             <apiMethodSelect
               v-model:model-value="requestVModel.method"
-              class="w-[140px]"
+              class="w-[120px]"
               @change="handleActiveDebugChange"
             />
             <a-input
@@ -57,7 +75,7 @@
                 props.isDefinition ? t('apiTestDebug.definitionUrlPlaceholder') : t('apiTestDebug.urlPlaceholder')
               "
               allow-clear
-              class="hover:z-10"
+              class="flex-1 hover:z-10"
               :style="isUrlError ? 'border: 1px solid rgb(var(--danger-6));z-index: 10' : ''"
               @input="() => (isUrlError = false)"
               @change="handleUrlChange"
@@ -73,6 +91,7 @@
             v-model:model-value="requestVModel.mode"
             type="button"
             class="mr-[12px]"
+            size="medium"
           >
             <a-radio value="definition">{{ t('apiTestManagement.definition') }}</a-radio>
             <a-radio value="debug">{{ t('apiTestManagement.debug') }}</a-radio>
@@ -132,6 +151,8 @@
             <!-- 接口定义-调试模式，可保存或保存为新用例 -->
             <a-dropdown-button
               v-if="requestVModel.mode === 'debug'"
+              type="outline"
+              class="arco-btn-group-outline--secondary"
               :disabled="(isHttpProtocol && !requestVModel.url) || saveLoading"
               @click="() => handleSelect('save')"
             >
@@ -166,6 +187,8 @@
                 hasAllPermission([props.permissionMap.create, props.permissionMap.saveASApi])
               "
               :disabled="(isHttpProtocol && !requestVModel.url) || saveLoading"
+              type="outline"
+              class="arco-btn-group-outline--secondary"
               @click="handleSaveShortcut"
             >
               <div class="flex items-center">
@@ -202,12 +225,12 @@
         v-model:active-key="requestVModel.activeTab"
         :content-tab-list="contentTabList"
         :get-text-func="getTabBadge"
-        class="sticky-content no-content relative top-0 border-b px-[16px]"
+        class="sticky-content no-content relative top-0 px-[16px]"
         @tab-click="requestTabClick"
       />
       <div :class="`request-content-and-response ${activeLayout}`">
         <a-spin class="request" :loading="requestVModel.executeLoading || loading">
-          <div class="request-tab-pane flex flex-col p-[16px]">
+          <div class="request-tab-pane flex flex-col p-[16px] pt-[8px]">
             <apiBaseForm
               v-if="!props.isCase && props.isDefinition"
               v-show="requestVModel.activeTab === RequestComposition.BASE_INFO"
@@ -281,6 +304,7 @@
               :response="requestVModel.response?.requestResults[0]?.responseResult.body"
               :assertion-config="requestVModel.children[0].assertionConfig"
               :show-extraction="true"
+              @change="handleActiveDebugChange"
             />
             <auth
               v-else-if="requestVModel.activeTab === RequestComposition.AUTH"

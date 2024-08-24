@@ -11,7 +11,7 @@
         :search-placeholder="t('caseManagement.caseReview.searchPlaceholder')"
         @keyword-search="(val, filter) => searchCase(filter)"
         @adv-search="searchCase"
-        @refresh="handleRefreshAndInitModules"
+        @refresh="handleRefreshAll"
       >
         <template v-if="showType !== 'list'" #nameRight>
           <div v-if="reviewPassRule === 'MULTIPLE'" class="ml-[16px]">
@@ -48,6 +48,7 @@
         no-disable
         filter-icon-align-left
         v-on="propsEvent"
+        @filter-change="getModuleCount"
         @batch-action="handleTableBatch"
       >
         <template #[FilterSlotNameEnum.CASE_MANAGEMENT_REVIEW_RESULT]="{ filterContent }">
@@ -214,7 +215,7 @@
           :label="t('caseManagement.caseReview.reviewResult')"
           class="mb-[16px]"
         >
-          <a-radio-group v-model:model-value="dialogForm.result" @change="() => dialogFormRef?.resetFields()">
+          <a-radio-group v-model:model-value="dialogForm.result">
             <a-radio value="PASS">
               <div class="inline-flex items-center">
                 <MsIcon type="icon-icon_succeed_filled" class="mr-[4px] text-[rgb(var(--success-6))]" />
@@ -636,7 +637,8 @@
     }
   }
 
-  async function handleRefreshAndInitModules() {
+  async function handleRefreshAll() {
+    emit('refresh');
     await initModules();
     refresh();
   }
@@ -814,7 +816,9 @@
   // 获取用例等级数据
   async function getCaseLevelFields() {
     const result = await getCaseDefaultFields(appStore.currentProjectId);
-    caseLevelFields.value = result.customFields.find((item: any) => item.internal && item.fieldName === '用例等级');
+    caseLevelFields.value = result.customFields.find(
+      (item: any) => item.internal && item.internalFieldKey === 'functional_priority'
+    );
     columns = columns.map((item) => {
       if (item.dataIndex === 'caseLevel') {
         return {
@@ -1089,7 +1093,6 @@
 <style lang="less" scoped>
   .case-show-type {
     @apply grid grid-cols-2;
-
     .show-type-icon {
       :deep(.arco-radio-button-content) {
         @apply flex;
@@ -1099,36 +1102,28 @@
       }
     }
   }
-
   :deep(.arco-radio-label) {
     @apply inline-flex;
   }
-
   :deep(.param-input:not(.arco-input-focus, .arco-select-view-focus)) {
     &:not(:hover) {
       border-color: transparent !important;
-
       .arco-input::placeholder {
         @apply invisible;
       }
-
       .arco-select-view-icon {
         @apply invisible;
       }
-
       .arco-select-view-value {
         color: var(--color-text-brand);
       }
-
       .arco-input-suffix {
         @apply invisible;
       }
     }
   }
-
   .list-show-type {
     padding: 0;
-
     :deep(.arco-radio-button-content) {
       padding: 4px 6px;
     }

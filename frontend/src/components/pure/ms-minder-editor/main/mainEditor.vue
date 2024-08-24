@@ -95,6 +95,8 @@
   });
   const currentTreePath = ref<MinderJsonNodeData[]>([]);
 
+  const floatMenuVisible = ref(false);
+
   async function init() {
     window.editor = new Editor(mec.value, {
       sequenceEnable: props.sequenceEnable,
@@ -140,7 +142,11 @@
         if (props.disabled) {
           ['movetoparent', 'arrange'].forEach((item) => notChangeCommands.add(item));
         }
-        if (selectNodes.length > 0 && !notChangeCommands.has(event.commandName.toLocaleLowerCase())) {
+        if (
+          !props.disabled &&
+          selectNodes.length > 0 &&
+          !notChangeCommands.has(event.commandName.toLocaleLowerCase())
+        ) {
           minderStore.setMinderUnsaved(true);
           selectNodes.forEach((node: MinderJsonNode) => {
             markChangeNode(node);
@@ -151,6 +157,12 @@
             const targetNode = window.minder.getSelectedNode();
             targetNode.parent.renderTree();
           }, 100);
+        }
+      },
+      handleDblclick() {
+        const state = window.editor.fsm.state();
+        if (state === 'input') {
+          floatMenuVisible.value = false;
         }
       },
     });
@@ -212,8 +224,6 @@
       window.minder.execCommand('camera', root);
     }, 300); // TODO:暂未知渲染时机，临时延迟解决
   }
-
-  const floatMenuVisible = ref(false);
 
   function save() {
     let data = importJson.value;
@@ -281,7 +291,7 @@
   watch(
     () => importJson.value.treePath,
     (arr) => {
-      currentTreePath.value = arr;
+      currentTreePath.value = arr || [];
     }
   );
 

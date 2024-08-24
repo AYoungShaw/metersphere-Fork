@@ -53,7 +53,7 @@
       </a-tooltip>
     </div>
     <div class="my-[16px] flex items-center">
-      <a-switch v-model:model-value="form.notificationConfig.apiCreator" size="small" />
+      <a-switch v-model:model-value="form.notificationConfig.apiCaseCreator" size="small" />
       <div class="ml-[8px] text-[var(--color-text-1)]">{{ t('case.NoticeApiCaseCreator') }}</div>
     </div>
     <div class="my-[16px] flex items-center">
@@ -98,8 +98,8 @@
 
   const initForm: batchSyncForm = {
     notificationConfig: {
-      apiCreator: false,
-      scenarioCreator: false,
+      apiCaseCreator: true,
+      scenarioCreator: true,
     },
     // 同步项目
     syncItems: {
@@ -112,7 +112,13 @@
   };
 
   const form = ref<batchSyncForm>(cloneDeep(initForm));
-  const checkType = ref([]);
+  const initCheckList = [
+    RequestComposition.HEADER,
+    RequestComposition.BODY,
+    RequestComposition.QUERY,
+    RequestComposition.REST,
+  ];
+  const checkType = ref([...initCheckList]);
 
   const checkList = ref([
     {
@@ -136,7 +142,7 @@
 
   function resetForm() {
     form.value = cloneDeep(initForm);
-    checkType.value = [];
+    checkType.value = [...initCheckList];
     showBatchSyncModal.value = false;
   }
 

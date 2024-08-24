@@ -7,7 +7,6 @@ import io.metersphere.sdk.util.CommonBeanFactory;
 import io.metersphere.sdk.util.Translator;
 import io.metersphere.system.domain.User;
 import io.metersphere.system.dto.sdk.TemplateCustomFieldDTO;
-import io.metersphere.system.utils.SessionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.HashMap;
@@ -22,12 +21,15 @@ public class CustomFieldMemberValidator extends AbstractCustomFieldValidator {
 
     protected Map<String, String> userIdMap;
     protected Map<String, String> userEmailMap;
-    protected Map<String, String> userNameMap;
+    protected Map<String, String> userIdEmailMap;
 
     public CustomFieldMemberValidator() {
+    }
+
+    public CustomFieldMemberValidator(String projectId) {
         this.isKVOption = true;
         ProjectApplicationService projectApplicationService = CommonBeanFactory.getBean(ProjectApplicationService.class);
-        List<User> memberOption = projectApplicationService.getProjectUserList(SessionUtils.getCurrentProjectId());
+        List<User> memberOption = projectApplicationService.getProjectUserList(projectId);
         userIdMap = memberOption.stream()
                 .collect(
                         Collectors.toMap(user -> user.getId().toLowerCase(), User::getId)
@@ -35,9 +37,9 @@ public class CustomFieldMemberValidator extends AbstractCustomFieldValidator {
         userEmailMap = new HashMap<>();
         memberOption.stream()
                 .forEach(user -> userEmailMap.put(user.getEmail().toLowerCase(), user.getId()));
-        userNameMap = new HashMap<>();
+        userIdEmailMap = new HashMap<>();
         memberOption.stream()
-                .forEach(user -> userNameMap.put(user.getId(), user.getName().toLowerCase()));
+                .forEach(user -> userIdEmailMap.put(user.getId(), user.getEmail().toLowerCase()));
     }
 
     @Override
@@ -68,8 +70,8 @@ public class CustomFieldMemberValidator extends AbstractCustomFieldValidator {
     @Override
     public Object parse2Value(String keyOrValue, TemplateCustomFieldDTO customField) {
         keyOrValue = keyOrValue.toLowerCase();
-        if (userNameMap.containsKey(keyOrValue)) {
-            return userNameMap.get(keyOrValue);
+        if (userIdEmailMap.containsKey(keyOrValue)) {
+            return userIdEmailMap.get(keyOrValue);
         }
         return keyOrValue;
     }

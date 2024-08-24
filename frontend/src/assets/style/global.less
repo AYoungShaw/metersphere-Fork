@@ -15,7 +15,7 @@ body {
   @apply m-0 h-full w-full p-0;
 
   font-size: 14px;
-  font-family: 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei' !important;
+  font-family: 'Helvetica Neue', Arial, 'PingFang SC', 'Source Han Serif' !important;
   color: var(--color-text-1);
   background-color: var(--color-bg-1);
   line-height: 22px;
@@ -180,5 +180,13 @@ body {
   }
   &--disabled {
     @apply cursor-not-allowed;
+  }
+}
+
+/* 报告气泡样式 */
+.report-popover-content {
+  padding: 16px;
+  .arco-popover-content {
+    @apply mt-0;
   }
 }

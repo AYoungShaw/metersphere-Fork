@@ -24,44 +24,14 @@
       :action-config="tableBatchActions"
       v-on="propsEvent"
       @batch-action="handleTableBatch"
+      @enable-change="enableChange"
     >
       <template #operation="{ record }">
-        <template v-if="!record.enable">
-          <div class="flex flex-row">
-            <span v-permission="['PROJECT_APPLICATION_API:UPDATE']" class="flex flex-row">
-              <MsButton class="!mr-0" @click="handleEnableOrDisableProject(record.id)">
-                {{ t('common.enable') }}
-              </MsButton>
-              <a-divider direction="vertical" />
-            </span>
-            <span>
-              <MsButton
-                v-permission="['PROJECT_APPLICATION_API:DELETE']"
-                class="!mr-0"
-                @click="handleDelete(record.id)"
-                >{{ t('common.delete') }}</MsButton
-              >
-            </span>
-          </div>
-        </template>
-        <template v-else>
-          <span v-permission="['PROJECT_APPLICATION_API:UPDATE']" class="flex flex-row items-center">
-            <MsButton class="!mr-0" @click="showAddRule(record)">{{ t('common.edit') }}</MsButton>
-            <a-divider class="h-[16px]" direction="vertical" />
-          </span>
-          <span v-permission="['PROJECT_APPLICATION_API:UPDATE']" class="flex flex-row items-center">
-            <MsButton class="!mr-0" @click="handleEnableOrDisableProject(record.id, false)">
-              {{ t('common.disable') }}
-            </MsButton>
-            <a-divider class="h-[16px]" direction="vertical" />
-          </span>
-          <MsTableMoreAction
-            v-permission="['PROJECT_APPLICATION_API:UPDATE']"
-            class="!mr-0"
-            :list="tableActions"
-            @select="handleMoreAction($event, record)"
-          ></MsTableMoreAction>
-        </template>
+        <span v-permission="['PROJECT_APPLICATION_API:UPDATE']" class="flex flex-row items-center">
+          <MsButton class="!mr-0" @click="showAddRule(record)">{{ t('common.edit') }}</MsButton>
+          <a-divider v-permission="['PROJECT_APPLICATION_API:DELETE']" class="h-[16px]" direction="vertical" />
+        </span>
+        <MsTableMoreAction class="!mr-0" :list="tableActions" @select="handleMoreAction($event, record)" />
       </template>
     </MsBaseTable>
   </MsCard>
@@ -116,6 +86,7 @@
   import { useI18n } from '@/hooks/useI18n';
   import useModal from '@/hooks/useModal';
   import { useAppStore, useTableStore } from '@/store';
+  import { hasAnyPermission } from '@/utils/permission';
 
   import { FakeTableListItem } from '@/models/projectManagement/menuManagement';
   import { ProjectManagementRouteEnum } from '@/enums/routeEnum';
@@ -162,7 +133,7 @@
         label: 'common.delete',
         eventTag: 'batchDelete',
         danger: true,
-        permission: ['PROJECT_APPLICATION_API:UPDATE'],
+        permission: ['PROJECT_APPLICATION_API:DELETE'],
       },
     ],
   };
@@ -218,6 +189,10 @@
     },
   ];
 
+  const hasOperationPermission = computed(() =>
+    hasAnyPermission(['PROJECT_APPLICATION_API:UPDATE', 'PROJECT_APPLICATION_API:DELETE'])
+  );
+
   const batchFormModels: Ref<FormItemModel[]> = ref([...initBatchFormModels]);
 
   const rulesColumn: MsTableColumn = [
@@ -231,6 +206,7 @@
       title: 'project.menu.rule.enable',
       dataIndex: 'enable',
       width: 143,
+      permission: ['PROJECT_APPLICATION_API:UPDATE'],
     },
     {
       title: 'project.menu.rule.label',
@@ -259,11 +235,11 @@
       width: 210,
     },
     {
-      title: 'project.menu.rule.operation',
+      title: hasOperationPermission.value ? 'project.menu.rule.operation' : '',
       dataIndex: 'operation',
       slotName: 'operation',
       showTooltip: true,
-      width: 169,
+      width: hasOperationPermission.value ? 150 : 50,
     },
   ];
   await tableStore.initColumn(TableKeyEnum.PROJECT_MANAGEMENT_MENU_FALSE_ALERT, rulesColumn, 'drawer');
@@ -340,6 +316,7 @@
       label: 'system.user.delete',
       eventTag: 'delete',
       danger: true,
+      permission: ['PROJECT_APPLICATION_API:DELETE'],
     },
   ];
 
@@ -469,6 +446,12 @@
         break;
       default:
         handleDelete(params);
+    }
+  }
+
+  function enableChange(record: FakeTableListItem, newValue: string | number | boolean) {
+    if (record.id) {
+      handleEnableOrDisableProject(record.id, newValue as boolean);
     }
   }
 

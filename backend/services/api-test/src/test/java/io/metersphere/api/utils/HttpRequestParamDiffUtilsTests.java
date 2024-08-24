@@ -228,6 +228,13 @@ public class HttpRequestParamDiffUtilsTests {
 
         Body body1 = new Body();
         Body body2 = new Body();
+
+        body1.setBodyType(Body.BodyType.FORM_DATA.name());
+        body1.setFormDataBody(new FormDataBody());
+        body2.setBodyType(Body.BodyType.FORM_DATA.name());
+        body2.setFormDataBody(new FormDataBody());
+        Assertions.assertFalse(HttpRequestParamDiffUtils.isBodyDiff(body1, body2));
+
         body1.setBodyType(Body.BodyType.FORM_DATA.name());
         body2.setBodyType(Body.BodyType.RAW.name());
         Assertions.assertTrue(HttpRequestParamDiffUtils.isBodyDiff(body1, body2));
@@ -759,6 +766,12 @@ public class HttpRequestParamDiffUtilsTests {
         sourceBody.getFormDataBody().getFormValues().add(formDataKV);
         result = HttpRequestParamDiffUtils.syncBodyDiff(true, sourceBody, targetBody);
         Assertions.assertEquals(result.getFormDataBody(), sourceBody.getFormDataBody());
+        FormDataKV formDataKV2 = new FormDataKV();
+        formDataKV2.setKey("key2");
+        formDataKV2.setValue("value2");
+        targetBody.getFormDataBody().getFormValues().add(formDataKV);
+        result = HttpRequestParamDiffUtils.syncBodyDiff(true, sourceBody, targetBody);
+        Assertions.assertNotEquals(result.getFormDataBody(), sourceBody.getFormDataBody());
 
         sourceBody.setBodyType(Body.BodyType.WWW_FORM.name());
         targetBody.setBodyType(Body.BodyType.WWW_FORM.name());

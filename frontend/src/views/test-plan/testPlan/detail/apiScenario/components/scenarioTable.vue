@@ -10,7 +10,7 @@
       :search-placeholder="t('common.searchByIdName')"
       @keyword-search="loadCaseList()"
       @adv-search="loadCaseList()"
-      @refresh="loadCaseList()"
+      @refresh="handleRefreshAll"
     />
     <a-spin :loading="tableLoading" class="w-full">
       <MsBaseTable
@@ -48,6 +48,14 @@
         </template>
         <template #status="{ record }">
           <apiStatus :status="record.status" />
+        </template>
+        <template #bugCount="{ record }">
+          <MsBugOperation
+            :can-edit="props.canEdit"
+            :bug-list="record.bugList"
+            :resource-id="record.id"
+            :bug-count="record.bugCount || 0"
+          />
         </template>
         <template v-if="props.canEdit" #operation="{ record }">
           <MsButton
@@ -113,6 +121,7 @@
     MsTableProps,
   } from '@/components/pure/ms-table/type';
   import useTable from '@/components/pure/ms-table/useTable';
+  import MsBugOperation from '@/components/business/ms-bug-operation/index.vue';
   import CaseLevel from '@/components/business/ms-case-associate/caseLevel.vue';
   import apiStatus from '@/views/api-test/components/apiStatus.vue';
   import CaseAndScenarioReportDrawer from '@/views/api-test/components/caseAndScenarioReportDrawer.vue';
@@ -243,11 +252,43 @@
       showInTable: false,
     },
     {
+      title: 'apiScenario.table.columns.createTime',
+      slotName: 'createTime',
+      dataIndex: 'createTime',
+      showInTable: true,
+      sortable: {
+        sortDirections: ['ascend', 'descend'],
+        sorter: true,
+      },
+      width: 200,
+      showDrag: true,
+    },
+    {
+      title: 'apiScenario.table.columns.updateTime',
+      slotName: 'updateTime',
+      dataIndex: 'updateTime',
+      sortable: {
+        sortDirections: ['ascend', 'descend'],
+        sorter: true,
+      },
+      showInTable: true,
+      width: 200,
+      showDrag: true,
+    },
+    {
       title: 'common.belongModule',
       dataIndex: 'moduleName',
       showTooltip: true,
       width: 200,
       showDrag: true,
+    },
+    {
+      title: 'testPlan.featureCase.bugCount',
+      dataIndex: 'bugCount',
+      slotName: 'bugCount',
+      width: 150,
+      showDrag: true,
+      showInTable: true,
     },
     {
       title: 'common.belongProject',
@@ -282,7 +323,7 @@
         loadOptionParams: {
           projectId: appStore.currentProjectId,
         },
-        remoteMethod: FilterRemoteMethodsEnum.PROJECT_PERMISSION_MEMBER,
+        remoteMethod: FilterRemoteMethodsEnum.EXECUTE_USER,
         placeholderText: t('caseManagement.featureCase.PleaseSelect'),
       },
     },
@@ -299,7 +340,7 @@
     scroll: { x: '100%' },
     tableKey: TableKeyEnum.TEST_PLAN_DETAIL_API_CASE,
     showSetting: true,
-    heightUsed: 460,
+    heightUsed: 445,
     showSubdirectory: true,
     draggable: { type: 'handle' },
     draggableCondition: true,
@@ -413,6 +454,12 @@
       loadCaseList();
     }
   );
+
+  async function handleRefreshAll() {
+    emit('refresh');
+    emit('initModules');
+    loadCaseList();
+  }
 
   async function getModuleCount() {
     const tableParams = await getTableParams(false);

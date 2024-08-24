@@ -51,7 +51,7 @@
           multiple
           :max-tag-count="2"
           size="small"
-          class="w-[260px]"
+          class="w-full max-w-[300px]"
           :popup-visible="record.showProjectSelect"
           @change="(value) => selectUserOrProject(value, record, 'project')"
           @popup-visible-change="visibleChange($event, record, 'project')"
@@ -74,7 +74,7 @@
           v-model="record.selectUserList"
           multiple
           :max-tag-count="2"
-          class="w-[260px]"
+          class="w-full max-w-[300px]"
           :popup-visible="record.showUserSelect"
           @change="(value) => selectUserOrProject(value, record, 'user')"
           @popup-visible-change="(value) => visibleChange(value, record, 'user')"
@@ -181,15 +181,16 @@
       dataIndex: 'email',
       showTooltip: true,
       sortIndex: 0,
+      width: 200,
     },
     {
       title: 'organization.member.tableColunmName',
       dataIndex: 'name',
       showInTable: true,
       showTooltip: true,
-      ellipsis: true,
       showDrag: false,
       sortIndex: 1,
+      width: 300,
     },
     {
       title: 'organization.member.tableColunmEmail',
@@ -197,7 +198,6 @@
       width: 150,
       showInTable: true,
       showTooltip: true,
-      ellipsis: true,
       sortIndex: 2,
       showDrag: false,
     },
@@ -207,7 +207,6 @@
       showInTable: true,
       width: 200,
       showTooltip: true,
-      ellipsis: true,
       showDrag: true,
     },
     {
@@ -223,8 +222,9 @@
       slotName: 'userRoleIdNameMap',
       dataIndex: 'userRoleIdNameMap',
       showInTable: true,
-      showDrag: true,
       isTag: true,
+      showDrag: true,
+      width: 300,
     },
     {
       title: 'organization.member.tableColunmStatus',

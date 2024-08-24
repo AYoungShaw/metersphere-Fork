@@ -263,11 +263,14 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
     if (
       Object.keys(node.data || {}).length === 0 ||
       node.data?.id === 'root' ||
-      (node.parent?.data?.resource || []).length === 0 ||
-      node.parent?.data?.id === 'NONE'
+      (node.parent?.data?.resource || []).length === 0
     ) {
-      // 没有数据的节点、默认模块节点、父节点为文本节点、父节点为NONE虚拟根节点的节点不可替换标签
+      // 没有数据的节点、默认模块节点、父节点为文本节点的节点不可替换标签
       return [];
+    }
+    if (node.parent?.data?.id === 'NONE') {
+      // 父节点为NONE虚拟根节点下只能替换为模块标签
+      return [moduleTag];
     }
     if (node.data?.resource?.some((e) => topTags.includes(e))) {
       // 选中节点属于顶级节点，可替换为除自身外的顶级标签
@@ -370,8 +373,8 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
   /**
    * 插入步骤描述
    */
-  function insetStepDesc() {
-    insertSpecifyNode('AppendChildNode', stepTag);
+  function insetStepDesc(type: 'AppendChildNode' | 'AppendSiblingNode') {
+    insertSpecifyNode(type, stepTag);
     nextTick(() => {
       insertSpecifyNode('AppendChildNode', stepExpectTag);
     });
@@ -420,7 +423,7 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
               insertSpecifyNode('AppendChildNode', remarkTag);
             } else if (!hasTextDesc) {
               // 没有文本描述，则默认添加一个步骤描述
-              insetStepDesc();
+              insetStepDesc('AppendChildNode');
             }
           }
         } else if (
@@ -429,9 +432,6 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
         ) {
           // 当前节点是步骤描述或文本描述，且没有子节点，则默认添加一个预期结果
           insertSpecifyNode('AppendChildNode', value || stepExpectTag);
-        } else if (node.data?.resource?.includes(prerequisiteTag) && (!node.children || node.children.length === 0)) {
-          // 当前节点是前置操作，则默认添加一个文本节点
-          execInert('AppendChildNode');
         } else if (
           (!node.data?.resource || node.data?.resource?.length === 0) &&
           (!node.parent?.data?.resource || node.parent?.data?.resource?.length === 0)
@@ -468,7 +468,7 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
             insertSpecifyNode('AppendSiblingNode', remarkTag);
           } else if (!hasTextDesc) {
             // 没有文本描述，则默认添加一个步骤描述
-            insetStepDesc();
+            insetStepDesc('AppendSiblingNode');
           }
         } else if (node.parent?.data?.resource?.includes(moduleTag) || !node.parent?.data?.resource) {
           // 当前节点的父节点是模块或没有标签，则默认添加一个文本节点
@@ -569,6 +569,12 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
         return true;
       }
       if (node.data?.resource?.includes(moduleTag)) {
+        if (node.data?.id === 'root') {
+          // 未规划节点下只能粘贴用例
+          if (!nodes.every((e) => e.data?.resource?.includes(caseTag))) {
+            return true;
+          }
+        }
         //  NONE 虚拟模块下，只能粘贴模块
         if (node.data?.id === 'NONE' && nodes.every((e) => e.data?.resource?.includes(moduleTag))) {
           return false;
@@ -629,6 +635,24 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
           // 粘贴的是期望结果节点
           return false;
         }
+      }
+    }
+    return true;
+  }
+
+  /**
+   * 是否可展示更多菜单节点操作(复制、剪切、粘贴、删除)
+   */
+  function canShowMoreMenuNodeOperation() {
+    if (window.minder) {
+      const node: MinderJsonNode = window.minder.getSelectedNode();
+      if (node?.data?.id === 'NONE') {
+        // 虚拟根节点不展示节点操作
+        return false;
+      }
+      if (node?.data?.resource?.includes(moduleTag) && node?.data?.id === 'root') {
+        // 根模块节点不展示节点操作
+        return false;
       }
     }
     return true;
@@ -726,5 +750,6 @@ export default function useMinderBaseApi({ hasEditPermission }: { hasEditPermiss
     handleContentChange,
     replaceableTags,
     priorityDisableCheck,
+    canShowMoreMenuNodeOperation,
   };
 }

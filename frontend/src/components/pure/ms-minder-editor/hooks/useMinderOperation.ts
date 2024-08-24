@@ -54,19 +54,23 @@ export default function useMinderOperation(options: MinderOperationProps) {
    * 执行复制
    */
   const minderCopy = async (e?: ClipboardEvent) => {
-    if ((!options.canShowMoreMenu || !options.canShowMoreMenuNodeOperation) && options.canShowBatchCopy === false) {
+    const { editor } = window;
+    const { minder, fsm } = editor;
+    const selectedNodes: MinderJsonNode[] = minder.getSelectedNodes();
+    if (
+      !options.canShowMoreMenu ||
+      !options.canShowMoreMenuNodeOperation ||
+      (selectedNodes.length > 1 && options.canShowBatchCopy === false)
+    ) {
       e?.preventDefault();
       return;
     }
-    const { editor } = window;
-    const { minder, fsm } = editor;
     const state = fsm.state();
     switch (state) {
       case 'input': {
         break;
       }
       case 'normal': {
-        const selectedNodes = minder.getSelectedNodes();
         minderStore.dispatchEvent(MinderEventName.COPY_NODE, undefined, undefined, undefined, selectedNodes);
         if (e?.clipboardData) {
           e.clipboardData.setData('text/plain', encode(selectedNodes));
@@ -87,15 +91,18 @@ export default function useMinderOperation(options: MinderOperationProps) {
    * 执行剪切
    */
   const minderCut = async (e?: ClipboardEvent) => {
+    const { editor } = window;
+    const { minder, fsm } = editor;
+    const selectedNodes: MinderJsonNode[] = minder.getSelectedNodes();
     if (
-      (options.disabled || !options.canShowMoreMenu || !options.canShowMoreMenuNodeOperation) &&
-      options.canShowBatchCut === false
+      options.disabled ||
+      !options.canShowMoreMenu ||
+      !options.canShowMoreMenuNodeOperation ||
+      (selectedNodes.length > 1 && options.canShowBatchCut === false)
     ) {
       e?.preventDefault();
       return;
     }
-    const { editor } = window;
-    const { minder, fsm } = editor;
     if (minder.getStatus() !== 'normal') {
       e?.preventDefault();
       return;
@@ -107,8 +114,12 @@ export default function useMinderOperation(options: MinderOperationProps) {
       }
       case 'normal': {
         markDeleteNode(minder);
-        const selectedNodes = minder.getSelectedNodes();
         if (selectedNodes.length) {
+          const newNodes = selectedNodes.map((node) => ({
+            ...node,
+            parent: node.parent, // 保存父节点信息，因为剪切节点后 parent 会被置空
+          }));
+          minderStore.dispatchEvent(MinderEventName.CUT_NODE, undefined, undefined, undefined, newNodes);
           if (e?.clipboardData) {
             e.clipboardData.setData('text/plain', encode(selectedNodes));
           } else {
@@ -116,10 +127,9 @@ export default function useMinderOperation(options: MinderOperationProps) {
             await copy(encode(selectedNodes));
           }
           minder.execCommand('Cut');
+          e?.preventDefault();
+          Message.success(t('common.cutSuccess'));
         }
-        minderStore.dispatchEvent(MinderEventName.CUT_NODE, undefined, undefined, undefined, selectedNodes);
-        e?.preventDefault();
-        Message.success(t('common.cutSuccess'));
         break;
       }
       default:
@@ -202,10 +212,12 @@ export default function useMinderOperation(options: MinderOperationProps) {
    * @param command 插入命令
    * @param value 携带的参数
    */
-  const execInsertCommand = (command: string, value?: string) => {
-    const node: MinderJsonNode = window.minder.getSelectedNode();
+  const execInsertCommand = (command: string, selectedNodes: MinderJsonNode[], value?: string) => {
+    if (selectedNodes.length > 1) {
+      return; // TODO: 批量操作暂不支持插入
+    }
     if (options.insertNode) {
-      options.insertNode(node, command, value);
+      options.insertNode(selectedNodes[0], command, value);
       return;
     }
     if (window.minder.queryCommandState(command) !== -1) {
@@ -229,7 +241,7 @@ export default function useMinderOperation(options: MinderOperationProps) {
    * @param value 携带的参数
    */
   const appendChildNode = (selectedNodes: MinderJsonNode[], value?: string) => {
-    execInsertCommand('AppendChildNode', value);
+    execInsertCommand('AppendChildNode', selectedNodes, value);
     minderStore.dispatchEvent(MinderEventName.INSERT_CHILD, value, undefined, undefined, selectedNodes);
   };
 
@@ -239,7 +251,7 @@ export default function useMinderOperation(options: MinderOperationProps) {
    * @param value 携带的参数
    */
   const appendSiblingNode = (selectedNodes: MinderJsonNode[], value?: string) => {
-    execInsertCommand('AppendSiblingNode', value);
+    execInsertCommand('AppendSiblingNode', selectedNodes, value);
     minderStore.dispatchEvent(MinderEventName.INSERT_SIBLING, value, undefined, undefined, selectedNodes);
   };
 
@@ -257,8 +269,8 @@ export default function useMinderOperation(options: MinderOperationProps) {
       if (!options.customPriority) {
         // 展开后，需要设置一次优先级展示，避免展开后优先级显示成脑图内置文案；如果设置了自定义优先级，则不在此设置，由外部自行处理
         setPriorityView(!!options.priorityStartWithZero, options.priorityPrefix || '');
-        window.minder.refresh();
       }
+      window.minder.refresh();
       minderStore.dispatchEvent(MinderEventName.COLLAPSE, undefined, undefined, undefined, selectedNodes);
     } else {
       // 选中的节点集合中有一个节点未展开，则全部展开
@@ -274,8 +286,8 @@ export default function useMinderOperation(options: MinderOperationProps) {
       if (!options.customPriority) {
         // 展开后，需要设置一次优先级展示，避免展开后优先级显示成脑图内置文案；如果设置了自定义优先级，则不在此设置，由外部自行处理
         setPriorityView(!!options.priorityStartWithZero, options.priorityPrefix || '');
-        window.minder.refresh();
       }
+      window.minder.refresh();
       minderStore.dispatchEvent(MinderEventName.EXPAND, undefined, undefined, undefined, selectedNodes);
     }
   };
@@ -285,13 +297,21 @@ export default function useMinderOperation(options: MinderOperationProps) {
    * @param selectedNodes 当前选中的节点集合
    */
   const minderDelete = (selectedNodes: MinderJsonNode[]) => {
+    if (selectedNodes.length > 1 && (!options.canShowBatchDelete || options.disabled)) {
+      // 批量操作节点时，如果不允许批量删除或者当前操作被禁用，则不执行删除操作
+      return;
+    }
     if (
-      (options.canShowDeleteMenu ||
-        (options.canShowMoreMenu && options.canShowMoreMenuNodeOperation) ||
-        options.canShowBatchDelete) &&
+      selectedNodes.length === 1 &&
+      (options.canShowDeleteMenu || (options.canShowMoreMenu && options.canShowMoreMenuNodeOperation)) &&
       !options.disabled
     ) {
-      minderStore.dispatchEvent(MinderEventName.DELETE_NODE, undefined, undefined, undefined, selectedNodes);
+      // 单个节点操作，如果允许删除操作，则执行删除操作
+      const newNodes = selectedNodes.map((node) => ({
+        ...node,
+        parent: node.parent, // 保存父节点信息，因为删除节点后 parent 会被置空
+      }));
+      minderStore.dispatchEvent(MinderEventName.DELETE_NODE, undefined, undefined, undefined, newNodes);
       window.minder.execCommand('RemoveNode');
     }
   };

@@ -279,9 +279,8 @@
   watch(
     [() => configList.value, () => cardItemList.value],
     () => {
-      const configValue = resetConfigEditList(configList.value);
-      const cardItemValue = resetConfigEditList(cardItemList.value);
-
+      const configValue = resetConfigEditList(cloneDeep(configList.value));
+      const cardItemValue = resetConfigEditList(cloneDeep(cardItemList.value));
       const isisEqualList = props.isGroup ? cloneDeep(defaultGroupConfig) : cloneDeep(defaultSingleConfig);
       if (!isEqual(configValue, isisEqualList) || (!isEqual(cardItemValue, isisEqualList) && !isInit.value)) {
         if (isInit.value) {
@@ -433,8 +432,9 @@
       }
     }
     .config-right-container {
-      padding: 16px;
+      padding: 16px 0 16px 16px;
       width: calc(100% - 300px);
+      min-width: 1000px;
       background: var(--color-bg-3);
     }
   }

@@ -34,21 +34,23 @@ public class ExportTaskManager {
     public static final String EXPORT_CONSUME = "export_consume";
 
 
-    public <T> void exportAsyncTask(String projectId, String fileId, String userId, String type, T t, Function<Object, Object> selectListFunc) throws InterruptedException {
+    public <T> ExportTask exportAsyncTask(String projectId, String fileId, String userId, String type, T t, Function<Object, Object> selectListFunc) throws InterruptedException {
         ExportTask exportTask = buildExportTask(projectId, fileId, userId, type);
         ExecutorService executorService = Executors.newFixedThreadPool(1);
         Future<?> future = executorService.submit(() -> {
-            while (!Thread.currentThread().isInterrupted()) {
+            if  (!Thread.currentThread().isInterrupted()) {
                 // 线程任务逻辑
                 LogUtils.info("Thread has been start.");
                 selectListFunc.apply(t);
+            } else {
+                LogUtils.info("Thread has been interrupted.");
             }
-            LogUtils.info("Thread has been interrupted.");
         });
         map.put(exportTask.getId(), future);
+        return exportTask;
     }
 
-    private ExportTask buildExportTask(String projectId, String fileId, String userId, String type) {
+    public ExportTask buildExportTask(String projectId, String fileId, String userId, String type) {
         ExportTask exportTask = new ExportTask();
         exportTask.setId(IDGenerator.nextStr());
         exportTask.setType(type);
@@ -58,8 +60,8 @@ public class ExportTaskManager {
         exportTask.setUpdateUser(userId);
         exportTask.setUpdateTime(System.currentTimeMillis());
         exportTask.setProjectId(projectId);
-        exportTask.setFileType(fileId);
-        exportTaskMapper.insert(exportTask);
+        exportTask.setFileId(fileId);
+        exportTaskMapper.insertSelective(exportTask);
         return exportTask;
     }
 

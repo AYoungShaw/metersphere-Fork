@@ -138,19 +138,22 @@
                 </slot>
               </template>
               <template v-else-if="item.isTag || item.isStringTag">
-                <template
-                  v-if="!record[item.dataIndex as string] || (Array.isArray(record[item.dataIndex as string]) && record[item.dataIndex as string].length === 0)"
-                >
-                  <slot :name="item.slotName" v-bind="{ record, rowIndex, column, columnConfig: item }"> - </slot>
-                </template>
-                <MsTagGroup
-                  v-else
-                  :is-string-tag="item.isStringTag"
-                  :tag-list="record[item.dataIndex as string]"
-                  type="primary"
-                  theme="outline"
-                  :tag-position="item.tagPosition"
-                />
+                <slot :name="item.slotName" v-bind="{ record, rowIndex, column, columnConfig: item }">
+                  <template
+                    v-if="!record[item.dataIndex as string] || (Array.isArray(record[item.dataIndex as string]) && record[item.dataIndex as string].length === 0)"
+                  >
+                    -
+                  </template>
+                  <template v-else>
+                    <MsTagGroup
+                      :is-string-tag="item.isStringTag"
+                      :tag-list="record[item.dataIndex as string]"
+                      type="primary"
+                      theme="outline"
+                      :tag-position="item.tagPosition"
+                    />
+                  </template>
+                </slot>
               </template>
               <template v-else-if="item.slotName === SpecialColumnEnum.OPERATION">
                 <slot name="operation" v-bind="{ record, rowIndex, columnConfig: item }" />
@@ -174,7 +177,7 @@
                 />
                 <a-tooltip
                   v-else
-                  position="top"
+                  position="tl"
                   content-class="max-w-[400px]"
                   :content="String(record[item.dataIndex as string])"
                   :disabled="record[item.dataIndex as string] === '' || record[item.dataIndex as string] === undefined || record[item.dataIndex as string] === null"
@@ -549,10 +552,27 @@
     return totalWidth + tablePadding;
   };
 
+  const getAllTagsFromData = (rows: TableData[], dataIndex: string): any[] => {
+    const allTags: Record<string, any>[] = [];
+
+    const collectTags = (nodes: TableData[]) => {
+      nodes.forEach((node) => {
+        if (node[dataIndex]) {
+          allTags.push(node[dataIndex]);
+        }
+        if (node.children && node.children.length > 0) {
+          collectTags(node.children);
+        }
+      });
+    };
+
+    collectTags(rows);
+    return allTags;
+  };
+
   // TODO 求总和里边最大宽度作为标签列宽 这里需要考虑一下性能优化
   const getMaxRowTagWidth = (rows: TableData[], dataIndex: string) => {
-    const allTags = ((rows as TableData) || []).map((row: TableData) => row[dataIndex] || []);
-
+    const allTags = getAllTagsFromData(rows, dataIndex);
     const rowWidths = (allTags || []).map((tags: any) => {
       return getRowTagTotalWidth(tags);
     });
@@ -1085,6 +1105,8 @@
     background: rgb(var(--primary-1)) content-box;
     .arco-table-th-title {
       .title-name {
+        padding-left: 4px;
+        border-radius: 2px 0 0 2px;
         color: rgb(var(--primary-5));
       }
     }
@@ -1099,6 +1121,8 @@
           color: rgb(var(--primary-5)) !important;
         }
         .title-name {
+          padding-left: 4px;
+          border-radius: 2px 0 0 2px;
           color: rgb(var(--primary-5));
         }
       }

@@ -1,6 +1,6 @@
 <template>
   <div class="navbar">
-    <div class="flex items-center px-[16px]">
+    <div class="flex w-[200px] items-center px-[16px]">
       <a-space>
         <div class="one-line-text flex max-w-[145px] items-center">
           <img :src="props.logo" class="mr-[4px] h-[34px] w-[32px]" />
@@ -16,7 +16,7 @@
       <template v-if="showProjectSelect">
         <a-select
           v-model:model-value="appStore.currentProjectId"
-          class="w-[200px] focus-within:!bg-[var(--color-text-n8)] hover:!bg-[var(--color-text-n8)]"
+          class="mr-[8px] w-[200px] focus-within:!bg-[var(--color-text-n8)] hover:!bg-[var(--color-text-n8)]"
           :bordered="false"
           :fallback-option="false"
           allow-search
@@ -147,7 +147,7 @@
         </a-dropdown>
       </li>
       <li>
-        <a-dropdown trigger="click" position="br" @select="changeLocale as any">
+        <a-dropdown trigger="click" position="br" @select="changeLanguage as any">
           <a-tooltip :content="t('settings.language')" position="br">
             <a-button type="secondary">
               <template #icon>
@@ -186,6 +186,7 @@
 
   import { getMessageUnReadCount } from '@/api/modules/message';
   import { switchProject } from '@/api/modules/project-management/project';
+  import { updateBaseInfo, updateLanguage } from '@/api/modules/user';
   import { MENU_LEVEL, type PathMapRoute } from '@/config/pathMap';
   import { useI18n } from '@/hooks/useI18n';
   import usePathMap from '@/hooks/usePathMap';
@@ -196,6 +197,7 @@
   import { getFirstRouteNameByPermission, hasAnyPermission } from '@/utils/permission';
 
   import { IconInfoCircle } from '@arco-design/web-vue/es/icon';
+  import type { LocaleType } from '#/global';
 
   const props = defineProps<{
     isPreview?: boolean;
@@ -293,6 +295,11 @@
     messageCenterVisible.value = true;
   }
 
+  function changeLanguage(locale: LocaleType) {
+    // 修改当前用户的语言
+    updateLanguage({ language: locale });
+    changeLocale(locale);
+  }
   function handleHelpSelect(val: string | number | Record<string, any> | undefined) {
     switch (val) {
       case 'doc':

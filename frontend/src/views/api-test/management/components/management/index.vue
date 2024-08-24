@@ -54,6 +54,7 @@
     :current-tab="currentTab"
     :member-options="memberOptions"
     @import="emit('import')"
+    @open-case-tab="(apiCaseDetail:ApiCaseDetail)=>newCaseTab(apiCaseDetail.id)"
     @delete-api="(id) => handleDeleteApiFromModuleTree(id)"
   />
   <apiCase
@@ -80,6 +81,7 @@
 </template>
 
 <script setup lang="ts">
+  import { useRoute } from 'vue-router';
   import { cloneDeep } from 'lodash-es';
 
   import MsEditableTab from '@/components/pure/ms-editable-tab/index.vue';
@@ -99,6 +101,7 @@
   import { hasAnyPermission } from '@/utils/permission';
 
   import { ProtocolItem } from '@/models/apiTest/common';
+  import { ApiCaseDetail } from '@/models/apiTest/management';
   import { MockDetail } from '@/models/apiTest/mock';
   import { ModuleTreeNode } from '@/models/common';
   import {
@@ -125,6 +128,7 @@
     (e: 'import'): void;
   }>();
   const appStore = useAppStore();
+  const route = useRoute();
   const { t } = useI18n();
   const requestCompositionStore = useRequestCompositionStore();
 
@@ -357,6 +361,13 @@
   onBeforeMount(() => {
     initMemberOptions();
     initProtocolList();
+    if ((route.query.tab as string) === 'case') {
+      currentTab.value = 'case';
+      currentTabChange('case');
+    } else if ((route.query.tab as string) === 'mock') {
+      currentTab.value = 'mock';
+      currentTabChange('mock');
+    }
   });
 
   useLeaveTabUnSaveCheck(apiTabs.value, [

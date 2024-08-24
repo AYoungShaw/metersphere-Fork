@@ -22,6 +22,7 @@
     sequence-enable
     @node-select="(node) => handleNodeSelect(node as PlanMinderNode)"
     @before-exec-command="handleBeforeExecCommand"
+    @action="handleAction"
     @save="handleMinderSave"
   >
     <template #extractMenu>
@@ -227,6 +228,8 @@
     :test-plan-id="props.planId"
     :modules-maps="selectedAssociateCasesParams.moduleMaps"
     :protocols="selectedAssociateCasesParams.protocols"
+    :node-api-test-set="nodeApiTestSet"
+    :node-scenario-test-set="nodeScenarioTestSet"
     @success="writeAssociateCases"
   />
 </template>
@@ -252,6 +255,7 @@
   import { useI18n } from '@/hooks/useI18n';
   import useAppStore from '@/store/modules/app';
   import useMinderStore from '@/store/modules/components/minder-editor';
+  import { MinderCustomEvent } from '@/store/modules/components/minder-editor/types';
   import { filterTree, getGenerateId, mapTree } from '@/utils';
   import { hasAnyPermission } from '@/utils/permission';
 
@@ -366,6 +370,29 @@
   function execInert(command: string, data?: PlanMinderNodeData | MinderJsonNodeData) {
     if (window.minder.queryCommandState(command) !== -1) {
       window.minder.execCommand(command, data);
+    }
+  }
+
+  const nodeApiTestSet = ref<SelectOptionData[]>([]);
+  const nodeScenarioTestSet = ref<SelectOptionData[]>([]);
+
+  function getTestNodeSet(nodeSet: PlanMinderNode[] = []): { name: string; id: string }[] {
+    return nodeSet.map((node) => ({
+      name: node.data?.text ?? '',
+      id: node.data?.id ?? '',
+    }));
+  }
+
+  function setCaseSelectedSet() {
+    const minderJson = window.minder.exportJson()?.root;
+    if (minderJson) {
+      const testApiNode =
+        minderJson?.children?.find((item: PlanMinderNode) => item.data.type === 'API')?.children ?? [];
+      const testScenarioNode =
+        minderJson?.children?.find((item: PlanMinderNode) => item.data.type === 'SCENARIO')?.children ?? [];
+
+      nodeApiTestSet.value = getTestNodeSet(testApiNode);
+      nodeScenarioTestSet.value = getTestNodeSet(testScenarioNode);
     }
   }
 
@@ -581,7 +608,7 @@
     selectedAssociateCasesParams.value = { ...param };
     const node: PlanMinderNode = window.minder.getSelectedNode();
     let associateType: string = '';
-    if (node.data.type === PlanMinderCollectionType.SCENARIO) {
+    if (node && node.data?.type === PlanMinderCollectionType.SCENARIO) {
       associateType = PlanMinderAssociateType.SCENARIO_CASE;
     } else {
       associateType = param?.associateType ?? node.data.type;
@@ -623,6 +650,7 @@
     configForm.value = cloneDeep(activePlanSet.value?.data);
     extraVisible.value = true;
     currentSelectCase.value = (activePlanSet.value?.data.type as unknown as CaseLinkEnum) || CaseLinkEnum.FUNCTIONAL;
+    setCaseSelectedSet();
     caseAssociateVisible.value = true;
     nextTick(() => {
       switchingConfigFormData.value = false;
@@ -631,6 +659,7 @@
 
   function openCaseAssociateDrawer() {
     currentSelectCase.value = (activePlanSet.value?.data?.type as unknown as CaseLinkEnum) || CaseLinkEnum.FUNCTIONAL;
+    setCaseSelectedSet();
     caseAssociateVisible.value = true;
   }
 
@@ -780,6 +809,28 @@
     }
   }
 
+  /**
+   * 处理脑图节点操作
+   * @param event 脑图事件对象
+   */
+  function handleAction(event: MinderCustomEvent) {
+    const { nodes, name } = event;
+    if (nodes && nodes.length > 0) {
+      switch (name) {
+        case MinderEventName.DELETE_NODE:
+        case MinderEventName.CUT_NODE:
+          nodes.forEach((node) => {
+            if (node.data?.id === activePlanSet.value?.data.id) {
+              handleConfigCancel();
+            }
+          });
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
   function handleExtendChange(val: string | number | boolean) {
     if (val && configForm.value) {
       const node: PlanMinderNode = window.minder.getNodeById(configForm.value.id);
@@ -878,9 +929,9 @@
       if (node.data.isNew) {
         tempMinderParams.value.editList.push({
           ...node.data,
-          id: undefined,
           num: nodeIndex,
           executeMethod: getExecuteMethod(node.data),
+          tempCollectionNode: true,
         });
       } else {
         tempMinderParams.value.editList.push({
@@ -906,11 +957,14 @@
               node.data = {
                 ...node.data,
                 ...cloneDeep(configForm.value),
+                text: node.data.text, // 避免因为此时脑图节点文本被修改而配置表单内的文本还是旧的
               };
             }
             configFormValidResult = true;
           }
         });
+      } else {
+        configFormValidResult = true;
       }
       if (!configFormValidResult) return;
       loading.value = true;

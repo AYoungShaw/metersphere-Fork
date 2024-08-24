@@ -25,7 +25,7 @@
           trigger="click"
           position="bl"
           :click-outside-to-close="false"
-          popup-container=".ms-minder-container"
+          popup-container="body"
         >
           <a-tooltip :content="t('caseManagement.caseReview.review')">
             <MsButton
@@ -43,7 +43,7 @@
               <ReviewSubmit
                 :review-pass-rule="reviewPassRule"
                 :select-node="selectNode"
-                :user-id="props.viewFlag ? userStore.id || '' : ''"
+                :user-id="props.viewStatusFlag ? userStore.id || '' : ''"
                 :review-id="route.query.id as string"
                 @done="handleReviewDone"
               />
@@ -137,6 +137,7 @@
     CaseReviewFunctionalCaseUserItem,
     ReviewHistoryItem,
     ReviewPassRule,
+    ReviewResult,
   } from '@/models/caseManagement/caseReview';
   import { ModuleTreeNode } from '@/models/common';
   import { StartReviewStatus } from '@/enums/caseEnum';
@@ -221,7 +222,6 @@
     };
     importJson.value.treePath = [];
     clearSelectedNodes();
-    window.minder.importJson(importJson.value);
     if (props.moduleId !== 'all') {
       // 携带具体的模块 ID 加载时，进入该模块内
       nextTick(() => {
@@ -478,16 +478,18 @@
 
   const selectNode = ref();
   const reviewVisible = ref(false);
-  function handleReviewDone(status: StartReviewStatus) {
+  function handleReviewDone(status: StartReviewStatus | ReviewResult) {
+    const node = window.minder.getSelectedNode();
     reviewVisible.value = false;
-    if (
-      props.reviewPassRule !== 'MULTIPLE' &&
-      status !== StartReviewStatus.UNDER_REVIEWED &&
-      selectNode.value.data?.resource?.includes(caseTag)
-    ) {
+    if (status !== 'UN_REVIEWED' && node.data?.resource?.includes(caseTag)) {
       window.minder.execCommand('resource', [statusTagMap[status], caseTag]);
-    } else {
-      initCaseTree();
+    } else if (status !== StartReviewStatus.UNDER_REVIEWED && node.data?.resource?.includes(moduleTag)) {
+      // 先清空子节点，从后向前遍历时，删除节点不会影响到尚未遍历的节点
+      for (let i = node.children.length - 1; i >= 0; i--) {
+        window.minder.removeNode(node.children[i]);
+      }
+      // 再重新渲染
+      initNodeCases(node);
     }
     emit('handleReviewDone');
   }
@@ -579,6 +581,7 @@
       }
       // 用例下面所有节点都展开
       expendNodeAndChildren(node);
+      node.layout();
     } else if (data?.resource?.includes(moduleTag) && data.count > 0 && data.isLoaded !== true) {
       // 模块节点且有用例且未加载过用例数据
       await initNodeCases(node);

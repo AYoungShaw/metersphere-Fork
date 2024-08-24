@@ -264,6 +264,29 @@
   );
 
   watch(
+    () => innerParams.value.formDataBody.formValues,
+    () => {
+      if (innerParams.value.formDataBody.formValues.length > 0) {
+        let hasNullFiles = false;
+        const newValues = innerParams.value.formDataBody.formValues.map((item) => {
+          // 导入的接口files字段可能为 null，兜底处理
+          hasNullFiles = item.files === null;
+          return {
+            ...item,
+            files: item.files ? item.files : [],
+          };
+        });
+        if (hasNullFiles) {
+          innerParams.value.formDataBody.formValues = newValues;
+        }
+      }
+    },
+    {
+      immediate: true,
+    }
+  );
+
+  watch(
     () => props.isDebug,
     (val) => {
       if (val) {
@@ -458,20 +481,20 @@
   const currentBodyCode = computed({
     get() {
       if (innerParams.value.bodyType === RequestBodyFormat.JSON) {
-        return innerParams.value.jsonBody.jsonValue;
+        return innerParams.value.jsonBody.jsonValue || '';
       }
       if (innerParams.value.bodyType === RequestBodyFormat.XML) {
-        return innerParams.value.xmlBody.value;
+        return innerParams.value.xmlBody.value || '';
       }
-      return innerParams.value.rawBody.value;
+      return innerParams.value.rawBody.value || '';
     },
     set(val) {
       if (innerParams.value.bodyType === RequestBodyFormat.JSON) {
-        innerParams.value.jsonBody.jsonValue = val;
+        innerParams.value.jsonBody.jsonValue = val || '';
       } else if (innerParams.value.bodyType === RequestBodyFormat.XML) {
-        innerParams.value.xmlBody.value = val;
+        innerParams.value.xmlBody.value = val || '';
       } else {
-        innerParams.value.rawBody.value = val;
+        innerParams.value.rawBody.value = val || '';
       }
     },
   });

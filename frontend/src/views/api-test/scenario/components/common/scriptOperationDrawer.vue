@@ -69,6 +69,7 @@
         :request-result="currentResponse"
         :console="currentResponse?.console"
         :is-edit="false"
+        is-definition
         hide-layout-switch
       >
         <template #titleRight>
@@ -169,6 +170,7 @@
                 ...props.detail,
                 processorType: RequestConditionProcessor.SCRIPT,
                 polymorphicName: 'MsScriptElement',
+                children: props.detail.children || defaultScript.children,
               }
             : defaultScript
         );

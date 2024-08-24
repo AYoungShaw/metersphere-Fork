@@ -29,18 +29,15 @@
                   >
                     {{ t('caseManagement.featureCase.importExcel') }}
                   </a-doption>
+                  <a-doption
+                    v-permission="['FUNCTIONAL_CASE:READ+IMPORT']"
+                    value="Xmind"
+                    @click="handleSelect('import', 'Xmind')"
+                  >
+                    {{ t('caseManagement.featureCase.importXmind') }}
+                  </a-doption>
                 </template>
               </a-dropdown-button>
-              <a-button
-                v-else-if="
-                  !hasAnyPermission(['FUNCTIONAL_CASE:READ+ADD']) && hasAnyPermission(['FUNCTIONAL_CASE:READ+IMPORT'])
-                "
-                class="ml-2"
-                type="primary"
-                @click="handleSelect('import', 'Excel')"
-              >
-                {{ t('caseManagement.featureCase.importExcel') }}
-              </a-button>
               <a-button
                 v-else
                 v-permission="['FUNCTIONAL_CASE:READ+ADD']"
@@ -162,7 +159,7 @@
    * @description 功能测试-功能用例
    */
   import { computed, ref } from 'vue';
-  import { useRouter } from 'vue-router';
+  import { useRoute, useRouter } from 'vue-router';
 
   import MsButton from '@/components/pure/ms-button/index.vue';
   import MsCard from '@/components/pure/ms-card/index.vue';
@@ -176,7 +173,11 @@
   import ValidateModal from './components/export/validateModal.vue';
   import ValidateResult from './components/export/validateResult.vue';
 
-  import { createCaseModuleTree, importExcelCase, importExcelChecked } from '@/api/modules/case-management/featureCase';
+  import {
+    createCaseModuleTree,
+    importExcelOrXMindCase,
+    importExcelOrXMindChecked,
+  } from '@/api/modules/case-management/featureCase';
   import { useI18n } from '@/hooks/useI18n';
   import useAppStore from '@/store/modules/app';
   import useFeatureCaseStore from '@/store/modules/case/featureCase';
@@ -189,11 +190,14 @@
   import type { FileItem } from '@arco-design/web-vue';
   import Message from '@arco-design/web-vue/es/message';
 
+  const route = useRoute();
+
   const router = useRouter();
 
   const appStore = useAppStore();
   const { t } = useI18n();
   const currentProjectId = computed(() => appStore.currentProjectId);
+  const featureCaseStore = useFeatureCaseStore();
 
   const isExpandAll = ref(false);
   const activeCaseType = ref<'folder' | 'module'>('folder'); // 激活用例类型
@@ -204,7 +208,7 @@
     isExpandAll.value = !isExpandAll.value;
   };
 
-  const activeFolder = ref<string>('all');
+  const activeFolder = ref<string>(featureCaseStore.moduleId[0] || 'all');
   const activeFolderName = ref('');
 
   // 选中节点
@@ -233,14 +237,13 @@
     return activeFolder.value === type ? 'folder-text case-active' : 'folder-text';
   };
 
-  const featureCaseStore = useFeatureCaseStore();
   // 处理用例树节点选中
   function caseNodeSelect(keys: string[], _offspringIds: string[], node: MsTreeNodeData) {
     [activeFolder.value] = keys;
     activeCaseType.value = 'module';
     offspringIds.value = [..._offspringIds];
     featureCaseStore.setModuleId(keys);
-    activeFolderName.value = node.title || node.name;
+    activeFolderName.value = node?.title || node?.name;
   }
 
   const confirmLoading = ref(false);
@@ -376,11 +379,12 @@
         versionId: '',
         cover,
       };
-      if (validateType.value === 'Excel') {
-        const result = await importExcelChecked({ request: params, fileList: files.map((item: any) => item.file) });
-        finish();
-        validateInfo.value = result.data;
-      }
+      const result = await importExcelOrXMindChecked(
+        { request: params, fileList: files.map((item: any) => item.file) },
+        validateType.value
+      );
+      finish();
+      validateInfo.value = result.data;
     } catch (error) {
       validateModal.value = false;
       console.log(error);
@@ -413,7 +417,10 @@
         cover: isCover.value,
         count: validateInfo.value.successCount,
       };
-      await importExcelCase({ request: params, fileList: fileList.value.map((item: any) => item.file) });
+      await importExcelOrXMindCase(
+        { request: params, fileList: fileList.value.map((item: any) => item.file) },
+        validateType.value
+      );
       Message.success(t('caseManagement.featureCase.importSuccess'));
       validateResultModal.value = false;
       showExcelModal.value = false;
@@ -450,8 +457,18 @@
   }
 
   function dragUpdate() {
-    caseTableRef.value.emitTableParams();
+    caseTableRef.value.initData();
   }
+
+  onBeforeUnmount(() => {
+    const routeName = [
+      CaseManagementRouteEnum.CASE_MANAGEMENT_CASE,
+      CaseManagementRouteEnum.CASE_MANAGEMENT_CASE_DETAIL,
+    ];
+    if (!routeName.includes(route.name as CaseManagementRouteEnum)) {
+      featureCaseStore.setModuleId(['all']);
+    }
+  });
 </script>
 
 <style scoped lang="less">

@@ -112,5 +112,9 @@ public interface ExtApiTestCaseMapper {
 
     void setApiChangeByApiDefinitionId(@Param("apiDefinitionId") String apiDefinitionId);
 
-    List<ApiTestCase> getApiCaseForBatchSync(@Param("ids") List<String> ids);
+    List<ApiTestCase> getRefApiScenarioCreator(@Param("ids") List<String> caseIds);
+
+    void clearApiChange(@Param("ids")  List<String> ids);
+
+    List<ApiTestCaseWithBlob> selectAllDetailByApiIds(@Param("apiIds") List<String> apiIds);
 }

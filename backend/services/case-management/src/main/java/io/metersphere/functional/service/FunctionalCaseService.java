@@ -906,13 +906,13 @@ public class FunctionalCaseService {
                 functionalCaseMapper.batchInsert(subList);
             });
             SubListUtils.dealForSubList(addBlobList, 500, subList -> {
-                functionalCaseBlobMapper.batchInsert(addBlobList);
+                functionalCaseBlobMapper.batchInsert(subList);
             });
             SubListUtils.dealForSubList(addAttachMentList, 500, subList -> {
-                functionalCaseAttachmentService.batchSaveAttachment(addAttachMentList);
+                functionalCaseAttachmentService.batchSaveAttachment(subList);
             });
             SubListUtils.dealForSubList(addCustomFieldList, 500, subList -> {
-                functionalCaseCustomFieldService.batchSaveCustomField(addCustomFieldList);
+                functionalCaseCustomFieldService.batchSaveCustomField(subList);
             });
             addFileAssociationMap.entrySet().forEach(entry -> {
                 functionalCaseAttachmentService.association(entry.getValue(), entry.getKey(), userId, FUNCTIONAL_CASE_BATCH_COPY_FILE_LOG_URL, request.getProjectId());
@@ -1246,6 +1246,10 @@ public class FunctionalCaseService {
         //需要保存的自定义字段
         Map<String, Object> customData = functionalCaseExcelData.getCustomData();
         customFieldsMap.forEach((k, v) -> {
+            //用例等级如果没有默认值，则为P0
+            if (StringUtils.equalsIgnoreCase(v.getInternalFieldKey(), "functional_priority") && (v.getDefaultValue() == null || StringUtils.isBlank(v.getDefaultValue().toString()))) {
+                v.setDefaultValue("P0");
+            }
             Object value = customData.get(k);
             FunctionalCaseCustomField caseCustomField = new FunctionalCaseCustomField();
             caseCustomField.setCaseId(caseId);
@@ -1273,11 +1277,11 @@ public class FunctionalCaseService {
     }
 
     private void setCustomFieldValue(Object value, FunctionalCaseCustomField caseCustomField) {
-        if (StringUtils.equalsIgnoreCase(value.toString(), "[]") || value instanceof List) {
+        if (value !=null && (StringUtils.equalsIgnoreCase(value.toString(), "[]") || value instanceof List)) {
             //数组类型
             caseCustomField.setValue(JSON.toJSONString(value));
         } else {
-            caseCustomField.setValue(value.toString());
+            caseCustomField.setValue(value == null ? StringUtils.EMPTY : value.toString());
         }
     }
 

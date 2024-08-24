@@ -4,6 +4,7 @@ import com.alibaba.excel.util.StringUtils;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import io.metersphere.functional.domain.FunctionalCase;
+import io.metersphere.functional.dto.ExportTaskDTO;
 import io.metersphere.functional.dto.FunctionalCaseDetailDTO;
 import io.metersphere.functional.dto.FunctionalCasePageDTO;
 import io.metersphere.functional.dto.FunctionalCaseVersionDTO;
@@ -230,6 +231,15 @@ public class FunctionalCaseController {
         return functionalCaseFileService.preCheckExcel(request, file);
     }
 
+    @PostMapping("/pre-check/xmind")
+    @Operation(summary = "用例管理-功能用例-xmind导入检查")
+    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_IMPORT)
+    @CheckOwner(resourceId = "#request.getProjectId()", resourceType = "project")
+    public FunctionalCaseImportResponse preCheckXMind(@RequestPart("request") FunctionalCaseImportRequest request, @RequestPart(value = "file", required = false) MultipartFile file) {
+        SessionUser user = SessionUtils.getUser();
+        return functionalCaseFileService.preCheckXMind(request, user, file);
+    }
+
 
     @PostMapping("/import/excel")
     @Operation(summary = "用例管理-功能用例-excel导入")
@@ -238,6 +248,15 @@ public class FunctionalCaseController {
     public FunctionalCaseImportResponse importExcel(@RequestPart("request") FunctionalCaseImportRequest request, @RequestPart(value = "file", required = false) MultipartFile file) {
         SessionUser user = SessionUtils.getUser();
         return functionalCaseFileService.importExcel(request, user, file);
+    }
+
+    @PostMapping("/import/xmind")
+    @Operation(summary = "用例管理-功能用例-xmind导入")
+    @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_IMPORT)
+    @CheckOwner(resourceId = "#request.getProjectId()", resourceType = "project")
+    public FunctionalCaseImportResponse importXMind(@RequestPart("request") FunctionalCaseImportRequest request, @RequestPart(value = "file", required = false) MultipartFile file) {
+        SessionUser user = SessionUtils.getUser();
+        return functionalCaseFileService.importXMind(request, user, file);
     }
 
     @PostMapping("/operation-history")
@@ -254,8 +273,8 @@ public class FunctionalCaseController {
     @PostMapping("/export/excel")
     @Operation(summary = "用例管理-功能用例-excel导出")
     @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_EXPORT)
-    public void testCaseExport(@Validated @RequestBody FunctionalCaseExportRequest request) {
-        functionalCaseFileService.export(SessionUtils.getUserId(), request);
+    public String testCaseExport(@Validated @RequestBody FunctionalCaseExportRequest request) {
+        return functionalCaseFileService.export(SessionUtils.getUserId(), request, SessionUtils.getCurrentOrganizationId());
     }
 
     @GetMapping("/stop/{taskId}")
@@ -294,14 +313,14 @@ public class FunctionalCaseController {
     @PostMapping("/export/xmind")
     @Operation(summary = "用例管理-功能用例-xmind导出")
     @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_EXPORT)
-    public void caseExportXmind(@Validated @RequestBody FunctionalCaseExportRequest request) {
-        functionalCaseXmindService.exportFunctionalCaseXmind(request, SessionUtils.getUserId());
+    public String caseExportXmind(@Validated @RequestBody FunctionalCaseExportRequest request) {
+        return functionalCaseXmindService.exportFunctionalCaseXmind(request, SessionUtils.getUserId(), SessionUtils.getCurrentOrganizationId());
     }
 
     @GetMapping(value = "/check/export-task")
     @Operation(summary = "用例管理-功能用例-导出任务校验")
     @RequiresPermissions(PermissionConstants.FUNCTIONAL_CASE_READ_EXPORT)
-    public String checkExportTask() {
+    public ExportTaskDTO checkExportTask() {
         return functionalCaseFileService.checkExportTask(SessionUtils.getCurrentProjectId(), SessionUtils.getUserId());
     }
 }

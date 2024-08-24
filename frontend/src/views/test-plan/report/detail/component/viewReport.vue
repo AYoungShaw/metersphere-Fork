@@ -1,8 +1,13 @@
 <template>
-  <ReportHeader v-if="!props.isDrawer && props.isPreview" :detail="detail" :share-id="shareId" :is-group="false" />
+  <ReportHeader
+    v-if="!props.isDrawer && props.isPreview"
+    :detail="detail"
+    :share-id="shareId"
+    :is-group="props.isGroup"
+  />
   <div class="analysis-wrapper" :data-cards="cardCount">
     <SystemTrigger :is-preview="props.isPreview">
-      <div :class="`${getAnalysisHover} analysis min-w-[238px]`">
+      <div :class="`${getAnalysisHover} analysis min-w-[330px]`">
         <div class="block-title">{{ t('report.detail.api.reportAnalysis') }}</div>
         <ReportMetricsItem
           v-for="analysisItem in reportAnalysisList"
@@ -23,31 +28,21 @@
       <div v-if="functionalCaseTotal" :class="`${getAnalysisHover} analysis min-w-[330px]`">
         <div class="block-title">{{ t('report.detail.useCaseAnalysis') }}</div>
         <div class="flex">
-          <div class="w-[70%]">
+          <div class="mr-[24px] flex-1">
             <SingleStatusProgress :detail="detail" type="FUNCTIONAL" status="pending" />
             <SingleStatusProgress :detail="detail" type="FUNCTIONAL" status="success" />
             <SingleStatusProgress :detail="detail" type="FUNCTIONAL" status="block" />
-            <SingleStatusProgress :detail="detail" type="FUNCTIONAL" status="error" />
+            <SingleStatusProgress :detail="detail" type="FUNCTIONAL" status="error" class="!mb-0" />
           </div>
-          <div class="relative w-[30%] min-w-[150px]">
-            <div class="charts absolute w-full text-center">
+          <div class="relative">
+            <div class="charts">
               <div class="text-[12px] !text-[var(--color-text-4)]">{{ t('report.passRate') }}</div>
-              <a-popover position="bottom" content-class="response-popover-content">
-                <div class="flex justify-center text-[18px] font-medium">
-                  <div class="one-line-text max-w-[80px] text-[var(--color-text-1)]">{{ functionCasePassRate }} </div>
-                </div>
-                <template #content>
-                  <div class="min-w-[95px] max-w-[400px] p-4 text-[14px]">
-                    <div class="text-[12px] font-medium text-[var(--color-text-4)]">{{ t('report.passRate') }}</div>
-                    <div class="mt-2 text-[18px] font-medium text-[var(--color-text-1)]">{{
-                      functionCasePassRate
-                    }}</div>
-                  </div>
-                </template>
-              </a-popover>
+              <div class="flex justify-center text-[16px] font-medium">
+                <div class="one-line-text max-w-[100px] text-[var(--color-text-1)]">{{ functionCasePassRate }} </div>
+              </div>
             </div>
-            <div class="flex h-full w-full min-w-[150px] items-center justify-center">
-              <MsChart width="150px" height="150px" :options="functionCaseOptions" />
+            <div class="flex h-full w-full items-center justify-center">
+              <MsChart width="100px" height="100px" :options="functionCaseOptions" />
             </div>
           </div>
         </div>
@@ -57,29 +52,21 @@
       <div v-if="apiCaseTotal" :class="`${getAnalysisHover} analysis min-w-[330px]`">
         <div class="block-title">{{ t('report.detail.apiUseCaseAnalysis') }}</div>
         <div class="flex">
-          <div class="w-[70%]">
+          <div class="mr-[24px] flex-1">
             <SingleStatusProgress type="API" :detail="detail" status="pending" />
             <SingleStatusProgress type="API" :detail="detail" status="success" />
             <SingleStatusProgress type="API" :detail="detail" status="fakeError" />
-            <SingleStatusProgress type="API" :detail="detail" status="error" />
+            <SingleStatusProgress type="API" :detail="detail" status="error" class="!mb-0" />
           </div>
-          <div class="relative w-[30%] min-w-[150px]">
-            <div class="charts absolute w-full text-center">
+          <div class="relative">
+            <div class="charts">
               <div class="text-[12px] !text-[var(--color-text-4)]">{{ t('report.passRate') }}</div>
-              <a-popover position="bottom" content-class="response-popover-content">
-                <div class="flex justify-center text-[18px] font-medium">
-                  <div class="one-line-text max-w-[80px] text-[var(--color-text-1)]">{{ apiCasePassRate }} </div>
-                </div>
-                <template #content>
-                  <div class="min-w-[95px] max-w-[400px] p-4 text-[14px]">
-                    <div class="text-[12px] font-medium text-[var(--color-text-4)]">{{ t('report.passRate') }}</div>
-                    <div class="mt-2 text-[18px] font-medium text-[var(--color-text-1)]">{{ apiCasePassRate }}</div>
-                  </div>
-                </template>
-              </a-popover>
+              <div class="flex justify-center text-[16px] font-medium">
+                <div class="one-line-text max-w-[100px] text-[var(--color-text-1)]">{{ apiCasePassRate }} </div>
+              </div>
             </div>
-            <div class="flex h-full w-full min-w-[150px] items-center justify-center">
-              <MsChart width="150px" height="150px" :options="apiCaseOptions" />
+            <div class="flex h-full w-full items-center justify-center">
+              <MsChart width="100px" height="100px" :options="apiCaseOptions" />
             </div>
           </div>
         </div>
@@ -92,31 +79,21 @@
       <div v-if="scenarioCaseTotal" :class="`${getAnalysisHover} analysis min-w-[330px]`">
         <div class="block-title">{{ t('report.detail.scenarioUseCaseAnalysis') }}</div>
         <div class="flex">
-          <div class="w-[70%]">
+          <div class="mr-[24px] flex-1">
             <SingleStatusProgress type="SCENARIO" :detail="detail" status="pending" />
             <SingleStatusProgress type="SCENARIO" :detail="detail" status="success" />
             <SingleStatusProgress type="SCENARIO" :detail="detail" status="fakeError" />
-            <SingleStatusProgress type="SCENARIO" :detail="detail" status="error" />
+            <SingleStatusProgress type="SCENARIO" :detail="detail" status="error" class="!mb-0" />
           </div>
-          <div class="relative w-[30%] min-w-[150px]">
-            <div class="charts absolute w-full text-center">
+          <div class="relative">
+            <div class="charts">
               <div class="text-[12px] !text-[var(--color-text-4)]">{{ t('report.passRate') }}</div>
-              <a-popover position="bottom" content-class="response-popover-content">
-                <div class="flex justify-center text-[18px] font-medium">
-                  <div class="one-line-text max-w-[80px] text-[var(--color-text-1)]">{{ scenarioCasePassRate }} </div>
-                </div>
-                <template #content>
-                  <div class="min-w-[95px] max-w-[400px] p-4 text-[14px]">
-                    <div class="text-[12px] font-medium text-[var(--color-text-4)]">{{ t('report.passRate') }}</div>
-                    <div class="mt-2 text-[18px] font-medium text-[var(--color-text-1)]">{{
-                      scenarioCasePassRate
-                    }}</div>
-                  </div>
-                </template>
-              </a-popover>
+              <div class="flex justify-center text-[16px] font-medium">
+                <div class="one-line-text max-w-[100px] text-[var(--color-text-1)]">{{ scenarioCasePassRate }} </div>
+              </div>
             </div>
-            <div class="flex h-full w-full min-w-[150px] items-center justify-center">
-              <MsChart width="150px" height="150px" :options="scenarioCaseOptions" />
+            <div class="flex h-full w-full items-center justify-center">
+              <MsChart width="100px" height="100px" :options="scenarioCaseOptions" />
             </div>
           </div>
         </div>
@@ -161,9 +138,34 @@
             </a-tooltip>
           </div>
         </div>
-        <MsCard simple auto-height auto-width>
-          <div v-if="item.value !== ReportCardTypeEnum.CUSTOM_CARD" class="mb-[8px] font-medium">
-            {{ t(item.label) }}
+        <div class="wrapper-preview-card">
+          <div class="flex items-center justify-between">
+            <div v-if="item.value !== ReportCardTypeEnum.CUSTOM_CARD" class="mb-[8px] font-medium">
+              {{ t(item.label) }}
+            </div>
+            <a-radio-group
+              v-if="item.value === ReportCardTypeEnum.SUB_PLAN_DETAIL && props.isPreview"
+              class="mb-2"
+              :model-value="currentMode"
+              type="button"
+              @change="handleModeChange"
+            >
+              <a-radio value="drawer">
+                <div class="mode-button">
+                  <MsIcon :class="{ 'active-color': currentMode === 'drawer' }" type="icon-icon_drawer" />
+                  <span class="mode-button-title">{{ t('msTable.columnSetting.drawer') }}</span>
+                </div>
+              </a-radio>
+              <a-radio value="new_window">
+                <div class="mode-button">
+                  <MsIcon
+                    :class="{ 'active-color': currentMode === 'new_window' }"
+                    type="icon-icon_into-item_outlined"
+                  />
+                  <span class="mode-button-title">{{ t('msTable.columnSetting.newWindow') }}</span>
+                </div>
+              </a-radio>
+            </a-radio-group>
           </div>
           <ReportDetailTable
             v-if="item.value === ReportCardTypeEnum.SUB_PLAN_DETAIL"
@@ -226,7 +228,7 @@
             @cancel="() => handleCancelCustom(item)"
             @handle-set-save="setIsSave(false)"
           />
-        </MsCard>
+        </div>
       </div>
     </VueDraggable>
   </div>
@@ -240,7 +242,6 @@
   import { VueDraggable } from 'vue-draggable-plus';
 
   import MsChart from '@/components/pure/chart/index.vue';
-  import MsCard from '@/components/pure/ms-card/index.vue';
   import SingleStatusProgress from '@/views/test-plan/report/component/singleStatusProgress.vue';
   import CustomRichText from '@/views/test-plan/report/detail/component/custom-card/customRichText.vue';
   import ApiAndScenarioTable from '@/views/test-plan/report/detail/component/system-card/apiAndScenarioTable.vue';
@@ -254,7 +255,14 @@
   import SystemTrigger from '@/views/test-plan/report/detail/component/system-card/systemTrigger.vue';
 
   import { getReportLayout, updateReportDetail } from '@/api/modules/test-plan/report';
-  import { commonConfig, defaultCount, defaultReportDetail, seriesConfig, statusConfig } from '@/config/testPlan';
+  import {
+    commonConfig,
+    defaultCount,
+    defaultReportDetail,
+    seriesConfig,
+    statusConfig,
+    toolTipConfig,
+  } from '@/config/testPlan';
   import { useI18n } from '@/hooks/useI18n';
   import useLeaveUnSaveTip from '@/hooks/useLeaveUnSaveTip';
   import { addCommasToNumber } from '@/utils';
@@ -318,6 +326,9 @@
   // 功能用例分析
   const functionCaseOptions = ref({
     ...commonConfig,
+    tooltip: {
+      ...toolTipConfig,
+    },
     series: {
       ...seriesConfig,
       data: [
@@ -334,6 +345,9 @@
   // 接口用例分析
   const apiCaseOptions = ref({
     ...commonConfig,
+    tooltip: {
+      ...toolTipConfig,
+    },
     series: {
       ...seriesConfig,
       data: [
@@ -350,6 +364,9 @@
   // 场景用例分析
   const scenarioCaseOptions = ref({
     ...commonConfig,
+    tooltip: {
+      ...toolTipConfig,
+    },
     series: {
       ...seriesConfig,
       data: [
@@ -391,33 +408,6 @@
     scenarioCaseOptions.value.series.data = getPassRateData(apiScenarioCount);
   }
 
-  const reportAnalysisList = computed<ReportMetricsItemModel[]>(() => [
-    {
-      name: t('report.detail.threshold'),
-      value: detail.value.passThreshold,
-      unit: '%',
-      icon: 'threshold',
-    },
-    {
-      name: t('report.passRate'),
-      value: detail.value.passRate,
-      unit: '%',
-      icon: 'passRate',
-    },
-    {
-      name: t('report.detail.performCompletion'),
-      value: detail.value.executeRate,
-      unit: '%',
-      icon: 'passRate',
-    },
-    {
-      name: t('report.detail.totalDefects'),
-      value: addCommasToNumber(detail.value.bugCount),
-      unit: t('report.detail.number'),
-      icon: 'bugTotal',
-    },
-  ]);
-
   const functionCasePassRate = computed(() => {
     const apiCaseDetail = getSummaryDetail(detail.value.functionalCount || defaultCount);
     return apiCaseDetail.successRate;
@@ -435,6 +425,63 @@
   const functionalCaseTotal = computed(() => getSummaryDetail(detail.value.functionalCount).caseTotal);
   const apiCaseTotal = computed(() => getSummaryDetail(detail.value.apiCaseCount).caseTotal);
   const scenarioCaseTotal = computed(() => getSummaryDetail(detail.value.apiScenarioCount).caseTotal);
+
+  const reportAnalysisList = computed<ReportMetricsItemModel[]>(() => {
+    if (props.isGroup) {
+      return [
+        {
+          name: t('report.detail.testPlanTotal'),
+          value: detail.value.planCount,
+          unit: t('report.detail.number'),
+          icon: 'plan_total',
+        },
+        {
+          name: t('report.detail.testPlanCaseTotal'),
+          value: detail.value.caseTotal,
+          unit: t('report.detail.number'),
+          icon: 'case_total',
+        },
+        {
+          name: t('report.passRate'),
+          value: detail.value.passRate,
+          unit: '%',
+          icon: 'passRate',
+        },
+        {
+          name: t('report.detail.totalDefects'),
+          value: addCommasToNumber(detail.value.bugCount),
+          unit: t('report.detail.number'),
+          icon: 'bugTotal',
+        },
+      ];
+    }
+    return [
+      {
+        name: t('report.detail.threshold'),
+        value: detail.value.passThreshold,
+        unit: '%',
+        icon: 'threshold',
+      },
+      {
+        name: t('report.passRate'),
+        value: detail.value.passRate,
+        unit: '%',
+        icon: 'passRate',
+      },
+      {
+        name: t('report.detail.performCompletion'),
+        value: detail.value.executeRate,
+        unit: '%',
+        icon: 'passRate',
+      },
+      {
+        name: t('report.detail.totalDefects'),
+        value: addCommasToNumber(detail.value.bugCount),
+        unit: t('report.detail.number'),
+        icon: 'bugTotal',
+      },
+    ];
+  });
 
   function showItem(item: configItem) {
     switch (item.value) {
@@ -479,6 +526,7 @@
       innerCardList.value = result;
       originLayoutInfo.value = cloneDeep(result);
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.log(error);
     }
   }
@@ -545,6 +593,10 @@
 
   const currentMode = ref<string>('drawer');
 
+  function handleModeChange(value: string | number | boolean, ev: Event) {
+    currentMode.value = value as string;
+  }
+
   function getColor(index: number, type: string) {
     if (type === 'top' && index === 0) {
       return ['text-[rgb(var(--primary-3))]'];
@@ -607,6 +659,7 @@
       currentItem.enableEdit = false;
       emit('updateSuccess');
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.log(error);
     }
   }
@@ -616,7 +669,6 @@
       ...currentItem,
       ...formValue,
     };
-
     innerCardList.value = innerCardList.value.map((item: configItem) => {
       if (item.id === currentItem.id) {
         return {
@@ -647,11 +699,6 @@
   .block-title {
     @apply mb-4 font-medium;
   }
-  .config-right-container {
-    padding: 16px;
-    width: calc(100% - 300px);
-    background: var(--color-bg-3);
-  }
   .analysis-wrapper {
     @apply mb-4 grid items-center gap-4;
     .analysis {
@@ -661,12 +708,16 @@
       box-shadow: 0 0 10px rgba(120 56 135/ 5%);
       @apply rounded-xl bg-white;
       .charts {
-        top: 36%;
+        @apply absolute text-center;
+
+        top: 50%;
         right: 0;
         bottom: 0;
-        left: 0;
+        left: 50%;
         z-index: 99;
-        margin: auto;
+        width: 70px;
+        height: 42px;
+        transform: translateY(-50%) translateX(-50%);
       }
     }
     &[data-cards='2'],
@@ -696,6 +747,7 @@
   .drag-container {
     .card-item {
       position: relative;
+      width: 100%;
       border: 1px solid transparent;
       border-radius: 12px;
       .action {
@@ -727,5 +779,12 @@
       border: 1px solid rgb(var(--primary-5));
       background: var(--color-text-n9);
     }
+  }
+  .wrapper-preview-card {
+    display: flex;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgb(120 56 135 / 5%);
+    @apply flex-col bg-white;
   }
 </style>

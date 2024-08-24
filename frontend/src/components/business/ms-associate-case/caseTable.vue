@@ -33,8 +33,7 @@
       <CaseLevel :case-level="filterContent.value" />
     </template>
     <template #caseLevel="{ record }">
-      <CaseLevel v-if="record.caseLevel" :case-level="record.caseLevel" />
-      <span v-else>-</span>
+      <CaseLevel :case-level="record.caseLevel" />
     </template>
     <template #[FilterSlotNameEnum.CASE_MANAGEMENT_EXECUTE_RESULT]="{ filterContent }">
       <ExecuteResult :execute-result="filterContent.value" />
@@ -50,7 +49,6 @@
 
 <script setup lang="ts">
   import { ref } from 'vue';
-  import { TableData } from '@arco-design/web-vue';
 
   import MsButton from '@/components/pure/ms-button/index.vue';
   import MsBaseTable from '@/components/pure/ms-table/base-table.vue';
@@ -75,7 +73,11 @@
   import useModuleSelection from './useModuleSelection';
   import { getPublicLinkCaseListMap } from './utils/page';
   import { casePriorityOptions } from '@/views/api-test/components/config';
-  import { executionResultMap, statusIconMap } from '@/views/case-management/caseManagementFeature/components/utils';
+  import {
+    executionResultMap,
+    getCaseLevels,
+    statusIconMap,
+  } from '@/views/case-management/caseManagementFeature/components/utils';
 
   const { openNewPage } = useOpenNewPage();
 
@@ -227,14 +229,6 @@
     return getPublicLinkCaseListMap[props.getPageApiType][props.activeSourceType];
   });
 
-  function getCaseLevel(record: TableData) {
-    if (record.customFields && record.customFields.length) {
-      const caseItem = record.customFields.find((item: any) => item.fieldName === '用例等级' && item.internal);
-      return caseItem?.options.find((item: any) => item.value === caseItem?.defaultValue)?.text;
-    }
-    return undefined;
-  }
-
   const { propsRes, propsEvent, loadList, setLoadListParams, resetFilterParams, setTableSelected } = useTable(
     getPageList.value,
     {
@@ -250,7 +244,7 @@
     (record) => {
       return {
         ...record,
-        caseLevel: getCaseLevel(record),
+        caseLevel: getCaseLevels(record.customFields),
       };
     }
   );

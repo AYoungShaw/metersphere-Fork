@@ -84,6 +84,10 @@ export default {
   'common.pleaseSelect': '请选择',
   'common.quickAddMember': '快速添加成员',
   'common.export': '导出',
+  'common.exporting': '正在导出',
+  'common.exportSuccessful': '导出成功',
+  'common.exportFailed': '导出失败',
+  'common.downloadFile': '下载文件',
   'common.import': '导入',
   'common.collapseAll': '收起全部',
   'common.expandAll': '展开全部',
@@ -203,4 +207,5 @@ export default {
   'common.inputPleaseEnterTags': '请输入更新标签回车添加，不得超过64字符',
   'common.cutSuccess': '剪切成功',
   'common.copySuccessToClipboard': '已复制到剪切板',
+  'common.casePriority': '用例等级',
 };

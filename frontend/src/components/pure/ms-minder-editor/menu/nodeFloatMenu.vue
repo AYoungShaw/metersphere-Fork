@@ -18,7 +18,7 @@
         @change="(val) => handleTagChange(val as string)"
       >
         <a-radio v-for="tag of currentNodeTags" :key="tag" :value="tag">{{ tag }}</a-radio>
-        <a-radio v-for="tag of tags" :key="tag" :value="tag">{{ tag }}</a-radio>
+        <a-radio v-for="tag of tags.filter((e) => e !== currentNodeTags[0])" :key="tag" :value="tag">{{ tag }}</a-radio>
       </a-radio-group>
       <a-dropdown
         v-if="props.insertSiblingMenus.length > 0"
@@ -137,26 +137,26 @@
           <a-doption v-if="props.canShowEnterNode" value="enterNode">
             <div class="flex items-center">
               <div>{{ t('minder.hotboxMenu.enterNode') }}</div>
-              <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl+ Enter)</div>
+              <div class="ml-[4px] text-[var(--color-text-4)]">(<MsCtrlOrCommand /> + Enter)</div>
             </div>
           </a-doption>
           <template v-if="props.canShowMoreMenuNodeOperation">
             <a-doption value="copy">
               <div class="flex items-center">
                 <div>{{ t('minder.hotboxMenu.copy') }}</div>
-                <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + C)</div>
+                <div class="ml-[4px] text-[var(--color-text-4)]">(<MsCtrlOrCommand /> + C)</div>
               </div>
             </a-doption>
             <a-doption value="cut">
               <div class="flex items-center">
                 <div>{{ t('minder.hotboxMenu.cut') }}</div>
-                <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + X)</div>
+                <div class="ml-[4px] text-[var(--color-text-4)]">(<MsCtrlOrCommand /> + X)</div>
               </div>
             </a-doption>
             <a-doption v-if="props.canShowPasteMenu && minderStore.clipboard.length > 0" value="paste">
               <div class="flex items-center">
                 <div>{{ t('minder.hotboxMenu.paste') }}</div>
-                <div class="ml-[4px] text-[var(--color-text-4)]">(Ctrl + V)</div>
+                <div class="ml-[4px] text-[var(--color-text-4)]">(<MsCtrlOrCommand /> + V)</div>
               </div>
             </a-doption>
             <a-doption value="delete">
@@ -190,6 +190,7 @@
   import { TriggerPopupTranslate } from '@arco-design/web-vue';
 
   import MsButton from '@/components/pure/ms-button/index.vue';
+  import MsCtrlOrCommand from '@/components/pure/ms-ctrl-or-command';
   import MsIcon from '@/components/pure/ms-icon-font/index.vue';
 
   import { useI18n } from '@/hooks/useI18n';
@@ -251,8 +252,13 @@
           await sleep(300); // 拖拽完毕后会有 300ms 的动画，等待动画结束后再计算
           nodePosition = window.minder.getSelectedNode()?.getRenderBox();
         }
-        if (nodePosition && isNodeInMinderView(undefined, nodePosition, nodePosition.width / 2)) {
-          // 判断节点在脑图可视区域内且遮挡的节点不超过节点宽度的一半，则显示菜单
+        const state = window.editor.fsm.state();
+        if (
+          nodePosition &&
+          isNodeInMinderView(undefined, nodePosition, Math.min(nodePosition.width / 2, 200)) &&
+          state !== 'input'
+        ) {
+          // 判断节点在脑图可视区域内且遮挡的节点不超过节点宽度的一半(超过 200px 则按 200px 算)且当前不是编辑名称状态，则显示菜单
           const nodeDomHeight = nodePosition.height || 0;
           menuPopupOffset.value = [nodePosition.x, nodePosition.y + nodeDomHeight + 4]; // 菜单显示在节点下方4px处
           menuVisible.value = true;

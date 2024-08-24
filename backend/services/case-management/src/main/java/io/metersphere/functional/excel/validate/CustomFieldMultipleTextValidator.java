@@ -54,11 +54,10 @@ public class CustomFieldMultipleTextValidator extends AbstractCustomFieldValidat
 
     @Override
     public Object parse2Value(String keyOrValuesStr, TemplateCustomFieldDTO customField) {
-        if (StringUtils.isBlank(keyOrValuesStr)) {
+        if (StringUtils.isBlank(keyOrValuesStr) || StringUtils.equals(keyOrValuesStr, "[]")) {
             return JSON.toJSONString(new ArrayList<>());
         }
-        List<String> keyOrValues = parse2Array(keyOrValuesStr);
-
-        return JSON.toJSONString(keyOrValues);
+        String keyOrValues = String.join(",", JSON.parseArray(keyOrValuesStr));
+        return keyOrValues;
     }
 }

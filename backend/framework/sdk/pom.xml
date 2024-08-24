@@ -155,6 +155,16 @@
             </exclusions>
         </dependency>
 
+        <!-- jsonNode xml 格式转换 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-xml</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+        </dependency>
+
         <!--        minio -->
         <dependency>
             <groupId>io.minio</groupId>

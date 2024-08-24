@@ -1,16 +1,15 @@
 package io.metersphere.functional.controller;
 
-import io.metersphere.functional.domain.FunctionalCase;
-import io.metersphere.functional.domain.FunctionalCaseAttachment;
-import io.metersphere.functional.domain.FunctionalCaseAttachmentExample;
-import io.metersphere.functional.domain.FunctionalCaseCustomField;
+import io.metersphere.functional.domain.*;
 import io.metersphere.functional.dto.CaseCustomFieldDTO;
 import io.metersphere.functional.dto.FunctionalCaseAttachmentDTO;
 import io.metersphere.functional.dto.FunctionalCasePageDTO;
 import io.metersphere.functional.dto.response.FunctionalCaseImportResponse;
 import io.metersphere.functional.excel.domain.FunctionalCaseHeader;
+import io.metersphere.functional.mapper.ExportTaskMapper;
 import io.metersphere.functional.mapper.FunctionalCaseAttachmentMapper;
 import io.metersphere.functional.mapper.FunctionalCaseCustomFieldMapper;
+import io.metersphere.functional.mapper.FunctionalCaseMapper;
 import io.metersphere.functional.request.*;
 import io.metersphere.functional.result.CaseManagementResultCode;
 import io.metersphere.functional.utils.FileBaseUtils;
@@ -84,7 +83,9 @@ public class FunctionalCaseControllerTests extends BaseTest {
     public static final String FUNCTIONAL_CASE_POS_URL = "/functional/case/edit/pos";
     public static final String DOWNLOAD_EXCEL_TEMPLATE_URL = "/functional/case/download/excel/template/";
     public static final String CHECK_EXCEL_URL = "/functional/case/pre-check/excel";
+    public static final String CHECK_XMIND_URL = "/functional/case/pre-check/xmind";
     public static final String IMPORT_EXCEL_URL = "/functional/case/import/excel";
+    public static final String IMPORT_XMIND_URL = "/functional/case/import/xmind";
     public static final String OPERATION_HISTORY_URL = "/functional/case/operation-history";
     public static final String EXPORT_EXCEL_URL = "/functional/case/export/excel";
     public static final String DOWNLOAD_XMIND_TEMPLATE_URL = "/functional/case/download/xmind/template/";
@@ -109,7 +110,12 @@ public class FunctionalCaseControllerTests extends BaseTest {
     @Resource
     private FunctionalCaseAttachmentMapper functionalCaseAttachmentMapper;
 
+    @Resource
+    private FunctionalCaseMapper functionalCaseMapper;
+
     protected static String functionalCaseId;
+    @Resource
+    private ExportTaskMapper exportTaskMapper;
 
 
     @Test
@@ -397,6 +403,14 @@ public class FunctionalCaseControllerTests extends BaseTest {
         this.requestMultipart(FUNCTIONAL_CASE_UPDATE_URL, paramMap);
 
         editRequest.setTextDescription("adfadsasfdf");
+        paramMap = new LinkedMultiValueMap<>();
+        paramMap.add("request", JSON.toJSONString(editRequest));
+        paramMap.add("files", files);
+        this.requestMultipart(FUNCTIONAL_CASE_UPDATE_URL, paramMap);
+
+        editRequest.setExpectedResult("adfadsasfdf");
+        editRequest.setPrerequisite("adfadsasfdf");
+        editRequest.setDescription("adfadsasfdf");
         paramMap = new LinkedMultiValueMap<>();
         paramMap.add("request", JSON.toJSONString(editRequest));
         paramMap.add("files", files);
@@ -774,6 +788,148 @@ public class FunctionalCaseControllerTests extends BaseTest {
         this.requestMultipart(IMPORT_EXCEL_URL, paramMap);
     }
 
+
+    @Test
+    @Order(19)
+    public void testImportXmind() throws Exception {
+        FunctionalCaseImportRequest request = new FunctionalCaseImportRequest();
+        request.setCover(true);
+        request.setProjectId("100001100001");
+        request.setCount("1");
+        LinkedMultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
+
+        String filePath = Objects.requireNonNull(this.getClass().getClassLoader().getResource("file/1xml.xmind")).getPath();
+        MockMultipartFile file = new MockMultipartFile("file", "11.xmind", MediaType.APPLICATION_OCTET_STREAM_VALUE, FileBaseUtils.getFileBytes(filePath));
+        paramMap.add("request", JSON.toJSONString(request));
+        paramMap.add("file", file);
+        MvcResult functionalCaseMvcResult = this.requestMultipartWithOkAndReturn(IMPORT_XMIND_URL, paramMap);
+
+        String functionalCaseImportResponseData = functionalCaseMvcResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        ResultHolder functionalCaseResultHolder = JSON.parseObject(functionalCaseImportResponseData, ResultHolder.class);
+        FunctionalCaseImportResponse functionalCaseImportResponse = JSON.parseObject(JSON.toJSONString(functionalCaseResultHolder.getData()), FunctionalCaseImportResponse.class);
+        Assertions.assertNotNull(functionalCaseImportResponse);
+
+        FunctionalCaseExample functionalCaseExample = new FunctionalCaseExample();
+        functionalCaseExample.createCriteria().andNameEqualTo("用例名称");
+        List<FunctionalCase> functionalCases = functionalCaseMapper.selectByExample(functionalCaseExample);
+        Assertions.assertNotNull(functionalCases);
+
+        String filePath5 = Objects.requireNonNull(this.getClass().getClassLoader().getResource("file/2module.xmind")).getPath();
+        MockMultipartFile file5 = new MockMultipartFile("file", "15.xmind", MediaType.APPLICATION_OCTET_STREAM_VALUE, FileBaseUtils.getFileBytes(filePath5));
+        paramMap = new LinkedMultiValueMap<>();
+        paramMap.add("request", JSON.toJSONString(request));
+        paramMap.add("file", file5);
+        functionalCaseMvcResult =  this.requestMultipartWithOkAndReturn(IMPORT_XMIND_URL, paramMap);
+        functionalCaseImportResponseData = functionalCaseMvcResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        functionalCaseResultHolder = JSON.parseObject(functionalCaseImportResponseData, ResultHolder.class);
+        functionalCaseImportResponse = JSON.parseObject(JSON.toJSONString(functionalCaseResultHolder.getData()), FunctionalCaseImportResponse.class);
+        Assertions.assertNotNull(functionalCaseImportResponse);
+        functionalCaseExample = new FunctionalCaseExample();
+        functionalCaseExample.createCriteria().andNameLike("%" + "用例名称"+"%");
+        functionalCases = functionalCaseMapper.selectByExample(functionalCaseExample);
+        Assertions.assertNotNull(functionalCases);
+
+        String filePath1 = Objects.requireNonNull(this.getClass().getClassLoader().getResource("file/3erro.xmind")).getPath();
+        MockMultipartFile file1 = new MockMultipartFile("file", "14.xmind", MediaType.APPLICATION_OCTET_STREAM_VALUE, FileBaseUtils.getFileBytes(filePath1));
+        paramMap = new LinkedMultiValueMap<>();
+        paramMap.add("request", JSON.toJSONString(request));
+        paramMap.add("file", file1);
+        functionalCaseMvcResult = this.requestMultipartWithOkAndReturn(IMPORT_XMIND_URL, paramMap);
+        functionalCaseImportResponseData = functionalCaseMvcResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        functionalCaseResultHolder = JSON.parseObject(functionalCaseImportResponseData, ResultHolder.class);
+        functionalCaseImportResponse = JSON.parseObject(JSON.toJSONString(functionalCaseResultHolder.getData()), FunctionalCaseImportResponse.class);
+        Assertions.assertNotNull(functionalCaseImportResponse);
+
+        String filePath4 = Objects.requireNonNull(this.getClass().getClassLoader().getResource("file/empty.xmind")).getPath();
+        MockMultipartFile file2 = new MockMultipartFile("file", "18.xmind", MediaType.APPLICATION_OCTET_STREAM_VALUE, FileBaseUtils.getFileBytes(filePath4));
+        paramMap = new LinkedMultiValueMap<>();
+        paramMap.add("request", JSON.toJSONString(request));
+        paramMap.add("file", file2);
+        functionalCaseMvcResult = this.requestMultipartWithOkAndReturn(IMPORT_XMIND_URL, paramMap);
+        functionalCaseImportResponseData = functionalCaseMvcResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        functionalCaseResultHolder = JSON.parseObject(functionalCaseImportResponseData, ResultHolder.class);
+        functionalCaseImportResponse = JSON.parseObject(JSON.toJSONString(functionalCaseResultHolder.getData()), FunctionalCaseImportResponse.class);
+        Assertions.assertNotNull(functionalCaseImportResponse);
+
+        paramMap = new LinkedMultiValueMap<>();
+        paramMap.add("request", JSON.toJSONString(request));
+        paramMap.add("file", null);
+        this.requestMultipart(IMPORT_XMIND_URL, paramMap).andExpect(status().is5xxServerError());
+
+        request.setCount(null);
+        paramMap = new LinkedMultiValueMap<>();
+        paramMap.add("request", JSON.toJSONString(request));
+        paramMap.add("file", file2);
+        this.requestMultipart(IMPORT_XMIND_URL, paramMap).andExpect(status().is5xxServerError());
+    }
+
+    @Test
+    @Order(20)
+    public void testPreCheckImportXmind() throws Exception {
+        FunctionalCaseImportRequest request = new FunctionalCaseImportRequest();
+        request.setCover(true);
+        request.setProjectId("100001100001");
+        request.setCount("1");
+        LinkedMultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
+
+        String filePath = Objects.requireNonNull(this.getClass().getClassLoader().getResource("file/1xml.xmind")).getPath();
+        MockMultipartFile file = new MockMultipartFile("file", "11.xmind", MediaType.APPLICATION_OCTET_STREAM_VALUE, FileBaseUtils.getFileBytes(filePath));
+        paramMap.add("request", JSON.toJSONString(request));
+        paramMap.add("file", file);
+        MvcResult functionalCaseMvcResult = this.requestMultipartWithOkAndReturn(CHECK_XMIND_URL, paramMap);
+
+        String functionalCaseImportResponseData = functionalCaseMvcResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        ResultHolder functionalCaseResultHolder = JSON.parseObject(functionalCaseImportResponseData, ResultHolder.class);
+        FunctionalCaseImportResponse functionalCaseImportResponse = JSON.parseObject(JSON.toJSONString(functionalCaseResultHolder.getData()), FunctionalCaseImportResponse.class);
+        Assertions.assertNotNull(functionalCaseImportResponse);
+        System.out.println(JSON.toJSONString(functionalCaseImportResponse));
+
+
+
+        String filePath5 = Objects.requireNonNull(this.getClass().getClassLoader().getResource("file/2module.xmind")).getPath();
+        MockMultipartFile file5 = new MockMultipartFile("file", "15.xmind", MediaType.APPLICATION_OCTET_STREAM_VALUE, FileBaseUtils.getFileBytes(filePath5));
+        paramMap = new LinkedMultiValueMap<>();
+        paramMap.add("request", JSON.toJSONString(request));
+        paramMap.add("file", file5);
+        functionalCaseMvcResult =  this.requestMultipartWithOkAndReturn(CHECK_XMIND_URL, paramMap);
+        functionalCaseImportResponseData = functionalCaseMvcResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        functionalCaseResultHolder = JSON.parseObject(functionalCaseImportResponseData, ResultHolder.class);
+        functionalCaseImportResponse = JSON.parseObject(JSON.toJSONString(functionalCaseResultHolder.getData()), FunctionalCaseImportResponse.class);
+        Assertions.assertNotNull(functionalCaseImportResponse);
+        System.out.println(JSON.toJSONString(functionalCaseImportResponse));
+
+
+        String filePath1 = Objects.requireNonNull(this.getClass().getClassLoader().getResource("file/3erro.xmind")).getPath();
+        MockMultipartFile file1 = new MockMultipartFile("file", "14.xmind", MediaType.APPLICATION_OCTET_STREAM_VALUE, FileBaseUtils.getFileBytes(filePath1));
+        paramMap = new LinkedMultiValueMap<>();
+        paramMap.add("request", JSON.toJSONString(request));
+        paramMap.add("file", file1);
+        functionalCaseMvcResult = this.requestMultipartWithOkAndReturn(CHECK_XMIND_URL, paramMap);
+        functionalCaseImportResponseData = functionalCaseMvcResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        functionalCaseResultHolder = JSON.parseObject(functionalCaseImportResponseData, ResultHolder.class);
+        functionalCaseImportResponse = JSON.parseObject(JSON.toJSONString(functionalCaseResultHolder.getData()), FunctionalCaseImportResponse.class);
+        Assertions.assertNotNull(functionalCaseImportResponse);
+        System.out.println(JSON.toJSONString(functionalCaseImportResponse.getErrorMessages()));
+
+        String filePath4 = Objects.requireNonNull(this.getClass().getClassLoader().getResource("file/empty.xmind")).getPath();
+        MockMultipartFile file2 = new MockMultipartFile("file", "18.xmind", MediaType.APPLICATION_OCTET_STREAM_VALUE, FileBaseUtils.getFileBytes(filePath4));
+        paramMap = new LinkedMultiValueMap<>();
+        paramMap.add("request", JSON.toJSONString(request));
+        paramMap.add("file", file2);
+        functionalCaseMvcResult = this.requestMultipartWithOkAndReturn(CHECK_XMIND_URL, paramMap);
+        functionalCaseImportResponseData = functionalCaseMvcResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        functionalCaseResultHolder = JSON.parseObject(functionalCaseImportResponseData, ResultHolder.class);
+        functionalCaseImportResponse = JSON.parseObject(JSON.toJSONString(functionalCaseResultHolder.getData()), FunctionalCaseImportResponse.class);
+        Assertions.assertNotNull(functionalCaseImportResponse);
+        System.out.println(JSON.toJSONString(functionalCaseImportResponse));
+
+        paramMap = new LinkedMultiValueMap<>();
+        paramMap.add("request", JSON.toJSONString(request));
+        paramMap.add("file", null);
+        this.requestMultipart(CHECK_XMIND_URL, paramMap).andExpect(status().is5xxServerError());
+
+    }
+
     @Test
     @Order(22)
     public void operationHistoryList() throws Exception {
@@ -857,10 +1013,29 @@ public class FunctionalCaseControllerTests extends BaseTest {
     @Test
     @Order(24)
     public void downloadFile() throws Exception {
-        mockMvc.perform(MockMvcRequestBuilders.get(DOWNLOAD_FILE_URL + DEFAULT_PROJECT_ID + "/" + "123142342")
+        download("12222");
+        ExportTask exportTask = new ExportTask();
+        exportTask.setId("12314234222");
+        exportTask.setProjectId(DEFAULT_PROJECT_ID);
+        exportTask.setFileId("123142342");
+        exportTask.setFileType("xlsx");
+        exportTask.setType("CASE");
+        exportTask.setState("SUCCESS");
+        exportTask.setCreateTime(System.currentTimeMillis());
+        exportTask.setCreateUser("admin");
+        exportTask.setUpdateUser("admin");
+        exportTask.setUpdateTime(System.currentTimeMillis());
+        exportTaskMapper.insertSelective(exportTask);
+        download("123142342");
+
+    }
+
+    private void download(String fileId) throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get(DOWNLOAD_FILE_URL + DEFAULT_PROJECT_ID + "/" + fileId)
                 .header(SessionConstants.HEADER_TOKEN, sessionId)
                 .header(SessionConstants.CSRF_TOKEN, csrfToken));
     }
+
 
     @Test
     @Order(25)
@@ -900,7 +1075,7 @@ public class FunctionalCaseControllerTests extends BaseTest {
         }};
         request.setOtherFields(otherHeaders);
 
-        request.setFileId("123142342");
+        request.setFileId("1231423421");
         this.requestPost(EXPORT_XMIND_URL, request);
         request.setSelectIds(new ArrayList<>());
         this.requestPost(EXPORT_XMIND_URL, request);
@@ -911,7 +1086,7 @@ public class FunctionalCaseControllerTests extends BaseTest {
     @Test
     @Order(4)
     public void checkExportTask() throws Exception {
-        this.requestGetExcel( EXPORT_XMIND_CHECK_URL);
+        this.requestGetExcel(EXPORT_XMIND_CHECK_URL);
     }
 
 }

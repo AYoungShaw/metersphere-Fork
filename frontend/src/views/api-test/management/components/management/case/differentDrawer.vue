@@ -12,63 +12,93 @@
     <template #title>
       <div class="flex w-full items-center justify-between">
         <div>{{ t('case.apiAndCaseDiff') }}</div>
-        <div class="flex items-center text-[14px]">
-          <div class="-mt-[2px] mr-[8px]"> {{ t('case.syncItem') }}</div>
-          <a-checkbox-group v-model="checkType">
-            <a-checkbox v-for="item of checkList" :key="item.value" :value="item.value">
-              <div class="flex items-center"
-                >{{ item.label }}
 
-                <a-tooltip v-if="item.tooltip" :content="item.tooltip" position="top">
-                  <div class="flex items-center">
-                    <icon-question-circle
-                      class="ml-[4px] text-[var(--color-text-4)] hover:text-[rgb(var(--primary-5))]"
-                      size="16"
-                    />
-                  </div>
-                </a-tooltip>
-              </div>
-            </a-checkbox>
-          </a-checkbox-group>
-          <a-divider direction="vertical" :margin="0" class="!mr-[8px]"></a-divider>
-          <a-switch
-            v-model:model-value="form.ignoreApiChange"
-            :before-change="(val) => changeIgnore(val)"
-            size="small"
-          />
-          <div class="ml-[8px]">{{ t('case.ignoreAllChange') }}</div>
-          <a-divider direction="vertical" :margin="8"></a-divider>
-          <a-switch v-model:model-value="form.deleteRedundantParam" size="small" />
-          <div class="ml-[8px] font-normal text-[var(--color-text-1)]">{{ t('case.deleteNotCorrespondValue') }}</div>
-          <a-divider direction="vertical" :margin="0" class="!ml-[8px]"></a-divider>
+        <div class="flex items-center text-[14px]">
+          <div v-if="hasAnyPermission(['PROJECT_API_DEFINITION_CASE:READ+UPDATE'])" class="flex items-center">
+            <div v-if="showSyncConfig" class="-mt-[2px] mr-[8px]"> {{ t('case.syncItem') }}</div>
+            <a-checkbox-group v-if="showSyncConfig" v-model="checkType">
+              <a-checkbox v-for="item of checkList" :key="item.value" :value="item.value">
+                <div class="flex items-center">
+                  {{ item.label }}
+                  <a-tooltip v-if="item.tooltip" :content="item.tooltip" position="top">
+                    <div class="flex items-center">
+                      <icon-question-circle
+                        class="ml-[4px] text-[var(--color-text-4)] hover:text-[rgb(var(--primary-5))]"
+                        size="16"
+                      />
+                    </div>
+                  </a-tooltip>
+                </div>
+              </a-checkbox>
+            </a-checkbox-group>
+            <a-divider v-if="showSyncConfig" direction="vertical" :margin="0" class="!mr-[8px]" />
+            <a-switch
+              v-model:model-value="form.ignoreApiChange"
+              :before-change="(val) => changeIgnore(val)"
+              size="small"
+            />
+            <div class="ml-[8px]">{{ t('case.ignoreAllChange') }}</div>
+            <a-divider direction="vertical" :margin="8"></a-divider>
+            <a-switch v-if="showSyncConfig" v-model:model-value="form.deleteRedundantParam" size="small" />
+            <div v-if="showSyncConfig" class="ml-[8px] font-normal text-[var(--color-text-1)]">
+              {{ t('case.deleteNotCorrespondValue') }}
+            </div>
+            <a-divider v-if="showSyncConfig" direction="vertical" :margin="0" class="!ml-[8px]" />
+          </div>
           <a-button class="mx-[12px]" type="secondary" @click="cancel">{{ t('common.cancel') }}</a-button>
-          <a-button class="mr-[12px]" type="outline" @click="clearThisChangeHandler">
+          <a-button
+            v-if="showSyncConfig && hasAnyPermission(['PROJECT_API_DEFINITION_CASE:READ+UPDATE'])"
+            class="mr-[12px]"
+            type="outline"
+            @click="clearThisChangeHandler"
+          >
             {{ t('case.ignoreThisChange') }}
           </a-button>
-          <a-button type="primary" :loading="syncLoading" :disabled="!checkType.length" @click="confirmSync">
-            {{ t('case.apiSyncChange') }}
+          <a-button
+            v-permission="['PROJECT_API_DEFINITION_CASE:READ+UPDATE']"
+            type="primary"
+            :loading="syncLoading"
+            :disabled="!checkType.length"
+            @click="confirmSync"
+          >
+            {{
+              showSyncConfig && hasAnyPermission(['PROJECT_API_DEFINITION_CASE:READ+UPDATE'])
+                ? t('case.apiSyncChange')
+                : t('common.confirm')
+            }}
           </a-button>
         </div>
       </div>
     </template>
     <!-- 图例 -->
     <div class="legend-container">
-      <div class="item mr-[24px]">
-        <div class="legend add"></div>
-        {{ t('case.diffAdd') }}
-      </div>
-      <div class="item">
-        <div class="legend delete"></div>
-        {{ t('common.delete') }}
+      <div class="flex items-center">
+        <div class="item mr-[8px]">
+          <div class="legend add"></div>
+          {{ t('case.diffAdd') }}
+        </div>
+        <div class="item">
+          <div class="legend delete"></div>
+          {{ t('common.delete') }}
+        </div>
       </div>
     </div>
     <!-- 对比 -->
     <div class="diff-container">
       <MsCard simple auto-height no-content-padding>
-        <a-spin class="h-full w-full p-4" :loading="loading">
+        <a-spin class="min-h-[calc(100vh-110px)] w-full p-4" :loading="loading">
           <div class="diff-normal">
             <div class="diff-item">
-              <div class="title-type"> [{{ apiDetailInfo?.num }}] {{ apiDetailInfo?.name }} </div>
+              <div class="flex">
+                <a-tooltip
+                  :content="`【${apiDetailInfo?.num}】${apiDetailInfo?.name}`"
+                  :mouse-enter-delay="300"
+                  position="br"
+                >
+                  <div class="title-type one-line-text"> [{{ apiDetailInfo?.num }}] {{ apiDetailInfo?.name }} </div>
+                </a-tooltip>
+              </div>
+
               <DiffItem
                 :diff-distance-map="diffDistanceMap"
                 mode="add"
@@ -76,12 +106,19 @@
                 :detail="apiDefinedRequest as RequestParam"
               />
             </div>
-            <div class="diff-item ml-[24px]">
-              <div class="title-type"> [{{ caseDetail?.num }}] {{ caseDetail?.name }} </div>
+            <div class="diff-item">
+              <div class="flex">
+                <a-tooltip
+                  :content="`【${caseDetail?.num}】${caseDetail?.name}`"
+                  :mouse-enter-delay="300"
+                  position="br"
+                >
+                  <div class="title-type one-line-text"> [{{ caseDetail?.num }}] {{ caseDetail?.name }} </div>
+                </a-tooltip>
+              </div>
               <DiffItem :diff-distance-map="diffDistanceMap" mode="delete" :detail="caseDetail as RequestParam" />
             </div>
           </div>
-
           <DiffRequestBody
             :defined-detail="apiDefinedRequest as RequestParam"
             :case-detail="caseDetail as RequestParam"
@@ -101,19 +138,20 @@
   import MsDrawer from '@/components/pure/ms-drawer/index.vue';
   import { TabItem } from '@/components/pure/ms-editable-tab/types';
   import DiffItem from './diffItem.vue';
-  import DiffRequestBody from './diffRequestBody.vue';
 
   import {
     clearThisChange,
     diffDataRequest,
     getCaseDetail,
     getDefinitionDetail,
+    getSyncedCaseDetail,
     ignoreEveryTimeChange,
   } from '@/api/modules/api-test/management';
   import { useI18n } from '@/hooks/useI18n';
+  import { hasAnyPermission } from '@/utils/permission';
 
   import { EnableKeyValueParam, ExecuteRequestCommonParam } from '@/models/apiTest/common';
-  import type { syncItem } from '@/models/apiTest/management';
+  import type { diffSyncParams, syncItem } from '@/models/apiTest/management';
   import { ApiDefinitionDetail } from '@/models/apiTest/management';
   import { RequestBodyFormat, RequestComposition } from '@/enums/apiEnum';
 
@@ -122,6 +160,8 @@
 
   const { t } = useI18n();
 
+  const DiffRequestBody = defineAsyncComponent(() => import('./diffRequestBody.vue'));
+
   const props = defineProps<{
     activeApiCaseId: string;
     activeDefinedId: string;
@@ -129,8 +169,9 @@
 
   const emit = defineEmits<{
     (e: 'close'): void;
-    (e: 'clearThisChange'): void;
-    (e: 'sync', activeDefinedId: string): void;
+    (e: 'clearThisChange', isEvery: boolean): void;
+    (e: 'sync', mergeRequest: RequestParam): void;
+    (e: 'loadList'): void;
   }>();
 
   const showDiffVisible = defineModel<boolean>('visible', {
@@ -165,40 +206,73 @@
       query: false,
       rest: false,
     },
-    noticeApiCaseCreator: true,
-    noticeApiScenarioCreator: true,
     ignoreApiChange: false,
   };
 
-  const checkType = ref([]);
+  const initCheckList = [
+    RequestComposition.HEADER,
+    RequestComposition.BODY,
+    RequestComposition.QUERY,
+    RequestComposition.REST,
+  ];
+
+  const checkType = ref([...initCheckList]);
 
   const form = ref({ ...initForm });
 
-  function cancel() {
-    showDiffVisible.value = false;
-    emit('close');
-  }
   const syncLoading = ref<boolean>(false);
-  // 同步
-  function confirmSync() {
-    // 处理同步类型参数
-    checkType.value.forEach((e: any) => {
-      const key = e.toLowerCase() as keyof syncItem;
-      form.value.syncItems[key] = true;
-    });
-
-    emit('sync', props.activeDefinedId);
-    showDiffVisible.value = false;
-  }
 
   const defaultCaseParams = inject<RequestParam>('defaultCaseParams');
   const caseDetail = ref<Record<string, any>>({});
 
   const apiDetailInfo = ref<Record<string, any>>({});
   const apiDefinedRequest = ref<Record<string, any>>({});
-
+  const syncCaseDetail = ref<Record<string, any>>({});
   const diffDistanceMap = ref<Record<string, any>>({});
 
+  // 获取用例详情
+  async function getCaseDetailInfo(id: string) {
+    try {
+      const res = await getCaseDetail(id);
+      syncCaseDetail.value = res;
+      const result = await diffDataRequest(id);
+      const { caseRequest, apiRequest } = result;
+      caseDetail.value = {
+        ...caseDetail.value,
+        ...caseRequest,
+        num: caseDetail.value.num,
+      };
+      apiDefinedRequest.value = apiRequest;
+      let parseRequestBodyResult;
+      if (res.protocol === 'HTTP') {
+        parseRequestBodyResult = parseRequestBodyFiles(res.request.body); // 解析请求体中的文件，将详情中的文件 id 集合收集，更新时以判断文件是否删除以及是否新上传的文件
+      }
+      caseDetail.value = {
+        ...cloneDeep(defaultCaseParams as RequestParam),
+        ...({
+          ...res,
+          ...caseRequest,
+          num: res.num,
+          url: res.path,
+          ...parseRequestBodyResult,
+        } as Partial<TabItem>),
+      };
+      form.value.ignoreApiChange = caseDetail.value.ignoreApiChange;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    }
+  }
+
+  async function getApiDetail(apiDefinitionId: string) {
+    try {
+      const detail = await getDefinitionDetail(apiDefinitionId);
+      apiDetailInfo.value = detail as ApiDefinitionDetail;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    }
+  }
   /**
    * 设置对比
    * @params apiValue  接口数据
@@ -318,48 +392,6 @@
     getBodyData(RequestBodyFormat.FORM_DATA);
     getBodyData(RequestBodyFormat.WWW_FORM);
   }
-  // 获取用例详情
-  async function getCaseDetailInfo(id: string) {
-    try {
-      const res = await getCaseDetail(id);
-      const result = await diffDataRequest(id);
-      const { caseRequest, apiRequest } = result;
-      caseDetail.value = {
-        ...caseDetail.value,
-        ...caseRequest,
-        num: caseDetail.value.num,
-      };
-      apiDefinedRequest.value = apiRequest;
-      let parseRequestBodyResult;
-      if (res.protocol === 'HTTP') {
-        parseRequestBodyResult = parseRequestBodyFiles(res.request.body); // 解析请求体中的文件，将详情中的文件 id 集合收集，更新时以判断文件是否删除以及是否新上传的文件
-      }
-      caseDetail.value = {
-        ...cloneDeep(defaultCaseParams as RequestParam),
-        ...({
-          ...res,
-          ...caseRequest,
-          num: res.num,
-          url: res.path,
-          ...parseRequestBodyResult,
-        } as Partial<TabItem>),
-      };
-      form.value.ignoreApiChange = caseDetail.value.ignoreApiChange;
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.log(error);
-    }
-  }
-
-  async function getApiDetail(apiDefinitionId: string) {
-    try {
-      const detail = await getDefinitionDetail(apiDefinitionId);
-      apiDetailInfo.value = detail as ApiDefinitionDetail;
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.log(error);
-    }
-  }
 
   const loading = ref<boolean>(false);
   async function getRequestDetail(definedId: string, apiCaseId: string) {
@@ -374,26 +406,84 @@
       loading.value = false;
     }
   }
+
+  const ignoreThisChangeLoading = ref(false);
   // 忽略并清除本次变更
   async function clearThisChangeHandler() {
     if (props.activeApiCaseId) {
+      ignoreThisChangeLoading.value = true;
       try {
         await clearThisChange(props.activeApiCaseId);
         getRequestDetail(props.activeDefinedId, props.activeApiCaseId);
-        emit('clearThisChange');
+        emit('clearThisChange', true);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.log(error);
+      } finally {
+        ignoreThisChangeLoading.value = false;
       }
     }
   }
+
+  async function cancel() {
+    if (!caseDetail.value.inconsistentWithApi) {
+      try {
+        await clearThisChange(props.activeApiCaseId);
+        emit('loadList');
+      } catch (error) {
+        console.log(error);
+      }
+    }
+    form.value = { ...initForm };
+    checkType.value = [...initCheckList];
+    showDiffVisible.value = false;
+    emit('close');
+  }
+
+  // 是否显示配置项
+  const showSyncConfig = computed(() => caseDetail.value.inconsistentWithApi && !form.value.ignoreApiChange);
+
+  // 同步
+  async function confirmSync() {
+    if (
+      !caseDetail.value.inconsistentWithApi ||
+      form.value.ignoreApiChange ||
+      !hasAnyPermission(['PROJECT_API_DEFINITION_CASE:READ+UPDATE'])
+    ) {
+      cancel();
+      return;
+    }
+    syncLoading.value = true;
+    try {
+      // 处理同步类型参数
+      checkType.value.forEach((e: any) => {
+        const key = e.toLowerCase() as keyof syncItem;
+        form.value.syncItems[key] = true;
+      });
+      const { id, request } = syncCaseDetail.value;
+
+      const params: diffSyncParams = {
+        ...form.value,
+        apiCaseRequest: request,
+        id,
+      };
+      const mergeRequest = await getSyncedCaseDetail(params);
+      emit('sync', mergeRequest);
+      cancel();
+    } catch (error) {
+      console.log(error);
+    } finally {
+      syncLoading.value = false;
+    }
+  }
+
   // 忽略每次变更
   async function changeIgnore(newValue: string | number | boolean) {
     try {
       await ignoreEveryTimeChange(props.activeApiCaseId, newValue as boolean);
+      await getRequestDetail(props.activeDefinedId, props.activeApiCaseId);
       Message.success(newValue ? t('case.eachHasBeenIgnored') : t('case.eachHasBeenIgnoredClosed'));
-      getRequestDetail(props.activeDefinedId, props.activeApiCaseId);
-      emit('clearThisChange');
+      emit('clearThisChange', false);
       return false;
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -432,7 +522,8 @@
     padding: 0 16px;
     min-height: calc(100vh - 110px);
     .diff-normal {
-      @apply flex;
+      gap: 24px;
+      @apply grid grid-cols-2;
       .diff-item {
         @apply flex-1;
         .title-type {

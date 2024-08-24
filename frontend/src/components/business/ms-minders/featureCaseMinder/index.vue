@@ -16,6 +16,7 @@
       :can-show-enter-node="canShowEnterNode"
       :insert-sibling-menus="insertSiblingMenus"
       :insert-son-menus="insertSonMenus"
+      :can-show-more-menu-node-operation="canShowMoreMenuNodeOperation()"
       :can-show-paste-menu="!stopPaste()"
       :can-show-more-menu="canShowMoreMenu()"
       :can-show-priority-menu="canShowPriorityMenu()"
@@ -30,7 +31,7 @@
       single-tag
       tag-enable
       sequence-enable
-      @content-change="handleContentChange"
+      @content-change="handleMinderNodeContentChange"
       @node-select="handleNodeSelect"
       @action="handleAction"
       @before-exec-command="handleBeforeExecCommand"
@@ -147,6 +148,7 @@
     handleContentChange,
     replaceableTags,
     priorityDisableCheck,
+    canShowMoreMenuNodeOperation,
   } = useMinderBaseApi({ hasEditPermission });
   const importJson = ref<MinderJson>({
     root: {} as MinderJsonNode,
@@ -212,7 +214,6 @@
       };
       importJson.value.treePath = [];
       clearSelectedNodes();
-      window.minder.importJson(importJson.value);
       if (props.moduleId !== 'all') {
         // 携带具体的模块 ID 加载时，进入该模块内
         nextTick(() => {
@@ -270,6 +271,17 @@
     return fullTabList.filter((item) => item.value === 'baseInfo');
   });
   const activeExtraKey = ref<'baseInfo' | 'attachment' | 'comments' | 'bug'>('baseInfo');
+
+  function handleMinderNodeContentChange(node?: MinderJsonNode) {
+    if (extraVisible.value) {
+      // 已打开用例详情抽屉，更改用例节点文本时同步更新抽屉内的用例名称
+      activeCase.value = {
+        ...activeCase.value,
+        name: node?.data?.text || window.minder.getNodeById(activeCase.value.id)?.data?.text || '',
+      };
+    }
+    handleContentChange(node);
+  }
 
   const fileList = ref<MsFileItem[]>([]);
   const checkUpdateFileIds = ref<string[]>([]);
@@ -603,6 +615,7 @@
       }
       // 用例下面所有节点都展开
       expendNodeAndChildren(node);
+      node.layout();
     } else if (data?.resource?.includes(moduleTag) && data.count > 0 && data.isLoaded !== true) {
       // 模块节点且有用例且未加载过用例数据
       await initNodeCases(node);
@@ -677,6 +690,18 @@
                 id: node.data?.id || '',
                 type: 'NONE',
               });
+            } else if (caseOffspringTags.some((e) => node.data?.resource?.includes(e))) {
+              // 用例下的子孙节点的移除，标记用例节点变化
+              const parentCase = tempMinderParams.value.updateCaseList.find((e) => e.id !== node.data?.id);
+              if (!parentCase) {
+                if (node.parent?.data?.resource?.includes(caseTag)) {
+                  // 第二层子节点
+                  node.parent.data.changed = true;
+                } else if (node.parent?.parent?.data?.resource?.includes(caseTag)) {
+                  // 第三层子节点
+                  node.parent.parent.data.changed = true;
+                }
+              }
             } else if (!caseOffspringTags.some((e) => node.data?.resource?.includes(e))) {
               // 非用例下的子孙节点的移除，才加入删除资源队列
               tempMinderParams.value.deleteResourceList.push({
@@ -714,6 +739,7 @@
   function customBatchExpand(node: MinderJsonNode) {
     if (node.data?.resource?.includes(caseTag)) {
       expendNodeAndChildren(node);
+      node.layout();
     }
   }
 
@@ -859,6 +885,36 @@
             ...getNodeMoveInfo(nodeIndex, parent as MinderJsonNode),
           });
         }
+      } else if (node.data.resource?.includes(caseTag)) {
+        // 处理用例节点（直接更改用例子孙节点可能没触发用例节点变化）
+        let hasChangedSubNode = false;
+        traverseTree(node.children, (child) => {
+          if (child.data?.changed === true) {
+            hasChangedSubNode = true;
+            return false;
+          }
+          return true;
+        });
+        if (hasChangedSubNode) {
+          const caseNodeInfo = getCaseNodeInfo(node as MinderJsonNode);
+          let caseBaseInfo;
+          if (activeCase.value.id === node.data.id) {
+            // 当前用例节点是打开的用例详情，获取用例详情数据
+            caseBaseInfo = baseInfoRef.value?.makeParams();
+          }
+          tempMinderParams.value.updateCaseList.push({
+            id: node.data.id,
+            moduleId: parent?.data.id || '',
+            type: 'UPDATE',
+            templateId: templateId.value,
+            tags: caseBaseInfo?.tags || [],
+            customFields: caseBaseInfo?.customFields || [],
+            name: caseBaseInfo?.name || node.data.text,
+            ...getNodeMoveInfo(nodeIndex, parent as MinderJsonNode),
+            ...caseNodeInfo,
+          });
+        }
+        return false; // 用例的子孙节点已经处理过，跳过
       }
       return true;
     });

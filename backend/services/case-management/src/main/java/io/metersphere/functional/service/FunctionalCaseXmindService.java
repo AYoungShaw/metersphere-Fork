@@ -9,7 +9,7 @@ import io.metersphere.functional.socket.ExportWebSocketHandler;
 import io.metersphere.functional.xmind.domain.FunctionalCaseXmindDTO;
 import io.metersphere.functional.xmind.domain.FunctionalCaseXmindData;
 import io.metersphere.functional.xmind.utils.XmindExportUtil;
-import io.metersphere.sdk.constants.ModuleConstants;
+import io.metersphere.sdk.constants.LocalRepositoryDir;
 import io.metersphere.sdk.constants.MsgType;
 import io.metersphere.sdk.dto.ExportMsgDTO;
 import io.metersphere.sdk.exception.MSException;
@@ -17,13 +17,19 @@ import io.metersphere.sdk.util.JSON;
 import io.metersphere.sdk.util.LogUtils;
 import io.metersphere.sdk.util.Translator;
 import io.metersphere.system.constants.ExportConstants;
+import io.metersphere.system.domain.User;
 import io.metersphere.system.dto.sdk.BaseTreeNode;
 import io.metersphere.system.dto.sdk.TemplateCustomFieldDTO;
+import io.metersphere.system.log.dto.LogDTO;
+import io.metersphere.system.log.service.OperationLogService;
 import io.metersphere.system.manager.ExportTaskManager;
+import io.metersphere.system.mapper.UserMapper;
+import io.metersphere.system.service.NoticeSendService;
 import io.metersphere.system.uid.IDGenerator;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +66,12 @@ public class FunctionalCaseXmindService {
     @Resource
     private FunctionalCaseLogService functionalCaseLogService;
     private static final String XMIND = "xmind";
+    @Resource
+    private OperationLogService operationLogService;
+    @Resource
+    private NoticeSendService noticeSendService;
+    @Resource
+    private UserMapper userMapper;
 
     public void downloadXmindTemplate(String projectId, HttpServletResponse response) {
         List<TemplateCustomFieldDTO> customFields = functionalCaseFileService.getCustomFields(projectId);
@@ -95,9 +107,11 @@ public class FunctionalCaseXmindService {
      *
      * @param request
      */
-    public void exportFunctionalCaseXmind(FunctionalCaseExportRequest request, String userId) {
+    public String exportFunctionalCaseXmind(FunctionalCaseExportRequest request, String userId, String orgId) {
         try {
-            exportTaskManager.exportAsyncTask(request.getProjectId(), request.getFileId(), userId, ExportConstants.ExportType.CASE.toString(), request, t -> exportXmind(request, userId));
+            functionalCaseFileService.exportCheck(request, userId);
+            ExportTask exportTask = exportTaskManager.exportAsyncTask(request.getProjectId(), request.getFileId(), userId, ExportConstants.ExportType.CASE.toString(), request, t -> exportXmind(request, userId, orgId));
+            return exportTask.getId();
         } catch (InterruptedException e) {
             LogUtils.error("导出失败：" + e);
             throw new MSException(e);
@@ -105,23 +119,30 @@ public class FunctionalCaseXmindService {
 
     }
 
-    private String exportXmind(FunctionalCaseExportRequest request, String userId) {
+    private String exportXmind(FunctionalCaseExportRequest request, String userId, String orgId) {
         //获取导出的ids集合
         List<String> ids = functionalCaseService.doSelectIds(request, request.getProjectId());
         if (CollectionUtils.isEmpty(ids)) {
             return null;
         }
-
+        File dir = null;
+        File tmpFile = null;
         try {
+            User user = userMapper.selectByPrimaryKey(userId);
+            noticeSendService.setLanguage(user.getLanguage());
             FunctionalCaseXmindData xmindData = buildXmindData(ids, request);
-            File tmpFile = new File(getClass().getClassLoader().getResource(StringUtils.EMPTY).getPath() +
+            dir = new File(LocalRepositoryDir.getSystemTempDir());
+            if (!dir.exists() && !dir.mkdir()) {
+                throw new MSException(Translator.get("upload_fail"));
+            }
+            tmpFile = new File(LocalRepositoryDir.getSystemTempDir() +
                     File.separatorChar + EXPORT_CASE_TMP_DIR + "_" + IDGenerator.nextStr() + ".xmind");
             List<TemplateCustomFieldDTO> templateCustomFields = functionalCaseFileService.getCustomFields(request.getProjectId());
-            TemplateCustomFieldDTO templateCustomFieldDTO = templateCustomFields.stream().filter(item -> StringUtils.equalsIgnoreCase(item.getFieldName(), Translator.get("custom_field.functional_priority"))).findFirst().get();
-            XmindExportUtil.export(xmindData, request, tmpFile, templateCustomFieldDTO);
+            XmindExportUtil.export(xmindData, request, tmpFile, templateCustomFields);
             functionalCaseFileService.uploadFileToMinio(XMIND, tmpFile, request.getFileId());
 
-            functionalCaseLogService.exportExcelLog(request);
+            LogDTO logDTO = functionalCaseLogService.exportExcelLog(request, "xmind", userId, orgId);
+            operationLogService.add(logDTO);
             List<ExportTask> exportTasks = functionalCaseFileService.getExportTasks(request.getProjectId(), userId);
             String taskId;
             if (CollectionUtils.isNotEmpty(exportTasks)) {
@@ -130,15 +151,23 @@ public class FunctionalCaseXmindService {
             } else {
                 taskId = MsgType.CONNECT.name();
             }
-            ExportMsgDTO exportMsgDTO = new ExportMsgDTO(request.getFileId(), taskId, ids.size(), MsgType.CONNECT.name());
+            ExportMsgDTO exportMsgDTO = new ExportMsgDTO(request.getFileId(), taskId, ids.size(), true, MsgType.EXEC_RESULT.name());
             ExportWebSocketHandler.sendMessageSingle(exportMsgDTO);
         } catch (Exception e) {
             List<ExportTask> exportTasks = functionalCaseFileService.getExportTasks(request.getProjectId(), userId);
             if (CollectionUtils.isNotEmpty(exportTasks)) {
                 functionalCaseFileService.updateExportTask(ExportConstants.ExportState.ERROR.name(), exportTasks.getFirst().getId(), XMIND);
             }
+            ExportMsgDTO exportMsgDTO = new ExportMsgDTO(request.getFileId(), "", 0, false, MsgType.EXEC_RESULT.name());
+            ExportWebSocketHandler.sendMessageSingle(exportMsgDTO);
             LogUtils.error(e);
             throw new MSException(e);
+        } finally {
+            try {
+                FileUtils.delete(tmpFile);
+            } catch (Exception e) {
+                throw new MSException(e);
+            }
         }
         return null;
     }
@@ -163,14 +192,9 @@ public class FunctionalCaseXmindService {
             String moduleId = entry.getKey();
             List<FunctionalCase> dataList = entry.getValue();
             List<FunctionalCaseXmindDTO> dtos = buildXmindDTO(dataList, functionalCaseBlobMap, customFieldMap);
-            if (StringUtils.equals(moduleId, ModuleConstants.DEFAULT_NODE_ID)) {
-                xmindData.setFunctionalCaseList(dtos);
-            } else {
-                LinkedList<BaseTreeNode> returnList = new LinkedList<>();
-                LinkedList<BaseTreeNode> modulePathDataList = getModuleById(moduleId, tree, returnList);
-                xmindData.setItem(modulePathDataList, dtos);
-                System.out.println("modulePathDataList: " + modulePathDataList);
-            }
+            LinkedList<BaseTreeNode> returnList = new LinkedList<>();
+            LinkedList<BaseTreeNode> modulePathDataList = getModuleById(moduleId, tree, returnList);
+            xmindData.setItem(modulePathDataList, dtos);
         }
 
         return xmindData;
@@ -214,13 +238,13 @@ public class FunctionalCaseXmindService {
             dto.setNum(item.getNum().toString());
             dto.setProjectId(item.getProjectId());
             dto.setName(item.getName());
-            dto.setTags(item.getTags().toString());
+            dto.setTags(JSON.toJSONString(item.getTags()));
             dto.setCaseEditType(item.getCaseEditType());
             dto.setSteps(new String(functionalCaseBlob.getSteps() == null ? new byte[0] : functionalCaseBlob.getSteps(), StandardCharsets.UTF_8));
-            dto.setTextDescription(new String(functionalCaseBlob.getTextDescription() == null ? new byte[0] : functionalCaseBlob.getTextDescription(), StandardCharsets.UTF_8));
-            dto.setExpectedResult(new String(functionalCaseBlob.getExpectedResult() == null ? new byte[0] : functionalCaseBlob.getExpectedResult(), StandardCharsets.UTF_8));
-            dto.setPrerequisite(new String(functionalCaseBlob.getPrerequisite() == null ? new byte[0] : functionalCaseBlob.getPrerequisite(), StandardCharsets.UTF_8));
-            dto.setDescription(new String(functionalCaseBlob.getDescription() == null ? new byte[0] : functionalCaseBlob.getDescription(), StandardCharsets.UTF_8));
+            dto.setTextDescription(functionalCaseFileService.parseHtml(new String(functionalCaseBlob.getTextDescription() == null ? new byte[0] : functionalCaseBlob.getTextDescription(), StandardCharsets.UTF_8)));
+            dto.setExpectedResult(functionalCaseFileService.parseHtml(new String(functionalCaseBlob.getExpectedResult() == null ? new byte[0] : functionalCaseBlob.getExpectedResult(), StandardCharsets.UTF_8)));
+            dto.setPrerequisite(functionalCaseFileService.parseHtml(new String(functionalCaseBlob.getPrerequisite() == null ? new byte[0] : functionalCaseBlob.getPrerequisite(), StandardCharsets.UTF_8)));
+            dto.setDescription(functionalCaseFileService.parseHtml(new String(functionalCaseBlob.getDescription() == null ? new byte[0] : functionalCaseBlob.getDescription(), StandardCharsets.UTF_8)));
             dto.setCustomFieldDTOList(customFields);
             caseXmindDTOS.add(dto);
         });

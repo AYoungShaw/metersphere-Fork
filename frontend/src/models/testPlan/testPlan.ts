@@ -164,6 +164,14 @@ export interface TestPlanBaseParams {
   triggerMode?: string;
 }
 
+export interface CaseBugItem {
+  bugId: string;
+  id: string;
+  title: string;
+  type: string;
+  caseId: string;
+}
+
 export interface PlanDetailFeatureCaseItem {
   id: string;
   num: string;
@@ -182,13 +190,7 @@ export interface PlanDetailFeatureCaseItem {
   caseId: string;
   testPlanId: string;
   testPlanCollectionName: string; // 测试集名称
-  bugList: {
-    bugId: string;
-    id: string;
-    title: string;
-    type: string;
-    caseId: string;
-  }[];
+  bugList: CaseBugItem[];
 }
 
 export interface PlanDetailFeatureCaseListQueryParams extends TableQueryParams, TestPlanBaseParams {}
@@ -257,6 +259,7 @@ export interface PassRateCountDetail {
 
 // 执行历史
 export interface ExecuteHistoryItem {
+  id: string;
   status: string;
   content: string;
   contentText: string;
@@ -268,6 +271,8 @@ export interface ExecuteHistoryItem {
   steps: string;
   createTime: string;
   deleted: boolean;
+  caseEditType: string; // 类型是：步骤描述
+  showResult: boolean;
 }
 
 export interface moduleForm {

@@ -118,7 +118,10 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
     @Resource
     private ExtApiTestCaseMapper extApiTestCaseMapper;
 
-    public List<TestPlanResourceExecResultDTO> selectDistinctExecResultByProjectId(String projectId) {
+    private static final String EXECUTOR = "executeUserName";
+
+    @Override
+	public List<TestPlanResourceExecResultDTO> selectDistinctExecResultByProjectId(String projectId) {
         return extTestPlanApiCaseMapper.selectDistinctExecResult(projectId);
     }
 
@@ -235,6 +238,7 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
      * @return
      */
     public List<TestPlanApiCasePageResponse> hasRelateApiCaseList(TestPlanApiCaseRequest request, boolean deleted) {
+        filterCaseRequest(request);
         if (CollectionUtils.isEmpty(request.getProtocols())) {
             return new ArrayList<>();
         }
@@ -337,6 +341,7 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
         if (CollectionUtils.isEmpty(request.getProtocols())) {
             return Collections.emptyMap();
         }
+        filterCaseRequest(request);
         switch (request.getTreeType()) {
             case TreeTypeEnums.MODULE:
                 return getModuleCount(request);
@@ -643,6 +648,7 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
                 super.checkCollection(testPlan.getId(), apiCase.getCollectionId(), CaseType.API_CASE.getKey());
                 boolean selectAllModule = apiCase.getModules().isSelectAllModule();
                 Map<String, ModuleSelectDTO> moduleMaps = apiCase.getModules().getModuleMaps();
+                moduleMaps.remove(MODULE_ALL);
                 if (selectAllModule) {
                     // 选择了全部模块
                     List<ApiTestCase> apiTestCaseList = extApiTestCaseMapper.selectAllApiCase(isRepeat, apiCase.getModules().getProjectId(), testPlan.getId(), apiCase.getModules().getProtocols());
@@ -700,7 +706,6 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
             testPlanApiCase.setCreateTime(System.currentTimeMillis());
             testPlanApiCase.setCreateUser(user.getId());
             testPlanApiCase.setPos(nextOrder.getAndAdd(DEFAULT_NODE_INTERVAL_POS));
-            testPlanApiCase.setExecuteUser(apiTestCase.getCreateUser());
             testPlanApiCase.setLastExecResult(ExecStatus.PENDING.name());
             testPlanApiCaseList.add(testPlanApiCase);
         });
@@ -885,4 +890,18 @@ public class TestPlanApiCaseService extends TestPlanResourceService {
         return count;
     }
 
+    /**
+     * 处理执行人为空过滤参数
+     * @param request 请求参数
+     */
+    protected void filterCaseRequest(TestPlanApiCaseRequest request) {
+        Map<String, List<String>> filter = request.getFilter();
+        if (filter != null && filter.containsKey(EXECUTOR)) {
+            List<String> filterExecutorIds = filter.get(EXECUTOR);
+            if (CollectionUtils.isNotEmpty(filterExecutorIds)) {
+                boolean containNullKey = filterExecutorIds.removeIf(id -> StringUtils.equals(id, "-"));
+                request.setNullExecutorKey(containNullKey);
+            }
+        }
+    }
 }

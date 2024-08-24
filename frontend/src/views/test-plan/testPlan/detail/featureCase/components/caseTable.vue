@@ -12,7 +12,7 @@
         :search-placeholder="t('ms.case.associate.searchPlaceholder')"
         @keyword-search="loadCaseList()"
         @adv-search="loadCaseList()"
-        @refresh="handleRefreshAndInitModules()"
+        @refresh="handleRefreshAll"
       >
         <template v-if="props.treeType === 'MODULE'" #right>
           <a-radio-group
@@ -77,7 +77,12 @@
           </span>
         </template>
         <template #bugCount="{ record }">
-          <BugCountPopover :case-item="record" :can-edit="props.canEdit" @load-list="loadList" />
+          <BugCountPopover
+            :bug-list="record.bugList"
+            :bug-count="record.bugCount"
+            :can-edit="props.canEdit"
+            @load-list="loadList"
+          />
         </template>
         <template v-if="props.canEdit" #operation="{ record }">
           <MsButton
@@ -151,7 +156,7 @@
       :params="batchUpdateParams"
       :show-title-count="showType === 'list'"
       :batch-update-executor="batchUpdateCaseExecutor"
-      @load-list="resetSelectorAndCaseList"
+      @load-list="resetCaseList"
     />
     <!-- 批量移动 -->
     <BatchApiMoveModal
@@ -183,11 +188,11 @@
     MsTableProps,
   } from '@/components/pure/ms-table/type';
   import useTable from '@/components/pure/ms-table/useTable';
+  import BugCountPopover from '@/components/business/ms-bug-operation/bugCountPopover.vue';
   import CaseLevel from '@/components/business/ms-case-associate/caseLevel.vue';
   import ExecuteResult from '@/components/business/ms-case-associate/executeResult.vue';
   import { getMinderOperationParams } from '@/components/business/ms-minders/caseReviewMinder/utils';
   import MsTestPlanFeatureCaseMinder from '@/components/business/ms-minders/testPlanFeatureCaseMinder/index.vue';
-  import BugCountPopover from './bugCountPopover.vue';
   import BatchApiMoveModal from '@/views/test-plan/testPlan/components/batchApiMoveModal.vue';
   import BatchUpdateExecutorModal from '@/views/test-plan/testPlan/components/batchUpdateExecutorModal.vue';
   import ExecuteForm from '@/views/test-plan/testPlan/detail/featureCase/components/executeForm.vue';
@@ -304,6 +309,30 @@
       showDrag: true,
     },
     {
+      title: 'caseManagement.featureCase.tableColumnCreateTime',
+      slotName: 'createTime',
+      dataIndex: 'createTime',
+      showInTable: true,
+      sortable: {
+        sortDirections: ['ascend', 'descend'],
+        sorter: true,
+      },
+      width: 200,
+      showDrag: true,
+    },
+    {
+      title: 'caseManagement.featureCase.tableColumnUpdateTime',
+      slotName: 'updateTime',
+      dataIndex: 'updateTime',
+      sortable: {
+        sortDirections: ['ascend', 'descend'],
+        sorter: true,
+      },
+      showInTable: true,
+      width: 200,
+      showDrag: true,
+    },
+    {
       title: 'common.executionResult',
       dataIndex: 'lastExecResult',
       slotName: 'lastExecResult',
@@ -356,7 +385,7 @@
         loadOptionParams: {
           projectId: appStore.currentProjectId,
         },
-        remoteMethod: FilterRemoteMethodsEnum.PROJECT_PERMISSION_MEMBER,
+        remoteMethod: FilterRemoteMethodsEnum.EXECUTE_USER,
         placeholderText: t('caseManagement.featureCase.PleaseSelect'),
       },
     },
@@ -373,7 +402,7 @@
     scroll: { x: '100%' },
     tableKey: TableKeyEnum.TEST_PLAN_DETAIL_FEATURE_CASE_TABLE,
     showSetting: true,
-    heightUsed: 460,
+    heightUsed: 445,
     showSubdirectory: true,
     draggable: { type: 'handle' },
     draggableCondition: true,
@@ -549,7 +578,8 @@
     }
   }
 
-  async function handleRefreshAndInitModules() {
+  async function handleRefreshAll() {
+    emit('refresh');
     await initModules();
     refresh();
   }
@@ -585,14 +615,9 @@
   }
 
   function resetCaseList() {
-    resetSelector();
-    getModuleCount();
-    loadList();
-  }
-
-  function resetSelectorAndCaseList() {
     if (showType.value === 'list') {
       resetSelector();
+      getModuleCount();
       loadList();
     }
   }
@@ -709,8 +734,7 @@
         excludeIds: batchParams.value?.excludeIds || [],
       });
       Message.success(t('common.updateSuccess'));
-      resetSelector();
-      loadList();
+      resetCaseList();
       emit('refresh');
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -800,24 +824,19 @@
   :deep(.param-input:not(.arco-input-focus, .arco-select-view-focus)) {
     &:not(:hover) {
       border-color: transparent !important;
-
       .arco-input::placeholder {
         @apply invisible;
       }
-
       .arco-select-view-icon {
         @apply invisible;
       }
-
       .arco-select-view-value {
         color: var(--color-text-brand);
       }
     }
   }
-
   .list-show-type {
     padding: 0;
-
     :deep(.arco-radio-button-content) {
       padding: 4px 6px;
     }

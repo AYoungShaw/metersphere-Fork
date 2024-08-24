@@ -334,11 +334,6 @@
     }
   );
 
-  // 用例等级
-  function getCaseLevel(record: CaseManagementTable) {
-    return (record.customFields.find((item: any) => item.name === '用例等级')?.value as CaseLevel) || 'P1';
-  }
-
   const loading = ref(false);
 
   function cancel() {
